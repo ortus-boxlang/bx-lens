@@ -160,8 +160,8 @@ spotless {
 
 /**
  * Custom task that creates a build/module folders
- * - Copies the build/libs/bx-lens-*.jar to build/modules/bxLens/libs/
- * - Copies the src/main/bx/** to build/modules/bxLens/ folder.
+ * - Copies the build/libs/bx-lens-*.jar to build/modules/bx-lens/libs/
+ * - Copies the src/main/bx/** to build/modules/bx-lens/ folder.
  */
 task createModuleStructure(type: Copy) {
 	mustRunAfter shadowJar, jar
@@ -196,7 +196,7 @@ task createModuleStructure(type: Copy) {
 		}
     }
 
-    destinationDir = file( 'build/modules/bxLens' )
+    destinationDir = file( "build/modules/${project.name}" )
 }
 task zipModuleStructure( type: Zip ) {
     group = "distribution"
