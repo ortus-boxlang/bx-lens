@@ -39,7 +39,8 @@ public class SoapCollector extends BaseCollector {
 	public void onSOAPRequest( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			long				now		= System.currentTimeMillis();
 			Map<String, Object>	entry	= new LinkedHashMap<>();
@@ -61,10 +62,12 @@ public class SoapCollector extends BaseCollector {
 	public void onSOAPResponse( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			LensService svc = getLensService();
-			if ( svc != null ) svc.getStats().totalSoapCalls.incrementAndGet();
+			if ( svc != null )
+				svc.getStats().totalSoapCalls.incrementAndGet();
 
 			long	now			= System.currentTimeMillis();
 			Object	rawExecTime	= event.get( Key.of( "executionTime" ) );

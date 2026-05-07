@@ -39,10 +39,12 @@ public class LensStop extends BaseLensBIF {
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
 		LensRequestData data = getLensData( context );
-		if ( !isEnabled( data ) ) return null;
+		if ( !isEnabled( data ) )
+			return null;
 
 		int maxTimings = getModuleSettings().getAsInteger( KEY_MAX_TIMINGS );
-		if ( data.timings.size() >= maxTimings ) return null;
+		if ( data.timings.size() >= maxTimings )
+			return null;
 
 		String	labelOrHash	= arguments.getAsString( Key.of( "labelOrHash" ) );
 		String	found		= null;
@@ -60,7 +62,8 @@ public class LensStop extends BaseLensBIF {
 			}
 		}
 
-		if ( found == null ) return null;
+		if ( found == null )
+			return null;
 
 		Map<String, Object>	t			= data.pendingTimings.remove( found );
 		long				now			= System.currentTimeMillis();
@@ -71,7 +74,7 @@ public class LensStop extends BaseLensBIF {
 		    ? ( ( Number ) t.get( "offset" ) ).longValue()
 		    : 0L;
 
-		Map<String, Object> timing = new LinkedHashMap<>();
+		Map<String, Object>	timing		= new LinkedHashMap<>();
 		timing.put( "label", t.get( "label" ) );
 		timing.put( "executionTime", now - startTick );
 		timing.put( "offset", offset );

@@ -42,16 +42,18 @@ public class LensAddMeasure extends BaseLensBIF {
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
 		LensRequestData data = getLensData( context );
-		if ( !isEnabled( data ) ) return null;
+		if ( !isEnabled( data ) )
+			return null;
 
 		int maxTimings = getModuleSettings().getAsInteger( KEY_MAX_TIMINGS );
-		if ( data.timings.size() >= maxTimings ) return null;
+		if ( data.timings.size() >= maxTimings )
+			return null;
 
-		String	label			= arguments.getAsString( Key.of( "label" ) );
-		long	executionTime	= arguments.getAsLong( Key.of( "executionTime" ) );
-		long	offset			= arguments.getAsLong( Key.of( "offset" ) );
+		String				label			= arguments.getAsString( Key.of( "label" ) );
+		long				executionTime	= arguments.getAsLong( Key.of( "executionTime" ) );
+		long				offset			= arguments.getAsLong( Key.of( "offset" ) );
 
-		Map<String, Object> entry = new LinkedHashMap<>();
+		Map<String, Object>	entry			= new LinkedHashMap<>();
 		entry.put( "label", label );
 		entry.put( "executionTime", executionTime );
 		entry.put( "offset", offset > 0 ? offset : System.currentTimeMillis() - data.startedAt );

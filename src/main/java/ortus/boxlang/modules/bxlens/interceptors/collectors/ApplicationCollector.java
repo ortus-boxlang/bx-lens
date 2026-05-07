@@ -40,29 +40,35 @@ public class ApplicationCollector extends BaseCollector {
 	@InterceptionPoint
 	public void onRequestStart( IStruct event ) {
 		try {
-			IBoxContext	ctx			= getCtx( event );
-			if ( ctx == null ) return;
+			IBoxContext ctx = getCtx( event );
+			if ( ctx == null )
+				return;
 
-			LensService	svc			= getLensService();
-			if ( svc == null ) return;
+			LensService svc = getLensService();
+			if ( svc == null )
+				return;
 
-			IStruct		settings	= getModuleSettings();
-			boolean		enabled		= Boolean.TRUE.equals( settings.getOrDefault( Key.of( "enabled" ), Boolean.TRUE ) );
-			String		reqId		= svc.startRequest();
+			IStruct			settings	= getModuleSettings();
+			boolean			enabled		= Boolean.TRUE.equals( settings.getOrDefault( Key.of( "enabled" ), Boolean.TRUE ) );
+			String			reqId		= svc.startRequest();
 
-			LensRequestData data = LensRequestData.getOrCreate( ctx, reqId, enabled );
-			if ( data == null ) return;
+			LensRequestData	data		= LensRequestData.getOrCreate( ctx, reqId, enabled );
+			if ( data == null )
+				return;
 
 			// Capture HTTP method/URL safely (not available in CLI context)
 			try {
 				Object exchange = ctx.getClass().getMethod( "getHTTPExchange" ).invoke( ctx );
 				if ( exchange != null ) {
-					Object method	= exchange.getClass().getMethod( "getRequestMethod" ).invoke( exchange );
-					Object url		= exchange.getClass().getMethod( "getRequestURL" ).invoke( exchange );
-					if ( method != null ) data.method = method.toString();
-					if ( url != null ) data.url = url.toString();
+					Object	method	= exchange.getClass().getMethod( "getRequestMethod" ).invoke( exchange );
+					Object	url		= exchange.getClass().getMethod( "getRequestURL" ).invoke( exchange );
+					if ( method != null )
+						data.method = method.toString();
+					if ( url != null )
+						data.url = url.toString();
 				}
-			} catch ( Exception ignored ) {}
+			} catch ( Exception ignored ) {
+			}
 		} catch ( Exception e ) {
 			// Fail silently - never break a request due to lens
 		}
@@ -72,13 +78,14 @@ public class ApplicationCollector extends BaseCollector {
 	public void onRequestEnd( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null ) return;
+			if ( data == null )
+				return;
 
-			long		now			= System.currentTimeMillis();
+			long now = System.currentTimeMillis();
 			data.endedAt = now;
 			long		duration	= now - data.startedAt;
 
-			LensService svc = getLensService();
+			LensService	svc			= getLensService();
 			if ( svc != null ) {
 				svc.endRequest( duration );
 				data.globalStats = svc.getStats().snapshot();
@@ -92,7 +99,8 @@ public class ApplicationCollector extends BaseCollector {
 	public void onSessionStart( IStruct event ) {
 		try {
 			LensService svc = getLensService();
-			if ( svc != null ) svc.getStats().activeSessions.incrementAndGet();
+			if ( svc != null )
+				svc.getStats().activeSessions.incrementAndGet();
 		} catch ( Exception e ) {
 			// Fail silently
 		}
@@ -102,7 +110,8 @@ public class ApplicationCollector extends BaseCollector {
 	public void onSessionEnd( IStruct event ) {
 		try {
 			LensService svc = getLensService();
-			if ( svc != null ) svc.getStats().activeSessions.decrementAndGet();
+			if ( svc != null )
+				svc.getStats().activeSessions.decrementAndGet();
 		} catch ( Exception e ) {
 			// Fail silently
 		}
@@ -112,7 +121,8 @@ public class ApplicationCollector extends BaseCollector {
 	public void onApplicationStart( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			Map<String, Object> entry = new LinkedHashMap<>();
 			entry.put( "type", "applicationStart" );
@@ -128,7 +138,8 @@ public class ApplicationCollector extends BaseCollector {
 	public void onApplicationEnd( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			Map<String, Object> entry = new LinkedHashMap<>();
 			entry.put( "type", "applicationEnd" );

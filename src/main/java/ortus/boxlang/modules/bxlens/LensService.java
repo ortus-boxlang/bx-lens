@@ -50,11 +50,11 @@ import java.util.UUID;
  */
 public class LensService extends BaseService {
 
-	public static final Key		NAME		= Key.of( "bxLensService" );
-	public final GlobalStats	stats		= new GlobalStats();
+	public static final Key						NAME		= Key.of( "bxLensService" );
+	public final GlobalStats					stats		= new GlobalStats();
 
 	// Collector registry
-	private final Map<String, BaseCollector> collectors = Collections.synchronizedMap( new LinkedHashMap<>() );
+	private final Map<String, BaseCollector>	collectors	= Collections.synchronizedMap( new LinkedHashMap<>() );
 
 	public LensService( BoxRuntime runtime ) {
 		super( runtime, NAME );
@@ -120,16 +120,26 @@ public class LensService extends BaseService {
 		// Register optional collectors based on settings.collectors struct
 		IStruct collectorSettings = getCollectorSettings( settings );
 
-		if ( isCollectorEnabled( collectorSettings, "queries" ) ) registerCollector( new QueryCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "http" ) ) registerCollector( new HttpCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "soap" ) ) registerCollector( new SoapCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "messages" ) ) registerCollector( new MessageCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "timeline" ) ) registerCollector( new TimelineCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "exceptions" ) ) registerCollector( new ExceptionCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "bifCalls" ) ) registerCollector( new BifCallCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "functionCalls" ) ) registerCollector( new FunctionCallCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "scopes" ) ) registerCollector( new ScopesCollector(), settings );
-		if ( isCollectorEnabled( collectorSettings, "boxlangInfo" ) ) registerCollector( new BoxLangInfoCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "queries" ) )
+			registerCollector( new QueryCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "http" ) )
+			registerCollector( new HttpCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "soap" ) )
+			registerCollector( new SoapCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "messages" ) )
+			registerCollector( new MessageCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "timeline" ) )
+			registerCollector( new TimelineCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "exceptions" ) )
+			registerCollector( new ExceptionCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "bifCalls" ) )
+			registerCollector( new BifCallCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "functionCalls" ) )
+			registerCollector( new FunctionCallCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "scopes" ) )
+			registerCollector( new ScopesCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "boxlangInfo" ) )
+			registerCollector( new BoxLangInfoCollector(), settings );
 	}
 
 	/**
@@ -139,7 +149,8 @@ public class LensService extends BaseService {
 		for ( BaseCollector c : collectors.values() ) {
 			try {
 				runtime.getInterceptorService().unregister( c );
-			} catch ( Exception ignored ) {}
+			} catch ( Exception ignored ) {
+			}
 		}
 		collectors.clear();
 	}
@@ -157,15 +168,18 @@ public class LensService extends BaseService {
 	private IStruct getCollectorSettings( IStruct settings ) {
 		try {
 			Object raw = settings.getOrDefault( Key.of( "collectors" ), null );
-			if ( raw instanceof IStruct ) return ( IStruct ) raw;
-		} catch ( Exception ignored ) {}
+			if ( raw instanceof IStruct )
+				return ( IStruct ) raw;
+		} catch ( Exception ignored ) {
+		}
 		return ortus.boxlang.runtime.types.Struct.of();
 	}
 
 	private boolean isCollectorEnabled( IStruct collectorSettings, String name ) {
 		try {
 			Object val = collectorSettings.getOrDefault( Key.of( name ), Boolean.TRUE );
-			if ( val instanceof Boolean ) return ( Boolean ) val;
+			if ( val instanceof Boolean )
+				return ( Boolean ) val;
 			if ( val instanceof IStruct ) {
 				// scopes is a struct with an "enabled" sub-key
 				Object enabled = ( ( IStruct ) val ).getOrDefault( Key.of( "enabled" ), Boolean.TRUE );

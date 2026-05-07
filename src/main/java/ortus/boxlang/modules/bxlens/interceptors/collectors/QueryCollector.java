@@ -39,11 +39,14 @@ public class QueryCollector extends BaseCollector {
 	public void postQueryExecute( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
-			if ( data.queries.size() >= getMaxSetting( "maxQueries", 100 ) ) return;
+			if ( data == null || !data.enabled )
+				return;
+			if ( data.queries.size() >= getMaxSetting( "maxQueries", 100 ) )
+				return;
 
 			LensService svc = getLensService();
-			if ( svc != null ) svc.getStats().totalQueries.incrementAndGet();
+			if ( svc != null )
+				svc.getStats().totalQueries.incrementAndGet();
 
 			Map<String, Object> entry = new LinkedHashMap<>();
 			entry.put( "sql", event.getOrDefault( Key.of( "sql" ), "" ) );

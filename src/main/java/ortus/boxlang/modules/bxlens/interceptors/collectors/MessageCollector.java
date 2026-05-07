@@ -43,7 +43,8 @@ public class MessageCollector extends BaseCollector {
 	 * Called directly from LensMessage BIF.
 	 */
 	public static void addMessage( LensRequestData data, String message, String type ) {
-		if ( data == null || !data.enabled ) return;
+		if ( data == null || !data.enabled )
+			return;
 		Map<String, Object> entry = new LinkedHashMap<>();
 		entry.put( "message", message );
 		entry.put( "type", type );

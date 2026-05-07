@@ -38,14 +38,16 @@ public class ScopesCollector extends BaseCollector {
 	public void onRequestEnd( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			IBoxContext ctx = getCtx( event );
-			if ( ctx == null ) return;
+			if ( ctx == null )
+				return;
 
-			IStruct settings = getModuleSettings();
-			Object	rawCollectors = settings.getOrDefault( Key.of( "collectors" ), null );
-			IStruct	scopeSettings = null;
+			IStruct	settings		= getModuleSettings();
+			Object	rawCollectors	= settings.getOrDefault( Key.of( "collectors" ), null );
+			IStruct	scopeSettings	= null;
 
 			if ( rawCollectors instanceof IStruct ) {
 				Object rawScopes = ( ( IStruct ) rawCollectors ).getOrDefault( Key.of( "scopes" ), null );
@@ -54,9 +56,9 @@ public class ScopesCollector extends BaseCollector {
 				}
 			}
 
-			boolean captureForm		= scopeSettings == null || Boolean.TRUE.equals( scopeSettings.getOrDefault( Key.of( "form" ), Boolean.TRUE ) );
-			boolean captureSession	= scopeSettings != null && Boolean.TRUE.equals( scopeSettings.getOrDefault( Key.of( "session" ), Boolean.FALSE ) );
-			boolean captureRequest	= scopeSettings != null && Boolean.TRUE.equals( scopeSettings.getOrDefault( Key.of( "request" ), Boolean.FALSE ) );
+			boolean	captureForm		= scopeSettings == null || Boolean.TRUE.equals( scopeSettings.getOrDefault( Key.of( "form" ), Boolean.TRUE ) );
+			boolean	captureSession	= scopeSettings != null && Boolean.TRUE.equals( scopeSettings.getOrDefault( Key.of( "session" ), Boolean.FALSE ) );
+			boolean	captureRequest	= scopeSettings != null && Boolean.TRUE.equals( scopeSettings.getOrDefault( Key.of( "request" ), Boolean.FALSE ) );
 
 			if ( captureForm ) {
 				data.formScope = captureScope( ctx, Key.of( "form" ) );
@@ -78,7 +80,8 @@ public class ScopesCollector extends BaseCollector {
 			if ( scope != null ) {
 				return Struct.fromMap( scope );
 			}
-		} catch ( Exception ignored ) {}
+		} catch ( Exception ignored ) {
+		}
 		return Struct.of();
 	}
 

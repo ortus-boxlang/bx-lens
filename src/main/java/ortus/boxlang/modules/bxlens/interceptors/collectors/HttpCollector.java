@@ -39,7 +39,8 @@ public class HttpCollector extends BaseCollector {
 	public void onHTTPRequest( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			long				now		= System.currentTimeMillis();
 			Map<String, Object>	entry	= new LinkedHashMap<>();
@@ -62,10 +63,12 @@ public class HttpCollector extends BaseCollector {
 	public void onHTTPResponse( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
-			LensService	svc			= getLensService();
-			if ( svc != null ) svc.getStats().totalHttpCalls.incrementAndGet();
+			LensService svc = getLensService();
+			if ( svc != null )
+				svc.getStats().totalHttpCalls.incrementAndGet();
 
 			String	url			= ( String ) event.getOrDefault( Key.of( "url" ), "" );
 			long	now			= System.currentTimeMillis();

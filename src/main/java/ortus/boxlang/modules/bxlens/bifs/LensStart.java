@@ -37,10 +37,11 @@ public class LensStart extends BaseLensBIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		String label = arguments.getAsString( Key.of( "label" ) );
+		String			label	= arguments.getAsString( Key.of( "label" ) );
 
-		LensRequestData data = getLensData( context );
-		if ( !isEnabled( data ) ) return label;
+		LensRequestData	data	= getLensData( context );
+		if ( !isEnabled( data ) )
+			return label;
 
 		long				now		= System.currentTimeMillis();
 		String				hash	= label + "_" + UUID.randomUUID().toString();

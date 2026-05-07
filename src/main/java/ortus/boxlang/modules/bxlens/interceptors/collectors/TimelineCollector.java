@@ -38,14 +38,16 @@ public class TimelineCollector extends BaseCollector {
 	public void preTemplateInvoke( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			long	now		= System.currentTimeMillis();
 
 			// Nesting depth = number of currently pending template entries
-			int depth = 0;
+			int		depth	= 0;
 			for ( Map<String, Object> t : data.templates ) {
-				if ( Boolean.TRUE.equals( t.get( "_pending" ) ) ) depth++;
+				if ( Boolean.TRUE.equals( t.get( "_pending" ) ) )
+					depth++;
 			}
 
 			Map<String, Object> entry = new LinkedHashMap<>();
@@ -65,8 +67,10 @@ public class TimelineCollector extends BaseCollector {
 	public void postTemplateInvoke( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
-			if ( data.templates.size() >= getMaxSetting( "maxTemplates", 200 ) ) return;
+			if ( data == null || !data.enabled )
+				return;
+			if ( data.templates.size() >= getMaxSetting( "maxTemplates", 200 ) )
+				return;
 
 			String	path		= event.getOrDefault( Key.of( "templatePath" ), "" ).toString();
 			long	now			= System.currentTimeMillis();

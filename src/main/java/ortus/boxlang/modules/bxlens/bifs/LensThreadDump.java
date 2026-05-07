@@ -35,7 +35,8 @@ public class LensThreadDump extends BaseLensBIF {
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
 		LensService svc = getLensService();
-		if ( svc == null ) return "LensService is not available";
+		if ( svc == null )
+			return "LensService is not available";
 
 		Long threadId = arguments.getAsLong( Key.of( "threadId" ) );
 		if ( threadId != null ) {

@@ -23,8 +23,8 @@ import ortus.boxlang.runtime.scopes.Key;
  */
 public class KeyDictionary {
 
-	public static final Key moduleName	= new Key( "bxLens" );
-	public static final Key lensData	= new Key( "__bxLensData__" );
+	public static final Key	moduleName	= new Key( "bxLens" );
+	public static final Key	lensData	= new Key( "__bxLensData__" );
 
 	/**
 	 * Retrieve the LensService from the global service registry.

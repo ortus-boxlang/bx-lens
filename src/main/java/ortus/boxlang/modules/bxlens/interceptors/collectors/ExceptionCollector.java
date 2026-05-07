@@ -39,16 +39,20 @@ public class ExceptionCollector extends BaseCollector {
 	public void onException( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
-			if ( data.exceptions.size() >= getMaxSetting( "maxExceptions", 50 ) ) return;
+			if ( data == null || !data.enabled )
+				return;
+			if ( data.exceptions.size() >= getMaxSetting( "maxExceptions", 50 ) )
+				return;
 
 			Object rawEx = event.get( Key.of( "exception" ) );
-			if ( rawEx == null ) return;
+			if ( rawEx == null )
+				return;
 
-			IStruct ex = rawEx instanceof IStruct ? ( IStruct ) rawEx : null;
+			IStruct		ex	= rawEx instanceof IStruct ? ( IStruct ) rawEx : null;
 
-			LensService svc = getLensService();
-			if ( svc != null ) svc.getStats().totalExceptions.incrementAndGet();
+			LensService	svc	= getLensService();
+			if ( svc != null )
+				svc.getStats().totalExceptions.incrementAndGet();
 
 			Map<String, Object> entry = new LinkedHashMap<>();
 			entry.put( "type", ex != null ? ex.getOrDefault( Key.of( "type" ), "unknown" ) : "unknown" );

@@ -50,7 +50,8 @@ public class LensDumpHeap extends BaseLensBIF {
 		}
 
 		LensService svc = getLensService();
-		if ( svc == null ) throw new RuntimeException( "LensDumpHeap: LensService is not available" );
+		if ( svc == null )
+			throw new RuntimeException( "LensDumpHeap: LensService is not available" );
 
 		try {
 			return svc.dumpHeap( outputPath );

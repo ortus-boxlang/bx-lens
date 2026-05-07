@@ -51,13 +51,14 @@ public class LensCollector extends BaseInterceptor {
 	@InterceptionPoint
 	public void onRequestStart( IStruct event ) {
 		IBoxContext ctx = getContext( event );
-		if ( ctx == null ) return;
+		if ( ctx == null )
+			return;
 
 		IStruct		settings	= getSettings();
 		LensService	svc			= getLensService();
 		String		reqId		= svc.startRequest();
 
-		IStruct variables = Struct.of(
+		IStruct		variables	= Struct.of(
 		    "form", Struct.of(),
 		    "url", Struct.of(),
 		    "cgi", Struct.of(),
@@ -66,7 +67,7 @@ public class LensCollector extends BaseInterceptor {
 		    "application", Struct.of()
 		);
 
-		IStruct lensData = Struct.of(
+		IStruct		lensData	= Struct.of(
 		    "requestId", reqId,
 		    "enabled", settings.getAsBoolean( Key.of( "enabled" ) ),
 		    "startedAt", System.currentTimeMillis(),
@@ -91,12 +92,15 @@ public class LensCollector extends BaseInterceptor {
 		try {
 			Object exchange = ctx.getClass().getMethod( "getHTTPExchange" ).invoke( ctx );
 			if ( exchange != null ) {
-				Object method = exchange.getClass().getMethod( "getRequestMethod" ).invoke( exchange );
-				Object url = exchange.getClass().getMethod( "getRequestURL" ).invoke( exchange );
-				if ( method != null ) lensData.put( "method", method.toString() );
-				if ( url != null ) lensData.put( "url", url.toString() );
+				Object	method	= exchange.getClass().getMethod( "getRequestMethod" ).invoke( exchange );
+				Object	url		= exchange.getClass().getMethod( "getRequestURL" ).invoke( exchange );
+				if ( method != null )
+					lensData.put( "method", method.toString() );
+				if ( url != null )
+					lensData.put( "url", url.toString() );
 			}
-		} catch ( Exception ignored ) {}
+		} catch ( Exception ignored ) {
+		}
 
 		ctx.putAttachment( KeyDictionary.lensData, lensData );
 	}
@@ -108,18 +112,20 @@ public class LensCollector extends BaseInterceptor {
 	@InterceptionPoint
 	public void onRequestEnd( IStruct event ) {
 		IBoxContext ctx = getContext( event );
-		if ( ctx == null ) return;
+		if ( ctx == null )
+			return;
 		IStruct lensData = getLensData( ctx );
-		if ( lensData == null ) return;
+		if ( lensData == null )
+			return;
 
 		long now = System.currentTimeMillis();
 		lensData.put( "endedAt", now );
 		long duration = now - lensData.getAsLong( Key.of( "startedAt" ) );
 		getLensService().endRequest( duration );
 
-		IStruct settings	= getSettings();
-		IStruct scopes		= settings.getAsStruct( Key.of( "scopes" ) );
-		IStruct variables	= lensData.getAsStruct( Key.of( "variables" ) );
+		IStruct	settings	= getSettings();
+		IStruct	scopes		= settings.getAsStruct( Key.of( "scopes" ) );
+		IStruct	variables	= lensData.getAsStruct( Key.of( "variables" ) );
 
 		// Scope snapshots — only for enabled scopes
 		captureScope( ctx, scopes, variables, "form", Key.of( "form" ) );
@@ -137,13 +143,15 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void postQueryExecute( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
-		IStruct settings = getSettings();
-		Array queries = lensData.getAsArray( Key.of( "queries" ) );
-		if ( queries.size() >= settings.getAsInteger( Key.of( "maxQueries" ) ) ) return;
+		IStruct	settings	= getSettings();
+		Array	queries		= lensData.getAsArray( Key.of( "queries" ) );
+		if ( queries.size() >= settings.getAsInteger( Key.of( "maxQueries" ) ) )
+			return;
 
 		getLensService().getStats().totalQueries.incrementAndGet();
 		long startedAt = lensData.getAsLong( Key.of( "startedAt" ) );
@@ -162,18 +170,20 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void preTemplateInvoke( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
 		Array	templates	= lensData.getAsArray( Key.of( "templates" ) );
 		long	startedAt	= lensData.getAsLong( Key.of( "startedAt" ) );
 		long	now			= System.currentTimeMillis();
 
 		// Nesting depth = number of currently pending template entries
-		int depth = 0;
+		int		depth		= 0;
 		for ( Object obj : templates ) {
-			if ( Boolean.TRUE.equals( ( ( IStruct ) obj ).getAsBoolean( Key.of( "_pending" ) ) ) ) depth++;
+			if ( Boolean.TRUE.equals( ( ( IStruct ) obj ).getAsBoolean( Key.of( "_pending" ) ) ) )
+				depth++;
 		}
 
 		templates.add( Struct.of(
@@ -191,13 +201,15 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void postTemplateInvoke( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
 		IStruct	settings	= getSettings();
 		Array	templates	= lensData.getAsArray( Key.of( "templates" ) );
-		if ( templates.size() >= settings.getAsInteger( Key.of( "maxTemplates" ) ) ) return;
+		if ( templates.size() >= settings.getAsInteger( Key.of( "maxTemplates" ) ) )
+			return;
 
 		String	path		= ( String ) event.getOrDefault( Key.of( "templatePath" ), "" );
 		long	now			= System.currentTimeMillis();
@@ -226,16 +238,19 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void onException( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
 		IStruct	settings	= getSettings();
 		Array	exceptions	= lensData.getAsArray( Key.of( "exceptions" ) );
-		if ( exceptions.size() >= settings.getAsInteger( Key.of( "maxExceptions" ) ) ) return;
+		if ( exceptions.size() >= settings.getAsInteger( Key.of( "maxExceptions" ) ) )
+			return;
 
 		Object rawEx = event.get( Key.of( "exception" ) );
-		if ( rawEx == null ) return;
+		if ( rawEx == null )
+			return;
 		IStruct ex = rawEx instanceof IStruct ? ( IStruct ) rawEx : Struct.of();
 
 		getLensService().getStats().totalExceptions.incrementAndGet();
@@ -255,9 +270,10 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void onHTTPRequest( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
 		long now = System.currentTimeMillis();
 		lensData.getAsArray( Key.of( "httpCalls" ) ).add( Struct.of(
@@ -278,9 +294,10 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void onHTTPResponse( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
 		getLensService().getStats().totalHttpCalls.incrementAndGet();
 		String	url			= ( String ) event.getOrDefault( Key.of( "url" ), "" );
@@ -307,9 +324,10 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void onSOAPRequest( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
 		long now = System.currentTimeMillis();
 		lensData.getAsArray( Key.of( "soapCalls" ) ).add( Struct.of(
@@ -329,9 +347,10 @@ public class LensCollector extends BaseInterceptor {
 	 */
 	@InterceptionPoint
 	public void onSOAPResponse( IStruct event ) {
-		IBoxContext ctx = getContext( event );
-		IStruct lensData = getLensData( ctx );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) ) return;
+		IBoxContext	ctx			= getContext( event );
+		IStruct		lensData	= getLensData( ctx );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( Key.of( "enabled" ) ) ) )
+			return;
 
 		getLensService().getStats().totalSoapCalls.incrementAndGet();
 		long	now			= System.currentTimeMillis();
@@ -374,19 +393,22 @@ public class LensCollector extends BaseInterceptor {
 	}
 
 	private IStruct getLensData( IBoxContext ctx ) {
-		if ( ctx == null ) return null;
+		if ( ctx == null )
+			return null;
 		return ctx.getAttachment( KeyDictionary.lensData );
 	}
 
 	private void captureScope( IBoxContext ctx, IStruct scopes, IStruct variables, String scopeName, Key scopeKey ) {
 		Object enabled = scopes.get( Key.of( scopeName ) );
-		if ( !Boolean.TRUE.equals( enabled ) ) return;
+		if ( !Boolean.TRUE.equals( enabled ) )
+			return;
 		try {
 			IScope scope = ctx.getScopeNearby( scopeKey );
 			if ( scope != null ) {
 				variables.put( scopeKey, Struct.fromMap( scope ) );
 			}
-		} catch ( Exception ignored ) {}
+		} catch ( Exception ignored ) {
+		}
 	}
 
 }

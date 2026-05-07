@@ -41,18 +41,21 @@ public class LensAddException extends BaseLensBIF {
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
 		LensRequestData data = getLensData( context );
-		if ( !isEnabled( data ) ) return null;
+		if ( !isEnabled( data ) )
+			return null;
 
 		int maxExceptions = getModuleSettings().getAsInteger( KEY_MAX_EXCEPTIONS );
-		if ( data.exceptions.size() >= maxExceptions ) return null;
+		if ( data.exceptions.size() >= maxExceptions )
+			return null;
 
 		LensService svc = getLensService();
-		if ( svc != null ) svc.getStats().totalExceptions.incrementAndGet();
+		if ( svc != null )
+			svc.getStats().totalExceptions.incrementAndGet();
 
-		Object rawEx = arguments.get( Key.of( "exception" ) );
-		IStruct ex = rawEx instanceof IStruct ? ( IStruct ) rawEx : null;
+		Object				rawEx	= arguments.get( Key.of( "exception" ) );
+		IStruct				ex		= rawEx instanceof IStruct ? ( IStruct ) rawEx : null;
 
-		Map<String, Object> entry = new LinkedHashMap<>();
+		Map<String, Object>	entry	= new LinkedHashMap<>();
 		entry.put( "type", ex != null ? ex.getOrDefault( Key.of( "type" ), "unknown" ) : "unknown" );
 		entry.put( "message", ex != null ? ex.getOrDefault( Key.of( "message" ), "" ) : ( rawEx != null ? rawEx.toString() : "" ) );
 		entry.put( "detail", ex != null ? ex.getOrDefault( Key.of( "detail" ), "" ) : "" );

@@ -44,15 +44,18 @@ public abstract class BaseCollector extends BaseInterceptor {
 
 	protected IBoxContext getCtx( IStruct event ) {
 		Object ctx = event.get( Key.of( "context" ) );
-		if ( ctx instanceof IBoxContext ) return ( IBoxContext ) ctx;
+		if ( ctx instanceof IBoxContext )
+			return ( IBoxContext ) ctx;
 		return RequestBoxContext.getCurrent();
 	}
 
 	protected LensRequestData getLensData( IStruct event ) {
 		IBoxContext ctx = getCtx( event );
-		if ( ctx == null ) return null;
+		if ( ctx == null )
+			return null;
 		IBoxContext req = ctx.getRequestContext();
-		if ( req == null ) req = ctx;
+		if ( req == null )
+			req = ctx;
 		return req.getAttachment( KeyDictionary.lensData );
 	}
 
@@ -61,7 +64,8 @@ public abstract class BaseCollector extends BaseInterceptor {
 	 */
 	protected LensRequestData getOrCreateLensData( IStruct event, String requestId, boolean enabled ) {
 		IBoxContext ctx = getCtx( event );
-		if ( ctx == null ) return null;
+		if ( ctx == null )
+			return null;
 		return LensRequestData.getOrCreate( ctx, requestId, enabled );
 	}
 

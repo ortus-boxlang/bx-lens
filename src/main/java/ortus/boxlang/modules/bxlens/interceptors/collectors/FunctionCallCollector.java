@@ -42,13 +42,15 @@ public class FunctionCallCollector extends BaseCollector {
 	public void preFunctionInvoke( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
-			if ( data.functionCalls.size() >= getMaxSetting( "maxFunctionCalls", 500 ) ) return;
+			if ( data == null || !data.enabled )
+				return;
+			if ( data.functionCalls.size() >= getMaxSetting( "maxFunctionCalls", 500 ) )
+				return;
 
-			String functionName = event.getOrDefault( Key.of( "functionName" ), event.getOrDefault( Key.of( "name" ), "unknown" ) ).toString();
+			String				functionName	= event.getOrDefault( Key.of( "functionName" ), event.getOrDefault( Key.of( "name" ), "unknown" ) ).toString();
 
-			long				now		= System.currentTimeMillis();
-			Map<String, Object>	entry	= new LinkedHashMap<>();
+			long				now				= System.currentTimeMillis();
+			Map<String, Object>	entry			= new LinkedHashMap<>();
 			entry.put( "functionName", functionName );
 			entry.put( "_startTick", now );
 			entry.put( "offset", now - data.startedAt );
@@ -62,18 +64,21 @@ public class FunctionCallCollector extends BaseCollector {
 	public void postFunctionInvoke( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
-			if ( data.functionCalls.size() >= getMaxSetting( "maxFunctionCalls", 500 ) ) return;
+			if ( data == null || !data.enabled )
+				return;
+			if ( data.functionCalls.size() >= getMaxSetting( "maxFunctionCalls", 500 ) )
+				return;
 
 			Map<String, Object> pending = pendingCalls.remove( Thread.currentThread().getId() );
-			if ( pending == null ) return;
+			if ( pending == null )
+				return;
 
-			long now		= System.currentTimeMillis();
-			long startTick	= pending.get( "_startTick" ) instanceof Number
+			long				now			= System.currentTimeMillis();
+			long				startTick	= pending.get( "_startTick" ) instanceof Number
 			    ? ( ( Number ) pending.get( "_startTick" ) ).longValue()
 			    : now;
 
-			Map<String, Object> entry = new LinkedHashMap<>();
+			Map<String, Object>	entry		= new LinkedHashMap<>();
 			entry.put( "functionName", pending.get( "functionName" ) );
 			entry.put( "executionTime", now - startTick );
 			entry.put( "offset", pending.get( "offset" ) );

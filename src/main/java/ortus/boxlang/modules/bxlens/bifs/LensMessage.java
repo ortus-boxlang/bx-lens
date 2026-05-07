@@ -41,18 +41,21 @@ public class LensMessage extends BaseLensBIF {
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
 		LensRequestData data = getLensData( context );
-		if ( !isEnabled( data ) ) return null;
+		if ( !isEnabled( data ) )
+			return null;
 
 		int maxMessages = getModuleSettings().getAsInteger( KEY_MAX_MESSAGES );
-		if ( data.messages.size() >= maxMessages ) return null;
+		if ( data.messages.size() >= maxMessages )
+			return null;
 
 		LensService svc = getLensService();
-		if ( svc != null ) svc.getStats().totalMessages.incrementAndGet();
+		if ( svc != null )
+			svc.getStats().totalMessages.incrementAndGet();
 
-		String message	= arguments.getAsString( Key.of( "message" ) );
-		String type		= arguments.getAsString( Key.of( "type" ) );
+		String				message	= arguments.getAsString( Key.of( "message" ) );
+		String				type	= arguments.getAsString( Key.of( "type" ) );
 
-		Map<String, Object> entry = new LinkedHashMap<>();
+		Map<String, Object>	entry	= new LinkedHashMap<>();
 		entry.put( "message", message );
 		entry.put( "type", type );
 		entry.put( "offset", System.currentTimeMillis() - data.startedAt );

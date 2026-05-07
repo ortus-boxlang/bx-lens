@@ -30,9 +30,11 @@ public class CollectorTest extends BaseIntegrationTest {
 	/** Get a field from the LensRequestData POJO using reflection. */
 	private Object getLensDataField( String fieldName ) throws Exception {
 		IBoxContext req = ctx.getRequestContext();
-		if ( req == null ) req = ctx;
+		if ( req == null )
+			req = ctx;
 		Object data = req.getAttachment( Key.of( "__bxLensData__" ) );
-		if ( data == null ) return null;
+		if ( data == null )
+			return null;
 		return data.getClass().getField( fieldName ).get( data );
 	}
 
@@ -44,7 +46,8 @@ public class CollectorTest extends BaseIntegrationTest {
 	@DisplayName( "LensRequestData POJO is attached to context after onRequestStart" )
 	public void testLensDataAttached() throws Exception {
 		IBoxContext req = ctx.getRequestContext();
-		if ( req == null ) req = ctx;
+		if ( req == null )
+			req = ctx;
 		Object data = req.getAttachment( Key.of( "__bxLensData__" ) );
 		assertThat( data ).isNotNull();
 	}

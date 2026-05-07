@@ -43,13 +43,16 @@ public class BifCallCollector extends BaseCollector {
 	public void onBIFInvocation( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
-			if ( data.bifCalls.size() >= getMaxSetting( "maxBifCalls", 500 ) ) return;
+			if ( data == null || !data.enabled )
+				return;
+			if ( data.bifCalls.size() >= getMaxSetting( "maxBifCalls", 500 ) )
+				return;
 
 			String bifName = event.getOrDefault( Key.of( "functionName" ), event.getOrDefault( Key.of( "name" ), "unknown" ) ).toString();
 
 			// Skip self-referential Lens BIF calls
-			if ( bifName.toLowerCase().startsWith( "lens" ) ) return;
+			if ( bifName.toLowerCase().startsWith( "lens" ) )
+				return;
 
 			long				now		= System.currentTimeMillis();
 			Map<String, Object>	entry	= new LinkedHashMap<>();
@@ -66,18 +69,21 @@ public class BifCallCollector extends BaseCollector {
 	public void postBIFInvocation( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
-			if ( data.bifCalls.size() >= getMaxSetting( "maxBifCalls", 500 ) ) return;
+			if ( data == null || !data.enabled )
+				return;
+			if ( data.bifCalls.size() >= getMaxSetting( "maxBifCalls", 500 ) )
+				return;
 
 			Map<String, Object> pending = pendingBifCalls.remove( Thread.currentThread().getId() );
-			if ( pending == null ) return;
+			if ( pending == null )
+				return;
 
-			long now		= System.currentTimeMillis();
-			long startTick	= pending.get( "_startTick" ) instanceof Number
+			long				now			= System.currentTimeMillis();
+			long				startTick	= pending.get( "_startTick" ) instanceof Number
 			    ? ( ( Number ) pending.get( "_startTick" ) ).longValue()
 			    : now;
 
-			Map<String, Object> entry = new LinkedHashMap<>();
+			Map<String, Object>	entry		= new LinkedHashMap<>();
 			entry.put( "bifName", pending.get( "bifName" ) );
 			entry.put( "executionTime", now - startTick );
 			entry.put( "offset", pending.get( "offset" ) );

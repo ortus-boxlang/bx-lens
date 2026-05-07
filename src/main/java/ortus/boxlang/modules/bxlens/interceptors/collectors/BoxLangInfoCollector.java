@@ -39,7 +39,8 @@ public class BoxLangInfoCollector extends BaseCollector {
 	public void onRequestStart( IStruct event ) {
 		try {
 			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled ) return;
+			if ( data == null || !data.enabled )
+				return;
 
 			Map<String, Object> info = new LinkedHashMap<>();
 			info.put( "javaVersion", System.getProperty( "java.version", "" ) );
@@ -57,7 +58,8 @@ public class BoxLangInfoCollector extends BaseCollector {
 							info.put( "version", bxInfo.getOrDefault( Key.of( "version" ), "" ) );
 						}
 					}
-				} catch ( Exception ignored ) {}
+				} catch ( Exception ignored ) {
+				}
 			}
 
 			// Record in appEvents for access at render time

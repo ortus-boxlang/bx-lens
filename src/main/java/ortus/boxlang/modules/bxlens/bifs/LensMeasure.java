@@ -42,8 +42,8 @@ public class LensMeasure extends BaseLensBIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		Object	labelOrClosureArg	= arguments.get( Key.of( "labelOrClosure" ) );
-		Object	closureArg			= arguments.get( Key.of( "closure" ) );
+		Object		labelOrClosureArg	= arguments.get( Key.of( "labelOrClosure" ) );
+		Object		closureArg			= arguments.get( Key.of( "closure" ) );
 
 		String		label;
 		Function	fn;
@@ -56,11 +56,11 @@ public class LensMeasure extends BaseLensBIF {
 			fn		= ( Function ) closureArg;
 		}
 
-		long	start	= System.currentTimeMillis();
-		Object	result	= fn.invoke( new FunctionBoxContext( context, fn ) );
-		long	elapsed	= System.currentTimeMillis() - start;
+		long			start	= System.currentTimeMillis();
+		Object			result	= fn.invoke( new FunctionBoxContext( context, fn ) );
+		long			elapsed	= System.currentTimeMillis() - start;
 
-		LensRequestData data = getLensData( context );
+		LensRequestData	data	= getLensData( context );
 		if ( isEnabled( data ) ) {
 			int maxTimings = getModuleSettings().getAsInteger( KEY_MAX_TIMINGS );
 			if ( data.timings.size() < maxTimings ) {

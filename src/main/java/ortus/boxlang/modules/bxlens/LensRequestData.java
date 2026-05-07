@@ -29,37 +29,37 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public class LensRequestData {
 
-	public final String					requestId;
-	public volatile boolean				enabled;
-	public final long					startedAt		= System.currentTimeMillis();
-	public volatile long				endedAt			= 0L;
-	public volatile String				method			= "";
-	public volatile String				url				= "";
-	public volatile int					statusCode		= 200;
-	public volatile String				applicationName	= "";
+	public final String								requestId;
+	public volatile boolean							enabled;
+	public final long								startedAt		= System.currentTimeMillis();
+	public volatile long							endedAt			= 0L;
+	public volatile String							method			= "";
+	public volatile String							url				= "";
+	public volatile int								statusCode		= 200;
+	public volatile String							applicationName	= "";
 
 	// Collector lists - thread-safe for concurrent append
-	public final List<Map<String, Object>>	queries			= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	exceptions		= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	templates		= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	httpCalls		= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	soapCalls		= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	messages		= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	timings			= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	bifCalls		= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	functionCalls	= new CopyOnWriteArrayList<>();
-	public final List<Map<String, Object>>	appEvents		= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			queries			= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			exceptions		= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			templates		= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			httpCalls		= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			soapCalls		= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			messages		= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			timings			= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			bifCalls		= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			functionCalls	= new CopyOnWriteArrayList<>();
+	public final List<Map<String, Object>>			appEvents		= new CopyOnWriteArrayList<>();
 
 	// Pending timers (label/hash -> start data)
-	public final Map<String, Map<String, Object>> pendingTimings = Collections.synchronizedMap( new LinkedHashMap<>() );
+	public final Map<String, Map<String, Object>>	pendingTimings	= Collections.synchronizedMap( new LinkedHashMap<>() );
 
 	// Scopes (populated at request end by ScopesCollector)
-	public volatile IStruct formScope		= Struct.of();
-	public volatile IStruct sessionScope	= Struct.of();
-	public volatile IStruct requestScope	= Struct.of();
+	public volatile IStruct							formScope		= Struct.of();
+	public volatile IStruct							sessionScope	= Struct.of();
+	public volatile IStruct							requestScope	= Struct.of();
 
 	// Global stats snapshot (populated at request end)
-	public volatile Map<String, Object> globalStats = new HashMap<>();
+	public volatile Map<String, Object>				globalStats		= new HashMap<>();
 
 	public LensRequestData( String requestId, boolean enabled ) {
 		this.requestId	= requestId;
@@ -70,9 +70,11 @@ public class LensRequestData {
 	 * Lazy-get from context; returns null if not yet initialized.
 	 */
 	public static LensRequestData get( IBoxContext ctx ) {
-		if ( ctx == null ) return null;
+		if ( ctx == null )
+			return null;
 		IBoxContext req = ctx.getRequestContext();
-		if ( req == null ) req = ctx;
+		if ( req == null )
+			req = ctx;
 		return req.getAttachment( KeyDictionary.lensData );
 	}
 
@@ -81,9 +83,11 @@ public class LensRequestData {
 	 * Safe to call from any collector - only one instance is ever created per request.
 	 */
 	public static LensRequestData getOrCreate( IBoxContext ctx, String requestId, boolean enabled ) {
-		if ( ctx == null ) return null;
+		if ( ctx == null )
+			return null;
 		IBoxContext req = ctx.getRequestContext();
-		if ( req == null ) req = ctx;
+		if ( req == null )
+			req = ctx;
 		return req.computeAttachmentIfAbsent( KeyDictionary.lensData, k -> new LensRequestData( requestId, enabled ) );
 	}
 
