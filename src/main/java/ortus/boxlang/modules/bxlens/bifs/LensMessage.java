@@ -11,27 +11,24 @@
  */
 package ortus.boxlang.modules.bxlens.bifs;
 
-import ortus.boxlang.modules.bxlens.util.KeyDictionary;
-import ortus.boxlang.runtime.bifs.BIF;
+import ortus.boxlang.modules.bxlens.LensRequestData;
+import ortus.boxlang.modules.bxlens.LensService;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
 import ortus.boxlang.runtime.scopes.Key;
-import ortus.boxlang.runtime.types.Array;
-import ortus.boxlang.runtime.types.IStruct;
-import ortus.boxlang.runtime.types.Struct;
 import ortus.boxlang.runtime.types.Argument;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * LensMessage( message [, type] ) — Add a developer message to the current request's debug panel.
  */
 @BoxBIF
-public class LensMessage extends BIF {
+public class LensMessage extends BaseLensBIF {
 
-	private static final Key	KEY_MESSAGES		= Key.of( "messages" );
-	private static final Key	KEY_ENABLED			= Key.of( "enabled" );
-	private static final Key	KEY_STARTED_AT		= Key.of( "startedAt" );
-	private static final Key	KEY_MAX_MESSAGES	= Key.of( "maxMessages" );
+	private static final Key KEY_MAX_MESSAGES = Key.of( "maxMessages" );
 
 	public LensMessage() {
 		super();
@@ -43,34 +40,23 @@ public class LensMessage extends BIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		IBoxContext requestCtx = context.getRequestContext();
-		if ( requestCtx == null ) {
-			requestCtx = context;
-		}
-		IStruct lensData = requestCtx.getAttachment( KeyDictionary.lensData );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( KEY_ENABLED ) ) ) {
-			return null;
-		}
+		LensRequestData data = getLensData( context );
+		if ( !isEnabled( data ) ) return null;
 
-		IStruct settings = moduleService.getModuleRecord( KeyDictionary.moduleName ).settings;
-		Integer maxMessages = settings.getAsInteger( KEY_MAX_MESSAGES );
-		Array messages = lensData.getAsArray( KEY_MESSAGES );
+		int maxMessages = getModuleSettings().getAsInteger( KEY_MAX_MESSAGES );
+		if ( data.messages.size() >= maxMessages ) return null;
 
-		if ( messages.size() >= maxMessages ) {
-			return null;
-		}
+		LensService svc = getLensService();
+		if ( svc != null ) svc.getStats().totalMessages.incrementAndGet();
 
-		KeyDictionary.getLensService( settings ).getStats().totalMessages.incrementAndGet();
+		String message	= arguments.getAsString( Key.of( "message" ) );
+		String type		= arguments.getAsString( Key.of( "type" ) );
 
-		String message = arguments.getAsString( Key.of( "message" ) );
-		String type = arguments.getAsString( Key.of( "type" ) );
-		long startedAt = lensData.getAsLong( KEY_STARTED_AT );
-
-		messages.add( Struct.of(
-		    "message", message,
-		    "type", type,
-		    "offset", System.currentTimeMillis() - startedAt
-		) );
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put( "message", message );
+		entry.put( "type", type );
+		entry.put( "offset", System.currentTimeMillis() - data.startedAt );
+		data.messages.add( entry );
 
 		return null;
 	}

@@ -7,7 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.Key;
-import ortus.boxlang.runtime.types.Array;
 import ortus.boxlang.runtime.types.IStruct;
 import ortus.boxlang.runtime.types.Struct;
 
@@ -15,38 +14,13 @@ public class IntegrationTest extends BaseIntegrationTest {
 
 	private static final Key LENS_KEY = Key.of( "__bxLensData__" );
 
-	/** Create a minimal enabled lensData struct and attach it to ctx. */
+	/**
+	 * Attach a minimal enabled lensData by firing the onRequestStart event,
+	 * which causes ApplicationCollector to create and attach a LensRequestData POJO.
+	 */
 	private void attachLensData( IBoxContext ctx ) {
-		IStruct	vars	= Struct.of(
-		    "form", Struct.of(),
-		    "url", Struct.of(),
-		    "cgi", Struct.of(),
-		    "request", Struct.of(),
-		    "session", Struct.of(),
-		    "application", Struct.of()
-		);
-
-		IStruct	data	= Struct.of(
-		    "requestId", java.util.UUID.randomUUID().toString(),
-		    "enabled", Boolean.TRUE,
-		    "startedAt", System.currentTimeMillis(),
-		    "endedAt", 0L,
-		    "method", "GET",
-		    "url", "/test",
-		    "statusCode", 200,
-		    "queries", Array.of(),
-		    "exceptions", Array.of(),
-		    "templates", Array.of(),
-		    "httpCalls", Array.of(),
-		    "soapCalls", Array.of(),
-		    "messages", Array.of(),
-		    "timings", Array.of(),
-		    "_pendingTimings", Struct.of(),
-		    "variables", vars,
-		    "globalStats", Struct.of()
-		);
-
-		ctx.putAttachment( LENS_KEY, data );
+		IStruct event = Struct.of( "context", ctx );
+		runtime.getInterceptorService().announce( "onRequestStart", event );
 	}
 
 	@Test
@@ -114,14 +88,13 @@ public class IntegrationTest extends BaseIntegrationTest {
 
 		runtime.executeStatement( "LensMessage('hello world','info')", ctx );
 
-		IStruct data = ( IStruct ) ctx.getAttachment( LENS_KEY );
-		assertThat( data ).isNotNull();
-		Array messages = ( Array ) data.get( Key.of( "messages" ) );
-		assertThat( messages.size() ).isGreaterThan( 0 );
+		// Verify by checking LensRender still works (message was appended to POJO)
+		Object result = runtime.executeStatement( "LensRender()", ctx );
+		assertThat( result.toString() ).contains( "hello world" );
 	}
 
 	@Test
-	@DisplayName( "LensStart/LensStop produces a timing entry" )
+	@DisplayName( "LensStart/LensStop produces a timing entry visible in render" )
 	public void testLensStartStop() {
 		IBoxContext ctx = getContext();
 		attachLensData( ctx );
@@ -130,8 +103,8 @@ public class IntegrationTest extends BaseIntegrationTest {
 		Object hash = runtime.executeStatement( "LensStart('myOp')", ctx );
 		runtime.executeStatement( "LensStop('" + hash + "')", ctx );
 
-		IStruct	data	= ( IStruct ) ctx.getAttachment( LENS_KEY );
-		Array	timings	= ( Array ) data.get( Key.of( "timings" ) );
-		assertThat( timings.size() ).isEqualTo( 1 );
+		// Verify timing data is in the rendered output
+		Object result = runtime.executeStatement( "LensRender()", ctx );
+		assertThat( result.toString() ).contains( "myOp" );
 	}
 }

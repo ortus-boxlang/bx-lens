@@ -28,7 +28,7 @@ import ortus.boxlang.runtime.types.Struct;
  * Listens to BoxLang runtime events and populates the per-request lens data struct
  * stored as a context attachment under the key "__bxLensData__".
  */
-@ortus.boxlang.runtime.events.Interceptor( autoLoad = true )
+@ortus.boxlang.runtime.events.Interceptor( autoLoad = false )
 public class LensCollector extends BaseInterceptor {
 
 	@Override
@@ -41,7 +41,7 @@ public class LensCollector extends BaseInterceptor {
 	}
 
 	private LensService getLensService() {
-		return KeyDictionary.getLensService( getSettings() );
+		return KeyDictionary.getLensService();
 	}
 
 	/**

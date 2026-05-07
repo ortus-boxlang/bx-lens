@@ -12,16 +12,25 @@ public abstract class BaseIntegrationTest {
 
 	protected static BoxRuntime		runtime;
 	protected static ModuleService	moduleService;
-	protected static Key			MODULE_NAME	= Key.of( "bxLens" );
+	protected static Key			MODULE_NAME		= Key.of( "bxLens" );
+
+	// Guard against multiple test-class @BeforeAll calls activating the module repeatedly,
+	// which would create multiple classloaders for the same module.
+	private static volatile boolean setupDone = false;
 
 	@BeforeAll
 	public static void setupRuntime() {
-		runtime			= BoxRuntime.getInstance( true );
-		moduleService	= runtime.getModuleService();
-		// Module is built to build/modules/bxLens by createModuleStructure task
-		moduleService.addModulePath( "build/modules" );
-		moduleService.registerAll();
-		moduleService.activateAll();
+		if ( setupDone ) return;
+		synchronized ( BaseIntegrationTest.class ) {
+			if ( setupDone ) return;
+			runtime			= BoxRuntime.getInstance( true );
+			moduleService	= runtime.getModuleService();
+			// Module is built to build/modules/bxLens by createModuleStructure task
+			moduleService.addModulePath( "build/modules" );
+			moduleService.registerAll();
+			moduleService.activateAll();
+			setupDone = true;
+		}
 	}
 
 	protected IBoxContext getContext() {

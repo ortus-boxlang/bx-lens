@@ -1,0 +1,93 @@
+/**
+ * [BoxLang]
+ *
+ * Copyright [2023] [Ortus Solutions, Corp]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
+ * License. You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS"
+ * BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language
+ * governing permissions and limitations under the License.
+ */
+package ortus.boxlang.modules.bxlens.interceptors.collectors;
+
+import ortus.boxlang.modules.bxlens.LensRequestData;
+import ortus.boxlang.modules.bxlens.LensService;
+import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
+import ortus.boxlang.runtime.events.InterceptionPoint;
+import ortus.boxlang.runtime.scopes.Key;
+import ortus.boxlang.runtime.types.IStruct;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Collects outgoing SOAP call data.
+ */
+@ortus.boxlang.runtime.events.Interceptor( autoLoad = false )
+public class SoapCollector extends BaseCollector {
+
+	@Override
+	public String getName() {
+		return "soap";
+	}
+
+	@InterceptionPoint
+	public void onSOAPRequest( IStruct event ) {
+		try {
+			LensRequestData data = getLensData( event );
+			if ( data == null || !data.enabled ) return;
+
+			long				now		= System.currentTimeMillis();
+			Map<String, Object>	entry	= new LinkedHashMap<>();
+			entry.put( "endpoint", event.getOrDefault( Key.of( "endpoint" ), "" ) );
+			entry.put( "action", event.getOrDefault( Key.of( "action" ), "" ) );
+			entry.put( "statusCode", 0 );
+			entry.put( "executionTime", 0L );
+			entry.put( "responseSize", 0 );
+			entry.put( "offset", now - data.startedAt );
+			entry.put( "_pending", Boolean.TRUE );
+			entry.put( "_startTick", now );
+			data.soapCalls.add( entry );
+		} catch ( Exception e ) {
+			// Fail silently
+		}
+	}
+
+	@InterceptionPoint
+	public void onSOAPResponse( IStruct event ) {
+		try {
+			LensRequestData data = getLensData( event );
+			if ( data == null || !data.enabled ) return;
+
+			LensService svc = getLensService();
+			if ( svc != null ) svc.getStats().totalSoapCalls.incrementAndGet();
+
+			long	now			= System.currentTimeMillis();
+			Object	rawExecTime	= event.get( Key.of( "executionTime" ) );
+
+			for ( int i = data.soapCalls.size() - 1; i >= 0; i-- ) {
+				Map<String, Object> s = data.soapCalls.get( i );
+				if ( Boolean.TRUE.equals( s.get( "_pending" ) ) ) {
+					s.put( "statusCode", event.getOrDefault( Key.of( "statusCode" ), 0 ) );
+					s.put( "responseSize", event.getOrDefault( Key.of( "responseSize" ), 0 ) );
+					long startTick = s.get( "_startTick" ) instanceof Number
+					    ? ( ( Number ) s.get( "_startTick" ) ).longValue()
+					    : now;
+					s.put( "executionTime", rawExecTime instanceof Number
+					    ? ( ( Number ) rawExecTime ).longValue()
+					    : now - startTick );
+					s.put( "_pending", Boolean.FALSE );
+					s.remove( "_startTick" );
+					break;
+				}
+			}
+		} catch ( Exception e ) {
+			// Fail silently
+		}
+	}
+
+}

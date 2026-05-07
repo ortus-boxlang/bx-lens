@@ -11,30 +11,23 @@
  */
 package ortus.boxlang.modules.bxlens.bifs;
 
-import ortus.boxlang.modules.bxlens.util.KeyDictionary;
-import ortus.boxlang.runtime.bifs.BIF;
+import ortus.boxlang.modules.bxlens.LensRequestData;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
 import ortus.boxlang.runtime.scopes.Key;
-import ortus.boxlang.runtime.types.Array;
-import ortus.boxlang.runtime.types.IStruct;
-import ortus.boxlang.runtime.types.Struct;
 import ortus.boxlang.runtime.types.Argument;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * LensStop( labelOrHash ) — Stop a custom timer started with LensStart().
  */
 @BoxBIF
-public class LensStop extends BIF {
+public class LensStop extends BaseLensBIF {
 
-	private static final Key	KEY_ENABLED			= Key.of( "enabled" );
-	private static final Key	KEY_TIMINGS			= Key.of( "timings" );
-	private static final Key	KEY_PENDING_TIMINGS	= Key.of( "_pendingTimings" );
-	private static final Key	KEY_MAX_TIMINGS		= Key.of( "maxTimings" );
-	private static final Key	KEY_LABEL			= Key.of( "label" );
-	private static final Key	KEY_START_TICK		= Key.of( "_startTick" );
-	private static final Key	KEY_OFFSET			= Key.of( "offset" );
+	private static final Key KEY_MAX_TIMINGS = Key.of( "maxTimings" );
 
 	public LensStop() {
 		super();
@@ -45,61 +38,46 @@ public class LensStop extends BIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		IBoxContext requestCtx = context.getRequestContext();
-		if ( requestCtx == null ) {
-			requestCtx = context;
-		}
-		IStruct lensData = requestCtx.getAttachment( KeyDictionary.lensData );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( KEY_ENABLED ) ) ) {
-			return null;
-		}
-		if ( !lensData.containsKey( KEY_PENDING_TIMINGS ) ) {
-			return null;
-		}
+		LensRequestData data = getLensData( context );
+		if ( !isEnabled( data ) ) return null;
 
-		IStruct	settings	= moduleService.getModuleRecord( KeyDictionary.moduleName ).settings;
-		Integer	maxTimings	= settings.getAsInteger( KEY_MAX_TIMINGS );
-		Array	timings		= lensData.getAsArray( KEY_TIMINGS );
+		int maxTimings = getModuleSettings().getAsInteger( KEY_MAX_TIMINGS );
+		if ( data.timings.size() >= maxTimings ) return null;
 
-		if ( timings.size() >= maxTimings ) {
-			return null;
-		}
-
-		IStruct	pending			= lensData.getAsStruct( KEY_PENDING_TIMINGS );
-		String	labelOrHash		= arguments.getAsString( Key.of( "labelOrHash" ) );
-		String	found			= null;
+		String	labelOrHash	= arguments.getAsString( Key.of( "labelOrHash" ) );
+		String	found		= null;
 
 		// Try exact hash first
-		if ( pending.containsKey( Key.of( labelOrHash ) ) ) {
+		if ( data.pendingTimings.containsKey( labelOrHash ) ) {
 			found = labelOrHash;
 		} else {
 			// Fall back to most-recent by label
-			for ( Key k : pending.keySet() ) {
-				IStruct entry = ( IStruct ) pending.get( k );
-				if ( labelOrHash.equals( entry.getAsString( KEY_LABEL ) ) ) {
-					found = k.getName();
+			for ( String k : data.pendingTimings.keySet() ) {
+				Map<String, Object> entry = data.pendingTimings.get( k );
+				if ( labelOrHash.equals( entry.get( "label" ) ) ) {
+					found = k;
 				}
 			}
 		}
 
-		if ( found == null || found.isEmpty() ) {
-			return null;
-		}
+		if ( found == null ) return null;
 
-		Key		foundKey	= Key.of( found );
-		IStruct	t			= ( IStruct ) pending.get( foundKey );
-		long	now			= System.currentTimeMillis();
-		long	startTick	= t.getAsLong( KEY_START_TICK );
-		long	offset		= t.getAsLong( KEY_OFFSET );
+		Map<String, Object>	t			= data.pendingTimings.remove( found );
+		long				now			= System.currentTimeMillis();
+		long				startTick	= t.get( "_startTick" ) instanceof Number
+		    ? ( ( Number ) t.get( "_startTick" ) ).longValue()
+		    : now;
+		long				offset		= t.get( "offset" ) instanceof Number
+		    ? ( ( Number ) t.get( "offset" ) ).longValue()
+		    : 0L;
 
-		timings.add( Struct.of(
-		    "label", t.getAsString( KEY_LABEL ),
-		    "executionTime", now - startTick,
-		    "offset", offset,
-		    "hash", found
-		) );
+		Map<String, Object> timing = new LinkedHashMap<>();
+		timing.put( "label", t.get( "label" ) );
+		timing.put( "executionTime", now - startTick );
+		timing.put( "offset", offset );
+		timing.put( "hash", found );
+		data.timings.add( timing );
 
-		pending.remove( foundKey );
 		return null;
 	}
 

@@ -27,23 +27,33 @@ class {
 			// Master on/off switch. Per-request override via LensEnable() / LensDisable().
 			enabled : true,
 
-			// Scope capture — form/url/cgi are always captured.
-			// session and application default off (potential security exposure).
-			scopes : {
-				form        : true,
-				url         : true,
-				cgi         : true,
-				request     : true,
-				session     : false,
-				application : false
+			// Collector toggles — control which data is collected
+			collectors : {
+				queries       : true,
+				http          : true,
+				soap          : true,
+				messages      : true,
+				exceptions    : true,
+				timeline      : true,
+				bifCalls      : false,   // expensive - off by default
+				functionCalls : false,   // expensive - off by default
+				scopes : {
+					enabled : true,
+					form    : true,
+					session : false,
+					request : false
+				},
+				boxlangInfo : true
 			},
 
 			// Collection limits (prevent unbounded memory use on long requests)
-			maxQueries    : 100,
-			maxExceptions : 50,
-			maxTemplates  : 200,
-			maxMessages   : 200,
-			maxTimings    : 200,
+			maxQueries        : 100,
+			maxExceptions     : 50,
+			maxTemplates      : 200,
+			maxMessages       : 200,
+			maxTimings        : 200,
+			maxBifCalls       : 500,
+			maxFunctionCalls  : 500,
 
 			// UI theme sent to the client: "dark" | "light" | "auto"
 			theme : "dark",
@@ -60,8 +70,7 @@ class {
 			editorLinkPattern : "vscode://file/{path}:{line}",
 
 			// Internal — populated in onLoad()
-			alpineSource : "",
-			lensService  : ""
+			alpineSource : ""
 		};
 
 		interceptors = [];
@@ -73,10 +82,19 @@ class {
 	 * Called by the ModuleService on module activation.
 	 */
 	function onLoad() {
-		// Start the module-scoped service
-		var svc = new ortus.boxlang.modules.bxlens.LensService( boxRuntime );
-		svc.onStartup();
-		settings.lensService = svc;
+		// Get the LensService KEY from the class
+		var svcKeyName = createObject( "java", "ortus.boxlang.modules.bxlens.LensService" ).NAME;
+
+		// Check if already registered globally (e.g., from a prior activation)
+		var svc = boxRuntime.getGlobalService( svcKeyName );
+		if ( isNull( svc ) || !isObject( svc ) ) {
+			svc = new ortus.boxlang.modules.bxlens.LensService( boxRuntime );
+			svc.onStartup();
+			boxRuntime.putGlobalService( svcKeyName, svc );
+		}
+
+		// Wire up collectors based on settings
+		svc.activateCollectors( settings );
 
 		// Embed Alpine.js source so LensRender() can include it inline
 		var alpinePath = moduleRecord.physicalPath & "/assets/alpine.min.js";
@@ -89,8 +107,11 @@ class {
 	 * Called by the ModuleService on module deactivation.
 	 */
 	function onUnload() {
-		if ( !isNull( settings.lensService ) && isObject( settings.lensService ) ) {
-			settings.lensService.onShutdown( false );
+		var svcKeyName = createObject( "java", "ortus.boxlang.modules.bxlens.LensService" ).NAME;
+		var svc = boxRuntime.getGlobalService( svcKeyName );
+		if ( !isNull( svc ) && isObject( svc ) ) {
+			svc.deactivateCollectors();
+			// Don't shutdown the service itself — it's global and may serve other invocations
 		}
 	}
 

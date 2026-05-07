@@ -14,8 +14,7 @@ package ortus.boxlang.modules.bxlens.bifs;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
-import ortus.boxlang.modules.bxlens.util.KeyDictionary;
-import ortus.boxlang.runtime.bifs.BIF;
+import ortus.boxlang.modules.bxlens.LensService;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
@@ -26,7 +25,7 @@ import ortus.boxlang.runtime.types.Argument;
  * LensDumpHeap( [outputPath] ) — Dump the JVM heap to a .hprof file.
  */
 @BoxBIF
-public class LensDumpHeap extends BIF {
+public class LensDumpHeap extends BaseLensBIF {
 
 	private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern( "yyyyMMddHHmmss" );
 
@@ -50,7 +49,8 @@ public class LensDumpHeap extends BIF {
 			outputPath = tmpDir + "bxlens-heap-" + timestamp + ".hprof";
 		}
 
-		var svc = KeyDictionary.getLensService( moduleService.getModuleRecord( KeyDictionary.moduleName ).settings );
+		LensService svc = getLensService();
+		if ( svc == null ) throw new RuntimeException( "LensDumpHeap: LensService is not available" );
 
 		try {
 			return svc.dumpHeap( outputPath );

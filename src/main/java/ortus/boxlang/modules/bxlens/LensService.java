@@ -14,27 +14,47 @@
  */
 package ortus.boxlang.modules.bxlens;
 
+import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.ApplicationCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.BifCallCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.BoxLangInfoCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.ExceptionCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.FunctionCallCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.HttpCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.MessageCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.QueryCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.ScopesCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.SoapCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.TimelineCollector;
 import ortus.boxlang.runtime.BoxRuntime;
 import ortus.boxlang.runtime.scopes.Key;
 import ortus.boxlang.runtime.services.BaseService;
+import ortus.boxlang.runtime.types.IStruct;
 
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryMXBean;
 import java.lang.management.MemoryUsage;
 import java.lang.management.ThreadInfo;
 import java.lang.management.ThreadMXBean;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Module-scoped service for bx-lens. Owns GlobalStats and exposes JVM utilities.
- * Registered in ModuleConfig.bx onLoad() and stored in moduleRecord.settings.lensService.
+ * Module-scoped service for bx-lens. Owns GlobalStats, manages collectors, and exposes JVM utilities.
+ * Registered globally via BoxRuntime.putGlobalService() from ModuleConfig.bx.
  */
 public class LensService extends BaseService {
 
-	public static final Key		NAME	= Key.of( "bxLensService" );
-	public final GlobalStats	stats	= new GlobalStats();
+	public static final Key		NAME		= Key.of( "bxLensService" );
+	public final GlobalStats	stats		= new GlobalStats();
+
+	// Collector registry
+	private final Map<String, BaseCollector> collectors = Collections.synchronizedMap( new LinkedHashMap<>() );
 
 	public LensService( BoxRuntime runtime ) {
 		super( runtime, NAME );
@@ -50,7 +70,12 @@ public class LensService extends BaseService {
 
 	@Override
 	public void onShutdown( Boolean force ) {
+		deactivateCollectors();
 	}
+
+	// -------------------------------------------------------------------------
+	// Request lifecycle
+	// -------------------------------------------------------------------------
 
 	/**
 	 * Generate a new UUID request identifier.
@@ -77,6 +102,113 @@ public class LensService extends BaseService {
 		return stats;
 	}
 
+	// -------------------------------------------------------------------------
+	// Collector management
+	// -------------------------------------------------------------------------
+
+	/**
+	 * Activate collectors based on module settings. Called from ModuleConfig.bx onLoad().
+	 *
+	 * @param settings module settings struct
+	 */
+	public void activateCollectors( IStruct settings ) {
+		deactivateCollectors();
+
+		// Always register ApplicationCollector
+		registerCollector( new ApplicationCollector(), settings );
+
+		// Register optional collectors based on settings.collectors struct
+		IStruct collectorSettings = getCollectorSettings( settings );
+
+		if ( isCollectorEnabled( collectorSettings, "queries" ) ) registerCollector( new QueryCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "http" ) ) registerCollector( new HttpCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "soap" ) ) registerCollector( new SoapCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "messages" ) ) registerCollector( new MessageCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "timeline" ) ) registerCollector( new TimelineCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "exceptions" ) ) registerCollector( new ExceptionCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "bifCalls" ) ) registerCollector( new BifCallCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "functionCalls" ) ) registerCollector( new FunctionCallCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "scopes" ) ) registerCollector( new ScopesCollector(), settings );
+		if ( isCollectorEnabled( collectorSettings, "boxlangInfo" ) ) registerCollector( new BoxLangInfoCollector(), settings );
+	}
+
+	/**
+	 * Deactivate and unregister all collectors.
+	 */
+	public void deactivateCollectors() {
+		for ( BaseCollector c : collectors.values() ) {
+			try {
+				runtime.getInterceptorService().unregister( c );
+			} catch ( Exception ignored ) {}
+		}
+		collectors.clear();
+	}
+
+	private void registerCollector( BaseCollector collector, IStruct settings ) {
+		try {
+			collector.configure( settings );
+			runtime.getInterceptorService().register( collector );
+			collectors.put( collector.getName(), collector );
+		} catch ( Exception e ) {
+			// Log but don't fail
+		}
+	}
+
+	private IStruct getCollectorSettings( IStruct settings ) {
+		try {
+			Object raw = settings.getOrDefault( Key.of( "collectors" ), null );
+			if ( raw instanceof IStruct ) return ( IStruct ) raw;
+		} catch ( Exception ignored ) {}
+		return ortus.boxlang.runtime.types.Struct.of();
+	}
+
+	private boolean isCollectorEnabled( IStruct collectorSettings, String name ) {
+		try {
+			Object val = collectorSettings.getOrDefault( Key.of( name ), Boolean.TRUE );
+			if ( val instanceof Boolean ) return ( Boolean ) val;
+			if ( val instanceof IStruct ) {
+				// scopes is a struct with an "enabled" sub-key
+				Object enabled = ( ( IStruct ) val ).getOrDefault( Key.of( "enabled" ), Boolean.TRUE );
+				return Boolean.TRUE.equals( enabled );
+			}
+			return Boolean.TRUE.equals( val );
+		} catch ( Exception e ) {
+			return true;
+		}
+	}
+
+	/**
+	 * Get all registered collectors.
+	 */
+	public Collection<BaseCollector> getAllCollectors() {
+		return Collections.unmodifiableCollection( collectors.values() );
+	}
+
+	/**
+	 * Check if a collector with the given name is registered.
+	 */
+	public boolean hasCollector( String name ) {
+		return collectors.containsKey( name );
+	}
+
+	/**
+	 * Get a collector by name.
+	 */
+	public Optional<BaseCollector> getCollector( String name ) {
+		return Optional.ofNullable( collectors.get( name ) );
+	}
+
+	/**
+	 * Get the count of registered collectors.
+	 */
+	public int getCollectorCount() {
+		return collectors.size();
+	}
+
+	// -------------------------------------------------------------------------
+	// JVM utilities
+	// -------------------------------------------------------------------------
+
 	/**
 	 * Returns a formatted thread dump for all live JVM threads.
 	 *
@@ -90,6 +222,19 @@ public class LensService extends BaseService {
 			sb.append( t.toString() );
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * Returns the thread dump for a specific thread ID.
+	 *
+	 * @param threadId JVM thread ID
+	 *
+	 * @return thread info string or not-found message
+	 */
+	public String getThreadDump( long threadId ) {
+		ThreadMXBean	bean	= ManagementFactory.getThreadMXBean();
+		ThreadInfo		info	= bean.getThreadInfo( threadId, Integer.MAX_VALUE );
+		return info != null ? info.toString() : "Thread " + threadId + " not found";
 	}
 
 	/**
@@ -113,9 +258,9 @@ public class LensService extends BaseService {
 	 * Dumps the JVM heap to a .hprof file. Requires a HotSpot JVM.
 	 *
 	 * @param outputPath absolute path for the .hprof file
-	 * 
+	 *
 	 * @return outputPath on success
-	 * 
+	 *
 	 * @throws Exception if the JVM does not support HotSpotDiagnosticMXBean or write fails
 	 */
 	public String dumpHeap( String outputPath ) throws Exception {

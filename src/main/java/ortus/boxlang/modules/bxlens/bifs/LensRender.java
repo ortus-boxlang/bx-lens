@@ -13,8 +13,8 @@ package ortus.boxlang.modules.bxlens.bifs;
 
 import java.lang.management.ManagementFactory;
 
-import ortus.boxlang.modules.bxlens.util.KeyDictionary;
-import ortus.boxlang.runtime.bifs.BIF;
+import ortus.boxlang.modules.bxlens.LensRequestData;
+import ortus.boxlang.modules.bxlens.LensService;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
@@ -26,12 +26,9 @@ import ortus.boxlang.runtime.types.Struct;
  * LensRender() — Render the bx-lens debug bar HTML fragment.
  */
 @BoxBIF
-public class LensRender extends BIF {
+public class LensRender extends BaseLensBIF {
 
-	private static final Key KEY_ENABLED		= Key.of( "enabled" );
-	private static final Key KEY_ENDED_AT		= Key.of( "endedAt" );
-	private static final Key KEY_STARTED_AT		= Key.of( "startedAt" );
-	private static final Key KEY_ALPINE_SOURCE	= Key.of( "alpineSource" );
+	private static final Key KEY_ALPINE_SOURCE = Key.of( "alpineSource" );
 
 	public LensRender() {
 		super();
@@ -39,29 +36,21 @@ public class LensRender extends BIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		IBoxContext requestCtx = context.getRequestContext();
-		if ( requestCtx == null ) {
-			requestCtx = context;
-		}
-		IStruct lensData = requestCtx.getAttachment( KeyDictionary.lensData );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( KEY_ENABLED ) ) ) {
-			return "";
-		}
+		LensRequestData data = getLensData( context );
+		if ( !isEnabled( data ) ) return "";
 
-		long	endedAt		= lensData.getAsLong( KEY_ENDED_AT );
-		long	startedAt	= lensData.getAsLong( KEY_STARTED_AT );
-		long	now			= System.currentTimeMillis();
-		long	totalTime	= ( endedAt > 0 ? endedAt : now ) - startedAt;
+		long		now			= System.currentTimeMillis();
+		long		totalTime	= ( data.endedAt > 0 ? data.endedAt : now ) - data.startedAt;
 
-		IStruct	settings	= moduleService.getModuleRecord( KeyDictionary.moduleName ).settings;
-		var		svc			= KeyDictionary.getLensService( settings );
+		IStruct		settings	= getModuleSettings();
+		LensService	svc			= getLensService();
 
 		// JVM snapshot
 		IStruct jvmData;
 		try {
 			jvmData = Struct.of(
-			    "memory", svc.getMemoryInfo(),
-			    "threadDump", svc.getThreadDump(),
+			    "memory", svc != null ? svc.getMemoryInfo() : Struct.of(),
+			    "threadDump", svc != null ? svc.getThreadDump() : "unavailable",
 			    "threadCount", ManagementFactory.getThreadMXBean().getThreadCount()
 			);
 		} catch ( Exception e ) {
@@ -77,9 +66,9 @@ public class LensRender extends BIF {
 		try {
 			IStruct serverScope = ( IStruct ) context.getScopeNearby( Key.of( "server" ) );
 			if ( serverScope != null ) {
-				IStruct bxInfo = serverScope.getAsStruct( Key.of( "boxlang" ) );
-				IStruct javaInfo = serverScope.getAsStruct( Key.of( "java" ) );
-				IStruct osInfo = serverScope.getAsStruct( Key.of( "os" ) );
+				IStruct bxInfo		= serverScope.getAsStruct( Key.of( "boxlang" ) );
+				IStruct javaInfo	= serverScope.getAsStruct( Key.of( "java" ) );
+				IStruct osInfo		= serverScope.getAsStruct( Key.of( "os" ) );
 				bxData = Struct.of(
 				    "version", bxInfo != null ? bxInfo.getOrDefault( Key.of( "version" ), "" ) : "",
 				    "javaVersion", javaInfo != null ? javaInfo.getOrDefault( Key.of( "version" ), "" ) : "",
@@ -99,7 +88,6 @@ public class LensRender extends BIF {
 		    "maxTemplates", settings.getOrDefault( Key.of( "maxTemplates" ), 200 ),
 		    "maxMessages", settings.getOrDefault( Key.of( "maxMessages" ), 200 ),
 		    "maxTimings", settings.getOrDefault( Key.of( "maxTimings" ), 200 ),
-		    "scopes", settings.getOrDefault( Key.of( "scopes" ), Struct.of() ),
 		    "theme", settings.getOrDefault( Key.of( "theme" ), "dark" ),
 		    "editorLinkPattern", settings.getOrDefault( Key.of( "editorLinkPattern" ), "" )
 		);
@@ -107,7 +95,10 @@ public class LensRender extends BIF {
 		String	defaultTheme	= ( String ) settings.getOrDefault( Key.of( "theme" ), "dark" );
 		String	alpineSource	= ( String ) settings.getOrDefault( KEY_ALPINE_SOURCE, "" );
 
-		String	jsonData			= ej( toJson( context, lensData ) );
+		// Convert the POJO to an IStruct for JSON serialization
+		IStruct lensDataStruct = data.toStruct();
+
+		String	jsonData			= ej( toJson( context, lensDataStruct ) );
 		String	jsonJvm				= ej( toJson( context, jvmData ) );
 		String	jsonBx				= ej( toJson( context, bxData ) );
 		String	jsonServerSettings	= ej( toJson( context, serverSettings ) );

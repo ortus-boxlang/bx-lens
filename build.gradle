@@ -129,7 +129,8 @@ serviceLoader {
     serviceInterface 'ortus.boxlang.runtime.async.tasks.IScheduler'
     serviceInterface 'ortus.boxlang.runtime.cache.providers.ICacheProvider'
 	serviceInterface 'ortus.boxlang.runtime.events.IInterceptor'
-	// LensService is managed manually by ModuleConfig.bx — not auto-discovered
+	// LensService is managed manually by ModuleConfig.bx onLoad() — not auto-discovered via ServiceLoader
+	// (ServiceLoader requires a no-arg constructor which BaseService does not support)
 }
 
 jar {

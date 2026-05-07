@@ -11,27 +11,25 @@
  */
 package ortus.boxlang.modules.bxlens.bifs;
 
-import ortus.boxlang.modules.bxlens.util.KeyDictionary;
-import ortus.boxlang.runtime.bifs.BIF;
+import ortus.boxlang.modules.bxlens.LensRequestData;
+import ortus.boxlang.modules.bxlens.LensService;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
 import ortus.boxlang.runtime.scopes.Key;
-import ortus.boxlang.runtime.types.Array;
-import ortus.boxlang.runtime.types.IStruct;
-import ortus.boxlang.runtime.types.Struct;
 import ortus.boxlang.runtime.types.Argument;
+import ortus.boxlang.runtime.types.IStruct;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * LensAddException( exception ) — Manually log a caught exception to the debug panel.
  */
 @BoxBIF
-public class LensAddException extends BIF {
+public class LensAddException extends BaseLensBIF {
 
-	private static final Key	KEY_EXCEPTIONS		= Key.of( "exceptions" );
-	private static final Key	KEY_ENABLED			= Key.of( "enabled" );
-	private static final Key	KEY_STARTED_AT		= Key.of( "startedAt" );
-	private static final Key	KEY_MAX_EXCEPTIONS	= Key.of( "maxExceptions" );
+	private static final Key KEY_MAX_EXCEPTIONS = Key.of( "maxExceptions" );
 
 	public LensAddException() {
 		super();
@@ -42,37 +40,25 @@ public class LensAddException extends BIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		IBoxContext requestCtx = context.getRequestContext();
-		if ( requestCtx == null ) {
-			requestCtx = context;
-		}
-		IStruct lensData = requestCtx.getAttachment( KeyDictionary.lensData );
-		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( KEY_ENABLED ) ) ) {
-			return null;
-		}
+		LensRequestData data = getLensData( context );
+		if ( !isEnabled( data ) ) return null;
 
-		IStruct	settings		= moduleService.getModuleRecord( KeyDictionary.moduleName ).settings;
-		Integer	maxExceptions	= settings.getAsInteger( KEY_MAX_EXCEPTIONS );
-		Array	exceptions		= lensData.getAsArray( KEY_EXCEPTIONS );
+		int maxExceptions = getModuleSettings().getAsInteger( KEY_MAX_EXCEPTIONS );
+		if ( data.exceptions.size() >= maxExceptions ) return null;
 
-		if ( exceptions.size() >= maxExceptions ) {
-			return null;
-		}
-
-		KeyDictionary.getLensService( settings ).getStats().totalExceptions.incrementAndGet();
+		LensService svc = getLensService();
+		if ( svc != null ) svc.getStats().totalExceptions.incrementAndGet();
 
 		Object rawEx = arguments.get( Key.of( "exception" ) );
-		IStruct ex = rawEx instanceof IStruct ? ( IStruct ) rawEx : Struct.of();
+		IStruct ex = rawEx instanceof IStruct ? ( IStruct ) rawEx : null;
 
-		long startedAt = lensData.getAsLong( KEY_STARTED_AT );
-
-		exceptions.add( Struct.of(
-		    "type", ex.getOrDefault( Key.of( "type" ), "unknown" ),
-		    "message", ex.getOrDefault( Key.of( "message" ), "" ),
-		    "detail", ex.getOrDefault( Key.of( "detail" ), "" ),
-		    "stackTrace", ex.getOrDefault( Key.of( "stackTrace" ), "" ),
-		    "offset", System.currentTimeMillis() - startedAt
-		) );
+		Map<String, Object> entry = new LinkedHashMap<>();
+		entry.put( "type", ex != null ? ex.getOrDefault( Key.of( "type" ), "unknown" ) : "unknown" );
+		entry.put( "message", ex != null ? ex.getOrDefault( Key.of( "message" ), "" ) : ( rawEx != null ? rawEx.toString() : "" ) );
+		entry.put( "detail", ex != null ? ex.getOrDefault( Key.of( "detail" ), "" ) : "" );
+		entry.put( "stackTrace", ex != null ? ex.getOrDefault( Key.of( "stackTrace" ), "" ) : "" );
+		entry.put( "offset", System.currentTimeMillis() - data.startedAt );
+		data.exceptions.add( entry );
 
 		return null;
 	}

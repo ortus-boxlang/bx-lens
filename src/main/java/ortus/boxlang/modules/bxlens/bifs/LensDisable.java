@@ -11,18 +11,16 @@
  */
 package ortus.boxlang.modules.bxlens.bifs;
 
-import ortus.boxlang.modules.bxlens.util.KeyDictionary;
-import ortus.boxlang.runtime.bifs.BIF;
+import ortus.boxlang.modules.bxlens.LensRequestData;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
-import ortus.boxlang.runtime.types.IStruct;
 
 /**
  * LensDisable() — Disable the bx-lens debug bar for the current request.
  */
 @BoxBIF
-public class LensDisable extends BIF {
+public class LensDisable extends BaseLensBIF {
 
 	public LensDisable() {
 		super();
@@ -30,13 +28,9 @@ public class LensDisable extends BIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		IBoxContext requestCtx = context.getRequestContext();
-		if ( requestCtx == null ) {
-			requestCtx = context;
-		}
-		IStruct lensData = requestCtx.getAttachment( KeyDictionary.lensData );
-		if ( lensData != null ) {
-			lensData.put( "enabled", Boolean.FALSE );
+		LensRequestData data = getLensData( context );
+		if ( data != null ) {
+			data.enabled = false;
 		}
 		return Boolean.TRUE;
 	}
