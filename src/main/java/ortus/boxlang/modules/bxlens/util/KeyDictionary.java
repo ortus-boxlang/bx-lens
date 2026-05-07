@@ -14,14 +14,34 @@
  */
 package ortus.boxlang.modules.bxlens.util;
 
+import ortus.boxlang.modules.bxlens.LensService;
+import ortus.boxlang.runtime.interop.DynamicObject;
 import ortus.boxlang.runtime.scopes.Key;
+import ortus.boxlang.runtime.types.IStruct;
 
 /**
  * Central registry of Key constants used by bx-lens.
  */
 public class KeyDictionary {
 
-	public static final Key	moduleName	= new Key( "bxLens" );
-	public static final Key	lensData	= new Key( "__bxLensData__" );
+	public static final Key	moduleName		= new Key( "bxLens" );
+	public static final Key	lensData		= new Key( "__bxLensData__" );
+	public static final Key	lensServiceKey	= new Key( "lensService" );
+
+	/**
+	 * Retrieve the LensService from module settings, unwrapping any DynamicObject wrapper
+	 * that BoxLang may have applied when storing Java objects in a BX struct.
+	 *
+	 * @param settings the module settings struct
+	 *
+	 * @return the LensService instance
+	 */
+	public static LensService getLensService( IStruct settings ) {
+		Object raw = settings.get( lensServiceKey );
+		if ( raw instanceof DynamicObject ) {
+			raw = ( ( DynamicObject ) raw ).getTargetInstance();
+		}
+		return ( LensService ) raw;
+	}
 
 }

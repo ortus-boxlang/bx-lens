@@ -64,12 +64,7 @@ class {
 			lensService  : ""
 		};
 
-		interceptors = [
-			{
-				class      : "#moduleRecord.invocationPath#.interceptors.LensCollector",
-				properties : {}
-			}
-		];
+		interceptors = [];
 
 		customInterceptionPoints = [];
 	}

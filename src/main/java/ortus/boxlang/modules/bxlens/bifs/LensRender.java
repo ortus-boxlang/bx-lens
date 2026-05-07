@@ -1,123 +1,203 @@
 /**
- * LensRender() — Render the bx-lens debug bar HTML fragment.
+ * [BoxLang]
  *
- * Insert the return value just before </body> in your HTML response.
- * Returns an empty string when the bar is disabled or no request data exists.
+ * Copyright [2023] [Ortus Solutions, Corp]
  *
- * @return string  Complete self-contained HTML fragment (style + script + div).
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
  */
-@BoxBIF( "LensRender" )
-class {
+package ortus.boxlang.modules.bxlens.bifs;
 
-	property name="moduleRecord";
+import java.lang.management.ManagementFactory;
 
-	function invoke() {
-		var ctx      = getBoxContext().getRequestContext() ?: getBoxContext();
-		var lensData = ctx.getAttachment( "__bxLensData__" );
-		if ( isNull( lensData ) || !lensData.enabled ) return "";
+import ortus.boxlang.modules.bxlens.util.KeyDictionary;
+import ortus.boxlang.runtime.bifs.BIF;
+import ortus.boxlang.runtime.bifs.BoxBIF;
+import ortus.boxlang.runtime.context.IBoxContext;
+import ortus.boxlang.runtime.scopes.ArgumentsScope;
+import ortus.boxlang.runtime.scopes.Key;
+import ortus.boxlang.runtime.types.IStruct;
+import ortus.boxlang.runtime.types.Struct;
 
-		var endedAt   = lensData.endedAt > 0 ? lensData.endedAt : getTickCount();
-		var totalTime = endedAt - lensData.startedAt;
-		var svc       = moduleRecord.settings.lensService;
+/**
+ * LensRender() — Render the bx-lens debug bar HTML fragment.
+ */
+@BoxBIF
+public class LensRender extends BIF {
 
-		// JVM snapshot at render time
-		var jvmData = {};
-		try {
-			jvmData = {
-				memory      : svc.getMemoryInfo(),
-				threadDump  : svc.getThreadDump(),
-				threadCount : createObject( "java", "java.lang.management.ManagementFactory" )
-				                  .getThreadMXBean().getThreadCount()
-			};
-		} catch ( any e ) {
-			jvmData = { memory:{}, threadDump:"unavailable", threadCount:0 };
+	private static final Key KEY_ENABLED		= Key.of( "enabled" );
+	private static final Key KEY_ENDED_AT		= Key.of( "endedAt" );
+	private static final Key KEY_STARTED_AT		= Key.of( "startedAt" );
+	private static final Key KEY_ALPINE_SOURCE	= Key.of( "alpineSource" );
+
+	public LensRender() {
+		super();
+	}
+
+	@Override
+	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
+		IBoxContext requestCtx = context.getRequestContext();
+		if ( requestCtx == null ) {
+			requestCtx = context;
+		}
+		IStruct lensData = requestCtx.getAttachment( KeyDictionary.lensData );
+		if ( lensData == null || !Boolean.TRUE.equals( lensData.getAsBoolean( KEY_ENABLED ) ) ) {
+			return "";
 		}
 
-		// BoxLang server info
-		var bxData = {};
+		long	endedAt		= lensData.getAsLong( KEY_ENDED_AT );
+		long	startedAt	= lensData.getAsLong( KEY_STARTED_AT );
+		long	now			= System.currentTimeMillis();
+		long	totalTime	= ( endedAt > 0 ? endedAt : now ) - startedAt;
+
+		IStruct	settings	= moduleService.getModuleRecord( KeyDictionary.moduleName ).settings;
+		var		svc			= KeyDictionary.getLensService( settings );
+
+		// JVM snapshot
+		IStruct jvmData;
 		try {
-			bxData = {
-				version     : server.boxlang.version    ?: "",
-				javaVersion : server.java.version       ?: "",
-				osName      : server.os.name            ?: "",
-				osArch      : server.os.arch            ?: "",
-				modules     : server.boxlang.modules    ?: [],
-				extensions  : server.boxlang.extensions ?: []
-			};
-		} catch ( any e ) {}
+			jvmData = Struct.of(
+			    "memory", svc.getMemoryInfo(),
+			    "threadDump", svc.getThreadDump(),
+			    "threadCount", ManagementFactory.getThreadMXBean().getThreadCount()
+			);
+		} catch ( Exception e ) {
+			jvmData = Struct.of(
+			    "memory", Struct.of(),
+			    "threadDump", "unavailable",
+			    "threadCount", 0
+			);
+		}
 
-		// Server-side settings surfaced to the settings panel (read-only on client)
-		var serverSettings = {
-			enabled           : moduleRecord.settings.enabled,
-			maxQueries        : moduleRecord.settings.maxQueries,
-			maxExceptions     : moduleRecord.settings.maxExceptions,
-			maxTemplates      : moduleRecord.settings.maxTemplates,
-			maxMessages       : moduleRecord.settings.maxMessages,
-			maxTimings        : moduleRecord.settings.maxTimings,
-			scopes            : moduleRecord.settings.scopes,
-			theme             : moduleRecord.settings.theme,
-			editorLinkPattern : moduleRecord.settings.editorLinkPattern
-		};
+		// BoxLang server info - best-effort
+		IStruct bxData = Struct.of();
+		try {
+			IStruct serverScope = ( IStruct ) context.getScopeNearby( Key.of( "server" ) );
+			if ( serverScope != null ) {
+				IStruct bxInfo = serverScope.getAsStruct( Key.of( "boxlang" ) );
+				IStruct javaInfo = serverScope.getAsStruct( Key.of( "java" ) );
+				IStruct osInfo = serverScope.getAsStruct( Key.of( "os" ) );
+				bxData = Struct.of(
+				    "version", bxInfo != null ? bxInfo.getOrDefault( Key.of( "version" ), "" ) : "",
+				    "javaVersion", javaInfo != null ? javaInfo.getOrDefault( Key.of( "version" ), "" ) : "",
+				    "osName", osInfo != null ? osInfo.getOrDefault( Key.of( "name" ), "" ) : "",
+				    "osArch", osInfo != null ? osInfo.getOrDefault( Key.of( "arch" ), "" ) : "",
+				    "modules", bxInfo != null ? bxInfo.getOrDefault( Key.of( "modules" ), new ortus.boxlang.runtime.types.Array() ) : new ortus.boxlang.runtime.types.Array(),
+				    "extensions", bxInfo != null ? bxInfo.getOrDefault( Key.of( "extensions" ), new ortus.boxlang.runtime.types.Array() ) : new ortus.boxlang.runtime.types.Array()
+				);
+			}
+		} catch ( Exception ignored ) {}
 
-		var jsonData           = _ej( jsonSerialize( lensData ) );
-		var jsonJvm            = _ej( jsonSerialize( jvmData ) );
-		var jsonBx             = _ej( jsonSerialize( bxData ) );
-		var jsonServerSettings = _ej( jsonSerialize( serverSettings ) );
+		// Server-side settings surfaced to the client
+		IStruct serverSettings = Struct.of(
+		    "enabled", settings.getOrDefault( Key.of( "enabled" ), Boolean.TRUE ),
+		    "maxQueries", settings.getOrDefault( Key.of( "maxQueries" ), 100 ),
+		    "maxExceptions", settings.getOrDefault( Key.of( "maxExceptions" ), 50 ),
+		    "maxTemplates", settings.getOrDefault( Key.of( "maxTemplates" ), 200 ),
+		    "maxMessages", settings.getOrDefault( Key.of( "maxMessages" ), 200 ),
+		    "maxTimings", settings.getOrDefault( Key.of( "maxTimings" ), 200 ),
+		    "scopes", settings.getOrDefault( Key.of( "scopes" ), Struct.of() ),
+		    "theme", settings.getOrDefault( Key.of( "theme" ), "dark" ),
+		    "editorLinkPattern", settings.getOrDefault( Key.of( "editorLinkPattern" ), "" )
+		);
 
-		return _buildHtml( jsonData, jsonJvm, jsonBx, jsonServerSettings, totalTime );
+		String	defaultTheme	= ( String ) settings.getOrDefault( Key.of( "theme" ), "dark" );
+		String	alpineSource	= ( String ) settings.getOrDefault( KEY_ALPINE_SOURCE, "" );
+
+		String	jsonData			= ej( toJson( context, lensData ) );
+		String	jsonJvm				= ej( toJson( context, jvmData ) );
+		String	jsonBx				= ej( toJson( context, bxData ) );
+		String	jsonServerSettings	= ej( toJson( context, serverSettings ) );
+
+		return buildHtml( jsonData, jsonJvm, jsonBx, jsonServerSettings, totalTime, defaultTheme, alpineSource );
+	}
+
+	// -------------------------------------------------------------------------
+	// Private — JSON serialization
+	// -------------------------------------------------------------------------
+
+	private String toJson( IBoxContext context, Object value ) {
+		return ( String ) context.invokeFunction( Key.of( "jsonSerialize" ), new Object[] { value } );
+	}
+
+	// -------------------------------------------------------------------------
+	// Private — escape JSON for safe JS literal embedding
+	// -------------------------------------------------------------------------
+
+	private static String ej( String json ) {
+		return json
+		    .replace( "&", "&amp;" )
+		    .replace( "<", "&lt;" )
+		    .replace( ">", "&gt;" )
+		    .replace( "'", "&#39;" );
 	}
 
 	// -------------------------------------------------------------------------
 	// Private — HTML assembly
 	// -------------------------------------------------------------------------
 
-	private function _buildHtml( jsonData, jsonJvm, jsonBx, jsonServerSettings, totalTime ) {
-		var alpine = moduleRecord.settings.alpineSource;
-		var sb     = createObject( "java", "java.lang.StringBuilder" ).init();
+	private String buildHtml( String jsonData, String jsonJvm, String jsonBx, String jsonServerSettings,
+	    long totalTime, String defaultTheme, String alpineSource ) {
+		StringBuilder sb = new StringBuilder();
 
-		sb.append( '<!-- bx-lens -->' );
-		sb.append( '<style id="bxlens-styles">' );
-		sb.append( _css() );
-		sb.append( '</style>' );
+		sb.append( "<!-- bx-lens -->" );
+		sb.append( "<style id=\"bxlens-styles\">" );
+		sb.append( CSS );
+		sb.append( "</style>" );
 
-		sb.append( '<script id="bxlens-script">' );
-		if ( len( alpine ) ) {
-			sb.append( alpine );
+		sb.append( "<script id=\"bxlens-script\">" );
+		if ( alpineSource != null && !alpineSource.isEmpty() ) {
+			sb.append( alpineSource );
 		}
-		sb.append( _js( jsonData, jsonJvm, jsonBx, jsonServerSettings, totalTime ) );
-		sb.append( '</script>' );
+		sb.append( buildJs( jsonData, jsonJvm, jsonBx, jsonServerSettings, totalTime, defaultTheme ) );
+		sb.append( "</script>" );
 
-		sb.append( _html() );
+		sb.append( HTML );
+
 		return sb.toString();
 	}
 
+	private String buildJs( String jsonData, String jsonJvm, String jsonBx, String jsonServerSettings,
+	    long totalTime, String defaultTheme ) {
+		return JS_PART1
+		    + defaultTheme + JS_PART2
+		    + totalTime + JS_PART3
+		    + jsonData + JS_PART4
+		    + jsonJvm + JS_PART5
+		    + jsonBx + JS_PART6
+		    + jsonServerSettings + JS_PART7;
+	}
+
 	// -------------------------------------------------------------------------
-	// Private — CSS
+	// Static content constants
 	// -------------------------------------------------------------------------
 
-	private function _css() {
-		return '
-##bxlens-root {
+	private static final String CSS = """
+
+#bxlens-root {
   all:initial;display:block;
   position:fixed;bottom:0;left:0;width:100%;
   z-index:2147483647;
   font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   font-size:13px;line-height:1.4;
-  --bxl-bg:##1a1a2e;--bxl-bg-panel:##16213e;--bxl-bg-tab:##0f3460;
-  --bxl-accent:##e94560;--bxl-accent2:##c73652;
-  --bxl-text:##eaeaea;--bxl-text-muted:##9ca3af;
-  --bxl-border:##2d3748;
-  --bxl-warn:##f59e0b;--bxl-err:##ef4444;--bxl-ok:##10b981;
-  --bxl-http:##38b2ac;--bxl-soap:##9f7aea;
+  --bxl-bg:#1a1a2e;--bxl-bg-panel:#16213e;--bxl-bg-tab:#0f3460;
+  --bxl-accent:#e94560;--bxl-accent2:#c73652;
+  --bxl-text:#eaeaea;--bxl-text-muted:#9ca3af;
+  --bxl-border:#2d3748;
+  --bxl-warn:#f59e0b;--bxl-err:#ef4444;--bxl-ok:#10b981;
+  --bxl-http:#38b2ac;--bxl-soap:#9f7aea;
   --bxl-bar-height:40px;--bxl-panel-height:360px;
   --bxl-font-mono:"Consolas","Monaco","Courier New",monospace;
 }
-##bxlens-root[data-bxl-theme="light"] {
-  --bxl-bg:##f1f5f9;--bxl-bg-panel:##ffffff;--bxl-bg-tab:##e2e8f0;
-  --bxl-text:##0f172a;--bxl-text-muted:##64748b;--bxl-border:##cbd5e1;
-  --bxl-accent:##e94560;--bxl-accent2:##c73652;
+#bxlens-root[data-bxl-theme="light"] {
+  --bxl-bg:#f1f5f9;--bxl-bg-panel:#ffffff;--bxl-bg-tab:#e2e8f0;
+  --bxl-text:#0f172a;--bxl-text-muted:#64748b;--bxl-border:#cbd5e1;
+  --bxl-accent:#e94560;--bxl-accent2:#c73652;
 }
-##bxlens-root *{box-sizing:border-box;margin:0;padding:0;}
+#bxlens-root *{box-sizing:border-box;margin:0;padding:0;}
 .bxlens-bar{
   display:flex;align-items:center;height:var(--bxl-bar-height);
   background:var(--bxl-bg);color:var(--bxl-text);
@@ -125,7 +205,7 @@ class {
   border-top:2px solid var(--bxl-accent);user-select:none;
 }
 .bxlens-logo{display:flex;align-items:center;gap:5px;color:var(--bxl-accent);font-weight:700;font-size:12px;flex-shrink:0;}
-.bxlens-method{padding:2px 6px;border-radius:3px;background:var(--bxl-accent);color:##fff;font-size:11px;font-weight:700;flex-shrink:0;}
+.bxlens-method{padding:2px 6px;border-radius:3px;background:var(--bxl-accent);color:#fff;font-size:11px;font-weight:700;flex-shrink:0;}
 .bxlens-url{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--bxl-text-muted);font-size:12px;}
 .bxlens-chip{
   display:flex;align-items:center;gap:3px;padding:2px 7px;
@@ -159,10 +239,10 @@ class {
   border-bottom:2px solid transparent;transition:color .15s;
 }
 .bxlens-tab:hover{color:var(--bxl-text);background:var(--bxl-bg-tab);}
-.bxlens-tab.active{color:##fff;border-bottom-color:var(--bxl-accent);}
+.bxlens-tab.active{color:#fff;border-bottom-color:var(--bxl-accent);}
 .bxlens-badge{
   padding:1px 5px;border-radius:8px;background:var(--bxl-accent);
-  color:##fff;font-size:10px;font-weight:700;min-width:18px;text-align:center;
+  color:#fff;font-size:10px;font-weight:700;min-width:18px;text-align:center;
 }
 .bxlens-badge.warn{background:var(--bxl-warn);}
 .bxlens-badge.ok{background:var(--bxl-ok);}
@@ -184,8 +264,8 @@ class {
   color:var(--bxl-text);white-space:pre-wrap;word-break:break-all;
 }
 .bxlens-badge-time{padding:1px 6px;border-radius:3px;font-size:11px;font-weight:600;}
-.bxlens-badge-time.slow{background:var(--bxl-err);color:##fff;}
-.bxlens-badge-time.med{background:var(--bxl-warn);color:##000;}
+.bxlens-badge-time.slow{background:var(--bxl-err);color:#fff;}
+.bxlens-badge-time.med{background:var(--bxl-warn);color:#000;}
 .bxlens-badge-time.fast{background:var(--bxl-bg-tab);color:var(--bxl-text);}
 .bxlens-ex{border-left:3px solid var(--bxl-err);padding:8px 10px;margin-bottom:8px;background:rgba(239,68,68,.07);border-radius:0 4px 4px 0;}
 .bxlens-ex-type{font-weight:700;color:var(--bxl-err);font-size:12px;}
@@ -218,29 +298,25 @@ class {
 .bxlens-pre{font-family:var(--bxl-font-mono);font-size:11px;white-space:pre-wrap;word-break:break-all;color:var(--bxl-text);}
 .bxlens-subNav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;}
 .bxlens-subBtn{padding:3px 10px;border-radius:3px;border:1px solid var(--bxl-border);background:transparent;color:var(--bxl-text-muted);cursor:pointer;font-size:11px;font-family:inherit;}
-.bxlens-subBtn.active{background:var(--bxl-accent);color:##fff;border-color:var(--bxl-accent);}
+.bxlens-subBtn.active{background:var(--bxl-accent);color:#fff;border-color:var(--bxl-accent);}
 .bxlens-btn{padding:5px 12px;border-radius:4px;border:1px solid var(--bxl-border);background:var(--bxl-bg-tab);color:var(--bxl-text);cursor:pointer;font-size:12px;font-family:inherit;}
 .bxlens-btn:hover{background:var(--bxl-border);}
 .bxlens-settings-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--bxl-border);font-size:13px;}
 .bxlens-settings-row label{cursor:pointer;}
 .bxlens-toggle-group{display:flex;gap:4px;}
 .bxlens-toggle{padding:3px 10px;border-radius:3px;border:1px solid var(--bxl-border);background:transparent;color:var(--bxl-text-muted);cursor:pointer;font-size:11px;font-family:inherit;}
-.bxlens-toggle.active{background:var(--bxl-accent);color:##fff;border-color:var(--bxl-accent);}
+.bxlens-toggle.active{background:var(--bxl-accent);color:#fff;border-color:var(--bxl-accent);}
 .bxlens-qviews{display:flex;gap:4px;margin-bottom:8px;}
 .bxlens-view-btn{padding:2px 8px;border-radius:3px;border:1px solid var(--bxl-border);background:transparent;color:var(--bxl-text-muted);cursor:pointer;font-size:11px;font-family:inherit;}
 .bxlens-view-btn.active{background:var(--bxl-bg-tab);color:var(--bxl-text);}
 .bxlens-scope-note{font-size:11px;color:var(--bxl-text-muted);font-style:italic;padding:8px 0;}
 .bxlens-bx-modules{font-size:11px;column-count:2;gap:10px;}
 .bxlens-bx-module{padding:2px 0;color:var(--bxl-text-muted);}
-';
-	}
+""";
 
-	// -------------------------------------------------------------------------
-	// Private — JavaScript (Alpine component + initialization)
-	// -------------------------------------------------------------------------
+	// JS is split at injection points: theme, totalTime, data, jvm, bx, ss
+	private static final String JS_PART1 = """
 
-	private function _js( jsonData, jsonJvm, jsonBx, jsonServerSettings, totalTime ) {
-		return '
 (function(){
 if(window.__bxLensInit__)return;
 window.__bxLensInit__=true;
@@ -260,14 +336,32 @@ function bxLensBar(){
     showThreadDump:false,
     hideEmptyTabs:_LS.get("hideEmptyTabs",false),
     panelHeight:_LS.get("panelHeight",360),
-    theme:_LS.get("theme","#moduleRecord.settings.theme#"),
+    theme:_LS.get("theme",\"""";
+
+	private static final String JS_PART2 = """
+"),
     editorMode:_LS.get("editorMode","vscode"),
     tlFilter:{T:true,Q:true,H:true,S:true,C:true},
-    totalTime:#totalTime#,
-    data:#jsonData#,
-    jvm:#jsonJvm#,
-    bx:#jsonBx#,
-    ss:#jsonServerSettings#,
+    totalTime:\"""";
+
+	private static final String JS_PART3 = """
+,
+    data:\"""";
+
+	private static final String JS_PART4 = """
+,
+    jvm:\"""";
+
+	private static final String JS_PART5 = """
+,
+    bx:\"""";
+
+	private static final String JS_PART6 = """
+,
+    ss:\"""";
+
+	private static final String JS_PART7 = """
+,
 
     init:function(){
       var r=this.$el;
@@ -357,7 +451,7 @@ function bxLensBar(){
     },
 
     sqlHash:function(sql){
-      return sql.replace(/\x27[^\x27]*\x27/g,"?").replace(/\b\d+\b/g,"?").replace(/\s+/g," ").trim().toLowerCase();
+      return sql.replace(/\\x27[^\\x27]*\\x27/g,"?").replace(/\\b\\d+\\b/g,"?").replace(/\\s+/g," ").trim().toLowerCase();
     },
     groupedQueries:function(){
       var g={};var qs=this.data.queries;
@@ -375,7 +469,7 @@ function bxLensBar(){
     tlEvents:function(){
       var ev=[],d=this.data,f=this.tlFilter;
       if(f.T)d.templates.forEach(function(t){ev.push({label:t.templatePath.split("/").pop()||t.templatePath,fullLabel:t.templatePath,dur:t.executionTime,off:t.offset,depth:t.depth||0,type:"T",color:"var(--bxl-accent)"});});
-      if(f.Q)d.queries.forEach(function(q){ev.push({label:q.sql.substring(0,60),fullLabel:q.sql,dur:q.executionTime,off:q.offset,depth:0,type:"Q",color:"##f6ad55"});});
+      if(f.Q)d.queries.forEach(function(q){ev.push({label:q.sql.substring(0,60),fullLabel:q.sql,dur:q.executionTime,off:q.offset,depth:0,type:"Q",color:"#f6ad55"});});
       if(f.H)(d.httpCalls||[]).forEach(function(h){ev.push({label:h.method+" "+h.url.substring(0,50),fullLabel:h.url,dur:h.executionTime,off:h.offset,depth:0,type:"H",color:"var(--bxl-http)"});});
       if(f.S)(d.soapCalls||[]).forEach(function(s){ev.push({label:s.action||s.endpoint,fullLabel:s.endpoint,dur:s.executionTime,off:s.offset,depth:0,type:"S",color:"var(--bxl-soap)"});});
       if(f.C)(d.timings||[]).forEach(function(c){ev.push({label:c.label,fullLabel:c.label,dur:c.executionTime,off:c.offset,depth:0,type:"C",color:"var(--bxl-ok)"});});
@@ -404,56 +498,51 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
   });
 }
 })();
-';
-	}
+""";
 
-	// -------------------------------------------------------------------------
-	// Private — HTML panel
-	// -------------------------------------------------------------------------
+	private static final String HTML = """
 
-	private function _html() {
-		return '
 <div id="bxlens-root" x-data="bxLensBar()" x-cloak>
 
 <!-- SUMMARY BAR -->
 <div class="bxlens-bar" @click="toggle()">
   <span class="bxlens-logo">
     <svg width="18" height="18" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M60 5 L20 55 L45 55 L40 95 L80 45 L55 45 Z" fill="##e94560"/>
+      <path d="M60 5 L20 55 L45 55 L40 95 L80 45 L55 45 Z" fill="#e94560"/>
     </svg>
     BoxLang
   </span>
-  <span class="bxlens-method" x-text="data.method||''GET''"></span>
-  <span class="bxlens-url" x-text="(data.url||'''').substring(0,90)" :title="data.url"></span>
+  <span class="bxlens-method" x-text="data.method||'GET'"></span>
+  <span class="bxlens-url" x-text="(data.url||'').substring(0,90)" :title="data.url"></span>
 
   <!-- timing -->
-  <span class="bxlens-chip" @click.stop="setTab(''timeline'')">
+  <span class="bxlens-chip" @click.stop="setTab('timeline')">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
     <span x-text="fmtMs(totalTime)"></span>
   </span>
 
   <!-- queries -->
-  <span class="bxlens-chip" :class="{warn:data.queries.length>10}" @click.stop="setTab(''queries'')">
+  <span class="bxlens-chip" :class="{warn:data.queries.length>10}" @click.stop="setTab('queries')">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3"/></svg>
-    <span x-text="data.queries.length+'' Q''"></span>
+    <span x-text="data.queries.length+' Q'"></span>
   </span>
 
   <!-- exceptions -->
-  <span class="bxlens-chip" :class="{err:data.exceptions.length>0}" @click.stop="setTab(''exceptions'')">
+  <span class="bxlens-chip" :class="{err:data.exceptions.length>0}" @click.stop="setTab('exceptions')">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-    <span x-text="data.exceptions.length+'' Ex''"></span>
+    <span x-text="data.exceptions.length+' Ex'"></span>
   </span>
 
   <!-- HTTP -->
-  <span class="bxlens-chip http" @click.stop="setTab(''http'')" x-show="data.httpCalls.length>0">
+  <span class="bxlens-chip http" @click.stop="setTab('http')" x-show="data.httpCalls.length>0">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z"/><path d="M3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18"/></svg>
-    <span x-text="data.httpCalls.length+'' H''"></span>
+    <span x-text="data.httpCalls.length+' H'"></span>
   </span>
 
   <!-- messages -->
-  <span class="bxlens-chip" @click.stop="setTab(''messages'')" x-show="data.messages.length>0">
+  <span class="bxlens-chip" @click.stop="setTab('messages')" x-show="data.messages.length>0">
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.25 12.76c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z"/></svg>
-    <span x-text="data.messages.length+'' M''"></span>
+    <span x-text="data.messages.length+' M'"></span>
   </span>
 
   <!-- settings gear -->
@@ -481,7 +570,7 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
         <span x-text="tab.charAt(0).toUpperCase()+tab.slice(1)"></span>
         <template x-if="counts()[tab]!==null&&counts()[tab]>0">
           <span class="bxlens-badge"
-                :class="{warn:tab===''queries''&&counts()[tab]>10,ok:tab===''timings''}"
+                :class="{warn:tab==='queries'&&counts()[tab]>10,ok:tab==='timings'}"
                 x-text="counts()[tab]"></span>
         </template>
       </button>
@@ -492,7 +581,7 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
   <div class="bxlens-content">
 
     <!-- ===== REQUEST ===== -->
-    <div x-show="activeTab===''request''">
+    <div x-show="activeTab==='request'">
       <div class="bxlens-section">
         <div class="bxlens-section-title">This Request</div>
         <table class="bxlens-kv">
@@ -500,7 +589,7 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
           <tr><th>Method</th><td x-text="data.method"></td></tr>
           <tr><th>URL</th><td style="word-break:break-all" x-text="data.url"></td></tr>
           <tr><th>Status</th><td x-text="data.statusCode"></td></tr>
-          <tr><th>Application</th><td x-text="data.applicationName||''—''"></td></tr>
+          <tr><th>Application</th><td x-text="data.applicationName||'—'"></td></tr>
           <tr><th>Total Time</th><td x-text="fmtMs(totalTime)"></td></tr>
           <tr><th>Queries</th><td x-text="data.queries.length"></td></tr>
           <tr><th>HTTP Calls</th><td x-text="(data.httpCalls||[]).length"></td></tr>
@@ -528,7 +617,7 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== EXCEPTIONS ===== -->
-    <div x-show="activeTab===''exceptions''">
+    <div x-show="activeTab==='exceptions'">
       <div class="bxlens-empty" x-show="data.exceptions.length===0">No exceptions — great job!</div>
       <template x-for="(ex,i) in data.exceptions" :key="i">
         <div class="bxlens-ex">
@@ -543,24 +632,24 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== QUERIES ===== -->
-    <div x-show="activeTab===''queries''">
+    <div x-show="activeTab==='queries'">
       <div class="bxlens-qviews">
-        <button class="bxlens-view-btn" :class="{active:qView===''list''}"   @click="qView=''list''">List</button>
-        <button class="bxlens-view-btn" :class="{active:qView===''grouped''}" @click="qView=''grouped''">Grouped</button>
-        <button class="bxlens-view-btn" :class="{active:qView===''slowest''}" @click="qView=''slowest''">Slowest First</button>
+        <button class="bxlens-view-btn" :class="{active:qView==='list'}"   @click="qView='list'">List</button>
+        <button class="bxlens-view-btn" :class="{active:qView==='grouped'}" @click="qView='grouped'">Grouped</button>
+        <button class="bxlens-view-btn" :class="{active:qView==='slowest'}" @click="qView='slowest'">Slowest First</button>
       </div>
 
       <div class="bxlens-empty" x-show="data.queries.length===0">No queries recorded.</div>
 
       <!-- list view -->
-      <template x-if="qView===''list''">
+      <template x-if="qView==='list'">
         <div>
           <template x-for="(q,i) in data.queries" :key="i">
             <div class="bxlens-query">
               <div class="bxlens-query-head">
                 <span class="bxlens-badge-time" :class="timeClass(q.executionTime)" x-text="fmtMs(q.executionTime)"></span>
-                <span style="color:var(--bxl-text-muted)" x-text="q.recordCount+'' rows''"></span>
-                <span style="color:var(--bxl-text-muted);font-size:10px" x-text="''+q.offset+''ms''"></span>
+                <span style="color:var(--bxl-text-muted)" x-text="q.recordCount+' rows'"></span>
+                <span style="color:var(--bxl-text-muted);font-size:10px" x-text="''+q.offset+'ms'"></span>
                 <button class="bxlens-query-copy" title="Copy SQL" @click="copySQL(q.sql)">⎘ copy</button>
               </div>
               <pre class="bxlens-sql" x-text="q.sql"></pre>
@@ -570,13 +659,13 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
       </template>
 
       <!-- grouped view -->
-      <template x-if="qView===''grouped''">
+      <template x-if="qView==='grouped'">
         <div>
           <template x-for="(g,i) in groupedQueries()" :key="i">
             <div class="bxlens-query">
               <div class="bxlens-query-head">
-                <span class="bxlens-badge" x-text="g.count+''×''"></span>
-                <span style="color:var(--bxl-text-muted)" x-text="''Total: ''+fmtMs(g.totalTime)+'' · Avg: ''+fmtMs(Math.round(g.totalTime/g.count))"></span>
+                <span class="bxlens-badge" x-text="g.count+'×'"></span>
+                <span style="color:var(--bxl-text-muted)" x-text="'Total: '+fmtMs(g.totalTime)+' · Avg: '+fmtMs(Math.round(g.totalTime/g.count))"></span>
                 <button class="bxlens-query-copy" @click="copySQL(g.sql)">⎘ copy</button>
               </div>
               <pre class="bxlens-sql" x-text="g.sql"></pre>
@@ -586,13 +675,13 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
       </template>
 
       <!-- slowest view -->
-      <template x-if="qView===''slowest''">
+      <template x-if="qView==='slowest'">
         <div>
           <template x-for="(q,i) in sortedQueries()" :key="i">
             <div class="bxlens-query">
               <div class="bxlens-query-head">
                 <span class="bxlens-badge-time" :class="timeClass(q.executionTime)" x-text="fmtMs(q.executionTime)"></span>
-                <span style="color:var(--bxl-text-muted)" x-text="q.recordCount+'' rows''"></span>
+                <span style="color:var(--bxl-text-muted)" x-text="q.recordCount+' rows'"></span>
                 <button class="bxlens-query-copy" @click="copySQL(q.sql)">⎘ copy</button>
               </div>
               <pre class="bxlens-sql" x-text="q.sql"></pre>
@@ -603,14 +692,14 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== HTTP ===== -->
-    <div x-show="activeTab===''http''">
+    <div x-show="activeTab==='http'">
       <div class="bxlens-empty" x-show="(data.httpCalls||[]).length===0">No outgoing HTTP calls recorded.</div>
       <template x-for="(h,i) in (data.httpCalls||[])" :key="i">
         <div class="bxlens-http">
           <div class="bxlens-http-row">
             <span style="font-weight:700;font-size:11px" x-text="h.method"></span>
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" x-text="h.url" :title="h.url"></span>
-            <span :class="''bxlens-status-''+statusClass(h.statusCode)" x-text="h.statusCode||''—''"></span>
+            <span :class="'bxlens-status-'+statusClass(h.statusCode)" x-text="h.statusCode||'—'"></span>
             <span style="color:var(--bxl-text-muted)" x-text="fmtBytes(h.responseSize)"></span>
             <span class="bxlens-badge-time" :class="timeClass(h.executionTime)" x-text="fmtMs(h.executionTime)"></span>
           </div>
@@ -619,14 +708,14 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== SOAP ===== -->
-    <div x-show="activeTab===''soap''">
+    <div x-show="activeTab==='soap'">
       <div class="bxlens-empty" x-show="(data.soapCalls||[]).length===0">No SOAP calls recorded.</div>
       <template x-for="(s,i) in (data.soapCalls||[])" :key="i">
         <div class="bxlens-http">
           <div class="bxlens-http-row">
             <span style="font-weight:700;font-size:11px">SOAP</span>
             <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px" x-text="s.action||s.endpoint" :title="s.endpoint"></span>
-            <span :class="''bxlens-status-''+statusClass(s.statusCode)" x-text="s.statusCode||''—''"></span>
+            <span :class="'bxlens-status-'+statusClass(s.statusCode)" x-text="s.statusCode||'—'"></span>
             <span style="color:var(--bxl-text-muted)" x-text="fmtBytes(s.responseSize)"></span>
             <span class="bxlens-badge-time" :class="timeClass(s.executionTime)" x-text="fmtMs(s.executionTime)"></span>
           </div>
@@ -635,43 +724,43 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== MESSAGES ===== -->
-    <div x-show="activeTab===''messages''">
+    <div x-show="activeTab==='messages'">
       <div class="bxlens-empty" x-show="(data.messages||[]).length===0">
-        No messages. Use <span class="bxlens-code">LensMessage(''hello'')</span> to add one.
+        No messages. Use <span class="bxlens-code">LensMessage('hello')</span> to add one.
       </div>
       <template x-for="(m,i) in (data.messages||[])" :key="i">
         <div class="bxlens-msg">
           <span class="bxlens-msg-icon" :style="msgColor(m.type)" x-text="msgIcon(m.type)"></span>
           <span class="bxlens-msg-text" x-text="m.message"></span>
-          <span class="bxlens-msg-offset" x-text="m.offset+''ms''"></span>
+          <span class="bxlens-msg-offset" x-text="m.offset+'ms'"></span>
         </div>
       </template>
     </div>
 
     <!-- ===== TIMINGS ===== -->
-    <div x-show="activeTab===''timings''">
+    <div x-show="activeTab==='timings'">
       <div class="bxlens-empty" x-show="(data.timings||[]).length===0">
-        No custom timings. Use <span class="bxlens-code">LensStart(''label'')</span> / <span class="bxlens-code">LensStop(''label'')</span>.
+        No custom timings. Use <span class="bxlens-code">LensStart('label')</span> / <span class="bxlens-code">LensStop('label')</span>.
       </div>
       <div style="display:flex;gap:4px;margin-bottom:8px;">
-        <button class="bxlens-view-btn" :class="{active:tView===''bars''}"  @click="tView=''bars''">Bars</button>
-        <button class="bxlens-view-btn" :class="{active:tView===''table''}" @click="tView=''table''">Table</button>
+        <button class="bxlens-view-btn" :class="{active:tView==='bars'}"  @click="tView='bars'">Bars</button>
+        <button class="bxlens-view-btn" :class="{active:tView==='table'}" @click="tView='table'">Table</button>
       </div>
-      <template x-if="tView===''bars''">
+      <template x-if="tView==='bars'">
         <div class="bxlens-tl">
           <template x-for="(t,i) in (data.timings||[])" :key="i">
             <div class="bxlens-tl-row">
               <span class="bxlens-tl-label" x-text="t.label"></span>
               <div class="bxlens-tl-wrap">
                 <div class="bxlens-tl-bar"
-                     :style="''background:var(--bxl-ok);left:''+pct(t.offset,totalTime)+''%;width:''+Math.max(0.5,pct(t.executionTime,totalTime))+''%''"></div>
+                     :style="'background:var(--bxl-ok);left:'+pct(t.offset,totalTime)+'%;width:'+Math.max(0.5,pct(t.executionTime,totalTime))+'%'"></div>
               </div>
               <span class="bxlens-tl-time" x-text="fmtMs(t.executionTime)"></span>
             </div>
           </template>
         </div>
       </template>
-      <template x-if="tView===''table''">
+      <template x-if="tView==='table'">
         <table class="bxlens-kv">
           <thead><tr><th>Label</th><th>Duration</th><th>Offset</th></tr></thead>
           <tbody>
@@ -679,7 +768,7 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
               <tr>
                 <td x-text="t.label"></td>
                 <td x-text="fmtMs(t.executionTime)"></td>
-                <td x-text="t.offset+''ms''"></td>
+                <td x-text="t.offset+'ms'"></td>
               </tr>
             </template>
           </tbody>
@@ -688,13 +777,13 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== TIMELINE ===== -->
-    <div x-show="activeTab===''timeline''">
+    <div x-show="activeTab==='timeline'">
       <div class="bxlens-tl-filters">
         <span class="bxlens-tl-filter" :class="{off:!tlFilter.T}"
               style="color:var(--bxl-accent);border-color:var(--bxl-accent);"
               @click="tlFilter.T=!tlFilter.T">Templates</span>
         <span class="bxlens-tl-filter" :class="{off:!tlFilter.Q}"
-              style="color:##f6ad55;border-color:##f6ad55;"
+              style="color:#f6ad55;border-color:#f6ad55;"
               @click="tlFilter.Q=!tlFilter.Q">Queries</span>
         <span class="bxlens-tl-filter" :class="{off:!tlFilter.H}"
               style="color:var(--bxl-http);border-color:var(--bxl-http);"
@@ -717,11 +806,11 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
         </div>
         <!-- Events -->
         <template x-for="(ev,i) in tlEvents()" :key="i">
-          <div class="bxlens-tl-row" :style="''padding-left:''+(ev.depth*14)+''px''">
+          <div class="bxlens-tl-row" :style="'padding-left:'+(ev.depth*14)+'px'">
             <span class="bxlens-tl-label" :title="ev.fullLabel" x-text="ev.label"></span>
-            <div class="bxlens-tl-wrap" :title="fmtMs(ev.dur)+'' @ ''+ev.off+''ms''">
+            <div class="bxlens-tl-wrap" :title="fmtMs(ev.dur)+' @ '+ev.off+'ms'">
               <div class="bxlens-tl-bar"
-                   :style="''background:''+ev.color+'';left:''+pct(ev.off,totalTime)+''%;width:''+Math.max(0.5,pct(ev.dur,totalTime))+''%''"></div>
+                   :style="'background:'+ev.color+';left:'+pct(ev.off,totalTime)+'%;width:'+Math.max(0.5,pct(ev.dur,totalTime))+'%'"></div>
             </div>
             <span class="bxlens-tl-time" x-text="fmtMs(ev.dur)"></span>
           </div>
@@ -730,18 +819,18 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== TEMPLATES ===== -->
-    <div x-show="activeTab===''templates''">
+    <div x-show="activeTab==='templates'">
       <div class="bxlens-empty" x-show="data.templates.length===0">No templates recorded.</div>
       <table class="bxlens-kv" x-show="data.templates.length>0">
-        <thead><tr><th>##</th><th>Template</th><th>Offset</th><th>Duration</th></tr></thead>
+        <thead><tr><th>#</th><th>Template</th><th>Offset</th><th>Duration</th></tr></thead>
         <tbody>
           <template x-for="(t,i) in data.templates" :key="i">
             <tr>
               <td style="color:var(--bxl-text-muted);width:24px" x-text="i+1"></td>
-              <td :style="''padding-left:''+(t.depth*12)+''px''" style="word-break:break-all;font-size:11px;font-family:var(--bxl-font-mono)">
-                <span x-text="(t.depth>0?''└ '':'''')+t.templatePath"></span>
+              <td :style="'padding-left:'+(t.depth*12)+'px'" style="word-break:break-all;font-size:11px;font-family:var(--bxl-font-mono)">
+                <span x-text="(t.depth>0?'└ ':'')+t.templatePath"></span>
               </td>
-              <td style="color:var(--bxl-text-muted);font-size:11px" x-text="t.offset+''ms''"></td>
+              <td style="color:var(--bxl-text-muted);font-size:11px" x-text="t.offset+'ms'"></td>
               <td><span class="bxlens-badge-time" :class="timeClass(t.executionTime)" x-text="fmtMs(t.executionTime)"></span></td>
             </tr>
           </template>
@@ -750,9 +839,9 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== VARIABLES ===== -->
-    <div x-show="activeTab===''variables''">
+    <div x-show="activeTab==='variables'">
       <div class="bxlens-subNav">
-        <template x-for="scope in [''form'',''url'',''cgi'',''request'',''session'',''application'']" :key="scope">
+        <template x-for="scope in ['form','url','cgi','request','session','application']" :key="scope">
           <button class="bxlens-subBtn" :class="{active:varScope===scope}" @click="varScope=scope"
                   x-text="scope.charAt(0).toUpperCase()+scope.slice(1)"></button>
         </template>
@@ -762,19 +851,19 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
       </template>
       <template x-if="!scopeEnabled(varScope)">
         <div class="bxlens-scope-note">
-          Scope capture is disabled. Enable in ModuleConfig: <span class="bxlens-code" x-text="''settings.scopes.''+varScope+'' = true''"></span>
+          Scope capture is disabled. Enable in ModuleConfig: <span class="bxlens-code" x-text="'settings.scopes.'+varScope+' = true'"></span>
         </div>
       </template>
     </div>
 
     <!-- ===== BOXLANG ===== -->
-    <div x-show="activeTab===''boxlang''">
+    <div x-show="activeTab==='boxlang'">
       <div class="bxlens-section">
         <div class="bxlens-section-title">Runtime</div>
         <table class="bxlens-kv">
-          <tr><th>BoxLang Version</th><td x-text="bx.version||''—''"></td></tr>
-          <tr><th>Java Version</th><td x-text="bx.javaVersion||''—''"></td></tr>
-          <tr><th>OS</th><td x-text="(bx.osName||''—'')+(bx.osArch?'' (''+bx.osArch+'')'':'''')"></td></tr>
+          <tr><th>BoxLang Version</th><td x-text="bx.version||'—'"></td></tr>
+          <tr><th>Java Version</th><td x-text="bx.javaVersion||'—'"></td></tr>
+          <tr><th>OS</th><td x-text="(bx.osName||'—')+(bx.osArch?' ('+bx.osArch+')':'')"></td></tr>
         </table>
       </div>
       <div class="bxlens-section" x-show="(bx.modules||[]).length>0">
@@ -796,22 +885,22 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
     </div>
 
     <!-- ===== JVM ===== -->
-    <div x-show="activeTab===''jvm''">
+    <div x-show="activeTab==='jvm'">
       <div class="bxlens-section">
         <div class="bxlens-section-title">Memory</div>
         <div x-show="jvm.memory">
           <div class="bxlens-mem-row">
             <span style="color:var(--bxl-text-muted)">Heap Used</span>
             <div class="bxlens-mem-bar">
-              <div class="bxlens-mem-fill" :style="''width:''+memPct(jvm.memory.heapUsed||0,jvm.memory.heapMax||1)+''%''"></div>
+              <div class="bxlens-mem-fill" :style="'width:'+memPct(jvm.memory.heapUsed||0,jvm.memory.heapMax||1)+'%'"></div>
             </div>
-            <span x-text="fmtBytes(jvm.memory.heapUsed||0)+'' / ''+fmtBytes(jvm.memory.heapMax||0)"></span>
+            <span x-text="fmtBytes(jvm.memory.heapUsed||0)+' / '+fmtBytes(jvm.memory.heapMax||0)"></span>
           </div>
           <div class="bxlens-mem-row">
             <span style="color:var(--bxl-text-muted)">Heap Committed</span>
             <div class="bxlens-mem-bar">
               <div class="bxlens-mem-fill" style="background:var(--bxl-http);"
-                   :style="''width:''+memPct(jvm.memory.heapCommitted||0,jvm.memory.heapMax||1)+''%''"></div>
+                   :style="'width:'+memPct(jvm.memory.heapCommitted||0,jvm.memory.heapMax||1)+'%'"></div>
             </div>
             <span x-text="fmtBytes(jvm.memory.heapCommitted||0)"></span>
           </div>
@@ -827,9 +916,9 @@ if(window.Alpine&&parseInt(window.Alpine.version)>=3){
       <div class="bxlens-section">
         <div class="bxlens-section-title">Threads</div>
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">
-          <span>Active Threads: <strong x-text="jvm.threadCount||''—''"></strong></span>
+          <span>Active Threads: <strong x-text="jvm.threadCount||'—'"></strong></span>
           <button class="bxlens-btn" @click="showThreadDump=!showThreadDump"
-                  x-text="showThreadDump?''Hide Thread Dump ▲'':''Show Thread Dump ▼''"></button>
+                  x-text="showThreadDump?'Hide Thread Dump ▲':'Show Thread Dump ▼'"></button>
         </div>
         <pre class="bxlens-pre" x-show="showThreadDump"
              style="max-height:200px;overflow-y:auto;font-size:10px;padding:8px;background:var(--bxl-bg);border-radius:4px;"
@@ -844,7 +933,7 @@ var path = LensDumpHeap( "/tmp/my.hprof" );</pre>
     </div>
 
     <!-- ===== SETTINGS ===== -->
-    <div x-show="activeTab===''settings''">
+    <div x-show="activeTab==='settings'">
       <div class="bxlens-section">
         <div class="bxlens-section-title">UI Preferences</div>
 
@@ -856,9 +945,9 @@ var path = LensDumpHeap( "/tmp/my.hprof" );</pre>
         <div class="bxlens-settings-row">
           <span style="color:var(--bxl-text-muted);min-width:90px">Theme</span>
           <div class="bxlens-toggle-group">
-            <button class="bxlens-toggle" :class="{active:theme===''dark''}"  @click="setTheme(''dark'')">Dark</button>
-            <button class="bxlens-toggle" :class="{active:theme===''light''}" @click="setTheme(''light'')">Light</button>
-            <button class="bxlens-toggle" :class="{active:theme===''auto''}"  @click="setTheme(''auto'')">Auto</button>
+            <button class="bxlens-toggle" :class="{active:theme==='dark'}"  @click="setTheme('dark')">Dark</button>
+            <button class="bxlens-toggle" :class="{active:theme==='light'}" @click="setTheme('light')">Light</button>
+            <button class="bxlens-toggle" :class="{active:theme==='auto'}"  @click="setTheme('auto')">Auto</button>
           </div>
         </div>
 
@@ -874,9 +963,9 @@ var path = LensDumpHeap( "/tmp/my.hprof" );</pre>
         <div class="bxlens-settings-row">
           <span style="color:var(--bxl-text-muted);min-width:90px">Editor Links</span>
           <div class="bxlens-toggle-group">
-            <button class="bxlens-toggle" :class="{active:editorMode===''vscode''}"    @click="setEditorMode(''vscode'')">VS Code</button>
-            <button class="bxlens-toggle" :class="{active:editorMode===''phpstorm''}"  @click="setEditorMode(''phpstorm'')">PhpStorm</button>
-            <button class="bxlens-toggle" :class="{active:editorMode===''off''}"       @click="setEditorMode(''off'')">Off</button>
+            <button class="bxlens-toggle" :class="{active:editorMode==='vscode'}"    @click="setEditorMode('vscode')">VS Code</button>
+            <button class="bxlens-toggle" :class="{active:editorMode==='phpstorm'}"  @click="setEditorMode('phpstorm')">PhpStorm</button>
+            <button class="bxlens-toggle" :class="{active:editorMode==='off'}"       @click="setEditorMode('off')">Off</button>
           </div>
         </div>
 
@@ -895,12 +984,12 @@ var path = LensDumpHeap( "/tmp/my.hprof" );</pre>
           <tr><th>Max Messages</th><td x-text="ss.maxMessages"></td></tr>
           <tr><th>Max Timings</th><td x-text="ss.maxTimings"></td></tr>
           <tr><th>Theme Default</th><td x-text="ss.theme"></td></tr>
-          <tr><th>Editor Pattern</th><td x-text="ss.editorLinkPattern||''(none)''"></td></tr>
+          <tr><th>Editor Pattern</th><td x-text="ss.editorLinkPattern||'(none)'"></td></tr>
           <tr><th>Scopes</th>
             <td>
               <template x-for="(v,k) in (ss.scopes||{})" :key="k">
-                <span :style="v?''color:var(--bxl-ok)'':''color:var(--bxl-text-muted)''">
-                  <span x-text="k"></span><span x-text="v?'' ✓ '':'' ✗ ''"></span>
+                <span :style="v?'color:var(--bxl-ok)':'color:var(--bxl-text-muted)'">
+                  <span x-text="k"></span><span x-text="v?' ✓ ':' ✗ '"></span>
                 </span>
               </template>
             </td>
@@ -912,20 +1001,7 @@ var path = LensDumpHeap( "/tmp/my.hprof" );</pre>
   </div><!-- end .bxlens-content -->
 </div><!-- end .bxlens-panel -->
 
-</div><!-- end ##bxlens-root -->
-';
-	}
-
-	// -------------------------------------------------------------------------
-	// Private — escape JSON for safe JS literal embedding
-	// -------------------------------------------------------------------------
-
-	private function _ej( json ) {
-		return json
-		    .replace( "&",  "&amp;" )
-		    .replace( "<",  "&lt;" )
-		    .replace( ">",  "&gt;" )
-		    .replace( char( 39 ), "&##39;" );
-	}
+</div><!-- end #bxlens-root -->
+""";
 
 }
