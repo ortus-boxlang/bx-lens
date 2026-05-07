@@ -924,7 +924,8 @@ var path = LensDumpHeap( "/tmp/my.hprof" );</pre>
 		return json
 		    .replace( "&",  "&amp;" )
 		    .replace( "<",  "&lt;" )
-		    .replace( ">",  "&gt;" );
+		    .replace( ">",  "&gt;" )
+		    .replace( char( 39 ), "&##39;" );
 	}
 
 }
