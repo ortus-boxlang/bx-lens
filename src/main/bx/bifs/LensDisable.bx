@@ -1,0 +1,21 @@
+/**
+ * LensDisable() — Disable the bx-lens debug bar for the current request.
+ *
+ * Useful to suppress the bar on AJAX endpoints, API responses, or binary downloads.
+ *
+ * @return true
+ */
+@BoxBIF( "LensDisable" )
+class {
+
+	property name="moduleRecord";
+
+	function invoke() {
+		var d = ( getBoxContext().getRequestContext() ?: getBoxContext() ).getAttachment( "__bxLensData__" );
+		if ( !isNull( d ) ) {
+			d.enabled = false;
+		}
+		return true;
+	}
+
+}

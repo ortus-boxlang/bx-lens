@@ -1,0 +1,27 @@
+/**
+ * LensMessage( message [, type] ) — Add a developer message to the current request's debug panel.
+ *
+ * Messages appear in the Messages tab.
+ *
+ * @message  The message string to log.
+ * @type     Severity level: info | warn | error | debug  (default: info)
+ */
+@BoxBIF( "LensMessage" )
+class {
+
+	property name="moduleRecord";
+
+	function invoke( required string message, string type = "info" ) {
+		var d = ( getBoxContext().getRequestContext() ?: getBoxContext() ).getAttachment( "__bxLensData__" );
+		if ( isNull( d ) || !d.enabled ) return;
+		if ( d.messages.len() >= moduleRecord.settings.maxMessages ) return;
+
+		moduleRecord.settings.lensService.getStats().totalMessages.incrementAndGet();
+		d.messages.append( {
+			message : message,
+			type    : type,
+			offset  : getTickCount() - d.startedAt
+		} );
+	}
+
+}

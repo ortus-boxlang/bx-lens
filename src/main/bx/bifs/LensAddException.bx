@@ -1,0 +1,28 @@
+/**
+ * LensAddException( exception ) — Manually log a caught exception to the debug panel.
+ *
+ * Useful when you catch exceptions and handle them gracefully but still want them visible.
+ *
+ * @exception  A caught exception object (catch variable or any struct with type/message keys).
+ */
+@BoxBIF( "LensAddException" )
+class {
+
+	property name="moduleRecord";
+
+	function invoke( required any exception ) {
+		var d = ( getBoxContext().getRequestContext() ?: getBoxContext() ).getAttachment( "__bxLensData__" );
+		if ( isNull( d ) || !d.enabled ) return;
+		if ( d.exceptions.len() >= moduleRecord.settings.maxExceptions ) return;
+
+		moduleRecord.settings.lensService.getStats().totalExceptions.incrementAndGet();
+		d.exceptions.append( {
+			type       : exception.type       ?: "unknown",
+			message    : exception.message    ?: "",
+			detail     : exception.detail     ?: "",
+			stackTrace : exception.stackTrace ?: "",
+			offset     : getTickCount() - d.startedAt
+		} );
+	}
+
+}

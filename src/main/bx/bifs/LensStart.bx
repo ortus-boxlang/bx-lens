@@ -1,0 +1,32 @@
+/**
+ * LensStart( label ) — Start a named custom timer.
+ *
+ * Returns a unique hash that can be passed to LensStop() to close the timing.
+ * Multiple concurrent timers with the same label are tracked independently.
+ *
+ * @label  Display name for this timing.
+ * @return String hash to pass to LensStop(). Returns label when disabled.
+ */
+@BoxBIF( "LensStart" )
+class {
+
+	property name="moduleRecord";
+
+	function invoke( required string label ) {
+		var d = ( getBoxContext().getRequestContext() ?: getBoxContext() ).getAttachment( "__bxLensData__" );
+		if ( isNull( d ) || !d.enabled ) return label;
+
+		if ( !structKeyExists( d, "_pendingTimings" ) ) {
+			d._pendingTimings = {};
+		}
+
+		var hash = label & "_" & createUUID();
+		d._pendingTimings[ hash ] = {
+			label      : label,
+			_startTick : getTickCount(),
+			offset     : getTickCount() - d.startedAt
+		};
+		return hash;
+	}
+
+}

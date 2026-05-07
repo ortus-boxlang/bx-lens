@@ -1,0 +1,22 @@
+/**
+ * LensDumpHeap( [outputPath] ) — Dump the JVM heap to a .hprof file.
+ *
+ * Requires a HotSpot JVM. The output file can be several GB; use with caution.
+ * Dumps only live objects (liveObjectsOnly = true).
+ *
+ * @outputPath  Optional absolute file path. Defaults to system temp dir with a timestamped filename.
+ * @return      Absolute path of the created .hprof file.
+ */
+@BoxBIF( "LensDumpHeap" )
+class {
+
+	property name="moduleRecord";
+
+	function invoke( string outputPath = "" ) {
+		if ( !len( trim( outputPath ) ) ) {
+			outputPath = getTempDirectory() & "bxlens-heap-" & dateTimeFormat( now(), "yyyymmddHHmmss" ) & ".hprof";
+		}
+		return moduleRecord.settings.lensService.dumpHeap( outputPath );
+	}
+
+}

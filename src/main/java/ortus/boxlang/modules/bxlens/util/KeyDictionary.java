@@ -12,15 +12,16 @@
  * BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-package ortus.boxlang.moduleslug.util;
+package ortus.boxlang.modules.bxlens.util;
 
 import ortus.boxlang.runtime.scopes.Key;
 
 /**
- * This class is used to store all the keys used in the dictionary for this module.
+ * Central registry of Key constants used by bx-lens.
  */
 public class KeyDictionary {
 
-	public static final Key moduleName = new Key( "@MODULE_SLUG@" );
+	public static final Key	moduleName	= new Key( "bxLens" );
+	public static final Key	lensData	= new Key( "__bxLensData__" );
 
 }
