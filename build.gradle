@@ -129,13 +129,14 @@ serviceLoader {
     serviceInterface 'ortus.boxlang.runtime.async.tasks.IScheduler'
     serviceInterface 'ortus.boxlang.runtime.cache.providers.ICacheProvider'
 	serviceInterface 'ortus.boxlang.runtime.events.IInterceptor'
-	serviceInterface 'ortus.boxlang.runtime.services.IService'
+	// LensService is managed manually by ModuleConfig.bx onLoad() — not auto-discovered via ServiceLoader
+	// (ServiceLoader requires a no-arg constructor which BaseService does not support)
 }
 
 jar {
     archiveVersion =  "${version}"
  	manifest {
-	   attributes 'Description': 'ExampleBoxLangModule'
+	   attributes 'Description': 'BoxLang Debug Bar Module (bx-lens)'
     }
 }
 shadowJar {
@@ -160,14 +161,18 @@ spotless {
 
 /**
  * Custom task that creates a build/module folders
- * - Copies the build/libs/BoxLangModuleTemplate-1.0.0.jar to build/module/libs/BoxLangModuleTemplate-1.0.0.jar
- * - Copies the src/main/bx/** to build/module/ folder.
+ * - Copies the build/libs/bx-lens-*.jar to build/modules/bx-lens/libs/
+ * - Copies the src/main/bx/** to build/modules/bx-lens/ folder.
  */
 task createModuleStructure(type: Copy) {
 	mustRunAfter shadowJar, jar
     from( 'build/libs' ) {
 		include "${project.name}-${version}.jar"
         into 'libs'
+    }
+    from( 'src/main/bx/assets' ) {
+        include '**/*.js'
+        into 'assets'
     }
     from( 'src/main/bx' ) {
 		include '**/*.bx'
@@ -192,7 +197,7 @@ task createModuleStructure(type: Copy) {
 		}
     }
 
-    destinationDir = file( 'build/module' )
+    destinationDir = file( "build/modules/${project.name}" )
 }
 task zipModuleStructure( type: Zip ) {
     group = "distribution"

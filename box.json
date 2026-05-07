@@ -1,22 +1,22 @@
 {
-	"name": "@MODULE_NAME@",
+	"name": "bxLens",
 	"version": "@build.version@+@build.number@",
-	"location": "https://downloads.ortussolutions.com/ortussolutions/boxlang-modules/@MODULE_SLUG@/@build.version@/@MODULE_SLUG@-@build.version@.zip",
+	"location": "https://downloads.ortussolutions.com/ortussolutions/boxlang-modules/bx-lens/@build.version@/bx-lens-@build.version@.zip",
 	"author": "Ortus Solutions",
-	"homepage": "https://github.com/ortus-boxlang/@MODULE_SLUG@",
-	"documentation": "https://github.com/ortus-boxlang/@MODULE_SLUG@",
+	"homepage": "https://github.com/ortus-boxlang/bx-lens",
+	"documentation": "https://github.com/ortus-boxlang/bx-lens",
 	"repository": {
 		"type": "git",
-		"URL": "https://github.com/ortus-boxlang/@MODULE_SLUG@"
+		"URL": "https://github.com/ortus-boxlang/bx-lens"
 	},
 	"bugs": "https://ortussolutions.atlassian.net/browse/BLMODULES",
-	"slug": "@MODULE_SLUG@",
-	"shortDescription": "Module template for BoxLang modules",
+	"slug": "bx-lens",
+	"shortDescription": "BoxLang Debug Bar — request profiling panel for web pages",
 	"type": "boxlang-modules",
 	"keywords": ["boxlang"],
 	"boxlang": {
 		"minimumVersion": "1.0.0",
-		"moduleName": "@MODULE_REGISTERED_NAME@"
+		"moduleName": "bxLens"
 	},
 	"private": false,
 	"license": [
