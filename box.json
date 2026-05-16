@@ -13,7 +13,9 @@
 	"slug": "bx-lens",
 	"shortDescription": "BoxLang Debug Bar — request profiling panel for web pages",
 	"type": "boxlang-modules",
-	"keywords": ["boxlang"],
+	"keywords": [
+		"boxlang"
+	],
 	"boxlang": {
 		"minimumVersion": "1.0.0",
 		"moduleName": "bxLens"
@@ -27,7 +29,6 @@
 	],
 	"devDependencies": {
 		"commandbox-boxlang": "*",
-		"commandbox-cfformat": "*",
 		"commandbox-docbox": "*",
 		"testbox": "*"
 	},
@@ -40,8 +41,5 @@
 		"/src/**",
 		"gradle/**"
 	],
-	"scripts": {
-		"setupTemplate": "task run taskFile=src/build/SetupTemplate.cfc",
-		"onRelease": "publish"
-	}
+	"scripts": {}
 }

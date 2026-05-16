@@ -14,8 +14,6 @@
  */
 package ortus.boxlang.modules.bxlens.util;
 
-import ortus.boxlang.modules.bxlens.LensService;
-import ortus.boxlang.runtime.BoxRuntime;
 import ortus.boxlang.runtime.scopes.Key;
 
 /**
@@ -23,16 +21,8 @@ import ortus.boxlang.runtime.scopes.Key;
  */
 public class KeyDictionary {
 
-	public static final Key	moduleName	= new Key( "bxLens" );
-	public static final Key	lensData	= new Key( "__bxLensData__" );
-
-	/**
-	 * Retrieve the LensService from the global service registry.
-	 *
-	 * @return the LensService instance, or null if not yet registered
-	 */
-	public static LensService getLensService() {
-		return ( LensService ) BoxRuntime.getInstance().getGlobalService( LensService.NAME );
-	}
+	public static final Key	moduleName		= new Key( "bxLens" );
+	public static final Key	lensData		= new Key( "__bxLensData__" );
+	public static final Key	bxLensService	= Key.of( "bxLensService" );
 
 }

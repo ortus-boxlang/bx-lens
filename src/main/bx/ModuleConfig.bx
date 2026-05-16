@@ -1,8 +1,13 @@
 /**
- * bx-lens Module Configuration
+ * BoxLang Lens Module
+ * ---
+ * A module can have the following folders that will be automatically registered:
+ * + bifs - Custom BIFs that will be registered into the runtime
+ * + interceptors - Custom interceptors that will be registered into the runtime via the configure() method
+ * + libs - Custom java libraries that your module leverages
+ * + tags - Custom tags that will be registered into the runtime
  *
- * BoxLang Debug Bar — request profiling panel for web pages.
- * Drop LensRender() just before </body> on any page to inject the debug bar.
+ * Every module will have its own classloader that will be used to load the module libs and dependencies.
  */
 class {
 
@@ -10,13 +15,67 @@ class {
 	property name="boxRuntime";
 	property name="log";
 
-	this.version     = "@build.version@+@build.number@";
-	this.mapping     = "bxLens";
-	this.author      = "Ortus Solutions";
-	this.description = "BoxLang Debug Bar — request profiling panel for web pages";
-	this.webURL      = "https://www.ortussolutions.com";
-	this.enabled     = true;
-	this.dependencies = [];
+	/**
+	 * --------------------------------------------------------------------------
+	 * Module Properties
+	 * --------------------------------------------------------------------------
+	 * Here is where you define the properties of your module that the module service
+	 * will use to register and activate your module
+	 */
+
+	/**
+	 * Your module version. Try to use semantic versioning
+	 * @mandatory
+	 */
+	this.version = "@build.version@+@build.number@"
+
+	/**
+	 * The BoxLang mapping for your module.  All BoxLang modules are registered with an internal
+	 * mapping prefix of : bxModules.{this.mapping}, /bxmodules/{this.mapping}. Ex: bxModules.test, /bxmodules/test
+	 */
+	this.mapping = "bxlens"
+
+	/**
+	 * The public mapping for your module.  This is the public facing mapping
+	 * that users will use to access your module features.
+	 * For us it will be /~bxlens -> public mapping
+	 */
+	this.publicMapping = {
+		name      : "~bxlens",
+		usePrefix : false,
+		path      : "public"
+	}
+
+	/**
+	 * Who built the module
+	 */
+	this.author = "Luis Majano"
+
+	/**
+	 * The module description
+	 */
+	this.description = "A debugging and profiling lens bar for BoxLang applications."
+
+	/**
+	 * The module web URL
+	 */
+	this.webURL = "https://www.ortussolutions.com"
+
+	/**
+	 * This boolean flag tells the module service to skip the module registration/activation process.
+	 */
+	this.enabled = true
+
+    /**
+	 * The module dependencies that this module needs to be activated before this module is activated
+	 */
+	this.dependencies = []
+
+	/**
+	 * --------------------------------------------------------------------------
+	 * Module Methods
+	 * --------------------------------------------------------------------------
+	 */
 
 	/**
 	 * Called by the ModuleService on module registration.
@@ -73,29 +132,12 @@ class {
 			alpineSource : ""
 		};
 
-		interceptors = [];
-
-		customInterceptionPoints = [];
 	}
 
 	/**
 	 * Called by the ModuleService on module activation.
 	 */
 	function onLoad() {
-		// Get the LensService KEY from the class
-		var svcKeyName = createObject( "java", "ortus.boxlang.modules.bxlens.LensService" ).NAME;
-
-		// Check if already registered globally (e.g., from a prior activation)
-		var svc = boxRuntime.getGlobalService( svcKeyName );
-		if ( isNull( svc ) || !isObject( svc ) ) {
-			svc = new ortus.boxlang.modules.bxlens.LensService( boxRuntime );
-			svc.onStartup();
-			boxRuntime.putGlobalService( svcKeyName, svc );
-		}
-
-		// Wire up collectors based on settings
-		svc.activateCollectors( settings );
-
 		// Embed Alpine.js source so LensRender() can include it inline
 		var alpinePath = moduleRecord.physicalPath & "/assets/alpine.min.js";
 		if ( fileExists( alpinePath ) ) {
@@ -107,12 +149,6 @@ class {
 	 * Called by the ModuleService on module deactivation.
 	 */
 	function onUnload() {
-		var svcKeyName = createObject( "java", "ortus.boxlang.modules.bxlens.LensService" ).NAME;
-		var svc = boxRuntime.getGlobalService( svcKeyName );
-		if ( !isNull( svc ) && isObject( svc ) ) {
-			svc.deactivateCollectors();
-			// Don't shutdown the service itself — it's global and may serve other invocations
-		}
 	}
 
 }

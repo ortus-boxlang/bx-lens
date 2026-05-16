@@ -34,10 +34,20 @@ public abstract class BaseCollector extends BaseInterceptor {
 	 */
 	public abstract String getName();
 
+	/**
+	 * Helper to get the LensService instance from the runtime.
+	 *
+	 * @return
+	 */
 	protected LensService getLensService() {
-		return ( LensService ) getRuntime().getGlobalService( LensService.NAME );
+		return ( LensService ) getRuntime().getGlobalService( KeyDictionary.bxLensService );
 	}
 
+	/**
+	 * Helper to get the module settings struct from the runtime.
+	 *
+	 * @return module settings struct
+	 */
 	protected IStruct getModuleSettings() {
 		return getRuntime().getModuleService().getModuleRecord( KeyDictionary.moduleName ).settings;
 	}
