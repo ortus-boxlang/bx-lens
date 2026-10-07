@@ -11,8 +11,8 @@
 		.order( 95 );
 	lensPanel( "harness-spans", "Phases" )
 		.spans( [
-			{ label : "warm up", start : 2, dur : 5, type : "custom" },
-			{ label : "render", start : 9, dur : 11, type : "custom" }
+			{ label : "warm up", start : 0.5, dur : 1.5, type : "custom" },
+			{ label : "render", start : 2.5, dur : 2, type : "custom" }
 		] );
 </bx:script>
 <bx:include template="/includes/header.bxm" />

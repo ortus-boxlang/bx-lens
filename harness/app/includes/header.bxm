@@ -18,6 +18,6 @@
 	<a href="/index.bxm">Home</a><a href="/orders.bxm">Orders</a><a href="/n-plus-one.bxm">N+1</a><a href="/slow.bxm">Slow query</a>
 	<a href="/caught-exception.bxm">Caught exception</a><a href="/error.bxm">Uncaught error</a><a href="/http.bxm">HTTP</a>
 	<a href="/cache.bxm">Cache</a><a href="/timers.bxm">Timers</a><a href="/functions.bxm">Functions</a><a href="/forms.bxm">Form</a>
-	<a href="/session.bxm">Session</a><a href="/transaction.bxm">Transaction</a><a href="/extend.bxm">Extend</a>
+	<a href="/session.bxm">Session</a><a href="/xss.bxm">Escaping</a><a href="/transaction.bxm">Transaction</a><a href="/extend.bxm">Extend</a>
 </nav>
 <main>

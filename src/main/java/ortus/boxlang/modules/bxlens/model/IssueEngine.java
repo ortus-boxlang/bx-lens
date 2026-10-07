@@ -125,6 +125,23 @@ public final class IssueEngine {
 			}
 		}
 
+		// Outgoing HTTP calls that failed
+		synchronized ( req.http ) {
+			for ( Map<String, Object> h : req.http ) {
+				int		status	= h.get( "status" ) instanceof Number n ? n.intValue() : 0;
+				String	what	= h.get( "method" ) + " " + h.get( "url" );
+				int		spanId	= h.get( "span" ) instanceof Number n ? n.intValue() : 0;
+				if ( status >= 500 || status == 0 ) {
+					req.addIssue( "crit", status == 0 ? "Outgoing HTTP call failed" : "Outgoing HTTP " + status, what,
+					    String.valueOf( h.getOrDefault( "file", "" ) ),
+					    h.get( "line" ) instanceof Number n ? n.intValue() : 0, "http", spanId );
+				} else if ( status >= 400 ) {
+					req.addIssue( "warn", "Outgoing HTTP " + status, what, String.valueOf( h.getOrDefault( "file", "" ) ),
+					    h.get( "line" ) instanceof Number n ? n.intValue() : 0, "http", spanId );
+				}
+			}
+		}
+
 		// Request level
 		if ( req.status >= 500 ) {
 			req.addIssue( "crit", "HTTP " + req.status, req.method + " " + req.uri, "", 0, "request", 0 );

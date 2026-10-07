@@ -140,4 +140,19 @@ public class IssueEngineTest {
 		assertThat( lone.flagSeverity ).isEqualTo( "warn" );
 	}
 
+	@Test
+	@DisplayName( "Failed outgoing HTTP calls are issues: 4xx warn, 5xx and transport errors are critical" )
+	public void outgoingHttp() {
+		LensRequest req = new LensRequest();
+		req.http.add( Map.of( "method", "GET", "url", "http://a/ok", "status", 200 ) );
+		req.http.add( Map.of( "method", "GET", "url", "http://a/missing", "status", 404 ) );
+		req.http.add( Map.of( "method", "POST", "url", "http://a/boom", "status", 503 ) );
+		req.http.add( Map.of( "method", "GET", "url", "http://a/down", "status", 0 ) );
+		IssueEngine.analyze( req, cfg );
+		assertThat( req.issues ).hasSize( 3 );
+		assertThat( req.issues.get( 0 ).get( "severity" ) ).isEqualTo( "warn" );
+		assertThat( req.issues.get( 1 ).get( "severity" ) ).isEqualTo( "crit" );
+		assertThat( req.issues.get( 2 ).get( "title" ) ).isEqualTo( "Outgoing HTTP call failed" );
+	}
+
 }

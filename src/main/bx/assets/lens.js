@@ -32,7 +32,8 @@
 				this.declared = page.declared || [];
 				this.d = page.data;
 				this.r = this.d.request;
-				this.total = Math.max( 1, this.r.durationMs );
+				// Spans contributed by panels may run past the request clock, so the axis covers them too
+				this.total = this.d.spans.reduce( function ( m, s ) { return Math.max( m, s.start + s.dur ); }, Math.max( 1, this.r.durationMs ) );
 				this.v0 = 0; this.v1 = this.total;
 				TYPES.forEach( function ( t ) { this.filters[ t.id ] = true; }, this );
 				this.height = this.ui.height || 360;
@@ -99,8 +100,14 @@
 				return this.d.spans.filter( function ( s ) { return s.type === "template" || s.type === "func"; } );
 			},
 			get customPanels() {
-				var known = {};
-				var out = ( this.d.panels || [] ).map( function ( p ) { known[ p.id ] = true; return p; } );
+				var known = {}, declared = {};
+				this.declared.forEach( function ( p ) { declared[ p.id ] = p; } );
+				// A declaration (onLensRegister) sets how the tab looks, the request data fills it
+				var out = ( this.d.panels || [] ).map( function ( p ) {
+					known[ p.id ] = true;
+					var d = declared[ p.id ];
+					return d ? Object.assign( {}, p, { label: d.label, icon: d.icon, order: d.order } ) : p;
+				} );
 				this.declared.forEach( function ( p ) {
 					if ( !known[ p.id ] ) { out.push( { id: p.id, label: p.label, icon: p.icon, order: p.order, renderer: p.renderer, badge: { count: -1, severity: "none" }, content: {} } ); }
 				} );
