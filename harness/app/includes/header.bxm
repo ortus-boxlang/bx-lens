@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title><bx:output>#request.pageTitle ?: "Lens Harness"#</bx:output></title>
+<style>
+	body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 0 0 420px; color: #1d2233; background: #f6f8fc; }
+	nav { background: #303446; padding: 10px 24px; display: flex; gap: 16px; flex-wrap: wrap; }
+	nav a { color: #00dbff; text-decoration: none; font-size: 14px; }
+	main { max-width: 860px; margin: 24px auto; padding: 0 24px; }
+	table { border-collapse: collapse; width: 100%; background: #fff; }
+	th, td { padding: 8px 10px; border-bottom: 1px solid #e0e6f2; text-align: left; }
+	code { background: #e8edf6; padding: 1px 5px; border-radius: 3px; }
+</style>
+</head>
+<body>
+<nav>
+	<a href="/index.bxm">Home</a><a href="/orders.bxm">Orders</a><a href="/n-plus-one.bxm">N+1</a><a href="/slow.bxm">Slow query</a>
+	<a href="/caught-exception.bxm">Caught exception</a><a href="/error.bxm">Uncaught error</a><a href="/http.bxm">HTTP</a>
+	<a href="/cache.bxm">Cache</a><a href="/timers.bxm">Timers</a><a href="/functions.bxm">Functions</a><a href="/forms.bxm">Form</a>
+	<a href="/session.bxm">Session</a><a href="/transaction.bxm">Transaction</a><a href="/extend.bxm">Extend</a>
+</nav>
+<main>

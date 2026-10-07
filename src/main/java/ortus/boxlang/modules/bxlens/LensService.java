@@ -3,290 +3,426 @@
  *
  * Copyright [2023] [Ortus Solutions, Corp]
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
- * License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS"
- * BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language
- * governing permissions and limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package ortus.boxlang.modules.bxlens;
 
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryMXBean;
-import java.lang.management.MemoryUsage;
-import java.lang.management.ThreadInfo;
-import java.lang.management.ThreadMXBean;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
+import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import ortus.boxlang.modules.bxlens.ext.CollectHandle;
+import ortus.boxlang.modules.bxlens.ext.LensRegistry;
 import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
+import ortus.boxlang.modules.bxlens.interceptors.ILensCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.CacheCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.ExceptionCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.FunctionCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.HttpCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.JvmCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.LifecycleCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.LogCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.ModulesCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.QueryCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.ScopesCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.TemplateCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.TransactionCollector;
+import ortus.boxlang.modules.bxlens.model.IssueEngine;
+import ortus.boxlang.modules.bxlens.model.LensRequest;
+import ortus.boxlang.modules.bxlens.model.Snapshot;
+import ortus.boxlang.modules.bxlens.render.BarRenderer;
+import ortus.boxlang.modules.bxlens.store.RequestStore;
 import ortus.boxlang.modules.bxlens.util.GlobalStats;
-import ortus.boxlang.modules.bxlens.util.KeyDictionary;
+import ortus.boxlang.modules.bxlens.util.Json;
+import ortus.boxlang.modules.bxlens.util.Keys;
+import ortus.boxlang.modules.bxlens.web.WebExchange;
 import ortus.boxlang.runtime.BoxRuntime;
+import ortus.boxlang.runtime.context.IBoxContext;
+import ortus.boxlang.runtime.context.RequestBoxContext;
 import ortus.boxlang.runtime.logging.BoxLangLogger;
-import ortus.boxlang.runtime.services.BaseService;
 import ortus.boxlang.runtime.types.IStruct;
+import ortus.boxlang.runtime.types.Struct;
 
 /**
- * Module-scoped service for bx-lens. Owns GlobalStats, manages collectors, and exposes JVM utilities.
- * Registered globally via BoxRuntime.putGlobalService() from ModuleConfig.bx.
+ * Owns everything global to bx-lens: the parsed settings, the collectors, the in-memory request history and the renderer.
+ * One instance lives in the module class loader. {@link #getInstance()} never returns null, so BIFs and collectors can always call it;
+ * before activation (or when Lens is disabled) it simply tracks nothing.
  */
-public class LensService extends BaseService {
+public final class LensService {
 
 	/**
-	 * GlobalStats instance shared across all collectors and requests. Collectors record metrics here, and it can be exposed via tags or APIs.
-	 * This is to record stats about the global BoxLang environment and overall request metrics, not per-request details (which should go in the request
-	 * context).
+	 * What ended the request.
 	 */
+	public enum Trigger {
+		END,
+		ERROR,
+		ABORT
+	}
+
+	/**
+	 * Placeholder written by lensRender() and replaced with the bar when the request ends.
+	 */
+	public static final String			MARKER		= "<!--bxlens:here-->";
+
+	private static volatile LensService	instance;
+
+	private volatile BoxRuntime			runtime;
+	private volatile LensConfig			config		= LensConfig.defaults();
+	private volatile AccessGuard		guard		= new AccessGuard( config );
+	private volatile RequestStore		store		= new RequestStore( 50 );
+	private volatile BarRenderer		renderer;
+	private volatile String				version		= "0.0.0";
 	private final GlobalStats			stats		= new GlobalStats();
-
-	/**
-	 * Map of active collectors, keyed by collector name. Built during startup and then immutable.
-	 */
-	private Map<String, BaseCollector>	collectors	= new LinkedHashMap<>();
-
-	/**
-	 * The main logger (volatile for thread-safe lazy initialization)
-	 */
+	private final LensRegistry			registry	= new LensRegistry();
+	private final List<ILensCollector>	collectors	= Collections.synchronizedList( new ArrayList<>() );
 	private volatile BoxLangLogger		logger;
 
-	/**
-	 * --------------------------------------------------------------------------
-	 * Constructors
-	 * --------------------------------------------------------------------------
-	 */
-
-	/**
-	 * public no-arg constructor for the ServiceProvider
-	 */
-	public LensService() {
-		this( BoxRuntime.getInstance() );
+	private LensService() {
 	}
 
 	/**
-	 * Constructor
-	 *
-	 * @param runtime The BoxRuntime
+	 * The service singleton.
 	 */
-	public LensService( BoxRuntime runtime ) {
-		super( runtime, KeyDictionary.bxLensService );
-		getLogger().trace( "+ bxLens Service built" );
-	}
-
-	/**
-	 * --------------------------------------------------------------------------
-	 * Runtime Service Event Methods
-	 * --------------------------------------------------------------------------
-	 */
-
-	@Override
-	public void onConfigurationLoad() {
-		// Not used by the service, since those are only for core services
-	}
-
-	@Override
-	public void onShutdown( Boolean force ) {
-		getLogger().debug( "+ bxLens Service shutdown requested" );
-		shutdownCollectors();
-	}
-
-	@Override
-	public void onStartup() {
-		getLogger().debug( "+ bxLens Service started" );
-	}
-
-	// -------------------------------------------------------------------------
-	// Collector management
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Activate collectors based on module settings. Called from ModuleConfig.bx onLoad().
-	 *
-	 * @param settings module settings struct
-	 */
-	public void activateCollectors( IStruct settings ) {
-	}
-
-	/**
-	 * Deactivate and unregister all collectors.
-	 */
-	public void shutdownCollectors() {
-		for ( BaseCollector c : collectors.values() ) {
-			try {
-				c.shutdown();
-				runtime.getInterceptorService().unregister( c );
-			} catch ( Exception ignored ) {
+	public static LensService getInstance() {
+		LensService i = instance;
+		if ( i == null ) {
+			synchronized ( LensService.class ) {
+				if ( instance == null ) {
+					instance = new LensService();
+				}
+				i = instance;
 			}
 		}
-		collectors.clear();
+		return i;
 	}
 
-	private void registerCollector( BaseCollector collector, IStruct settings ) {
+	/**
+	 * Activate with the module settings. Called from ModuleConfig.bx on load. Safe to call again on reload.
+	 *
+	 * @param runtime   the runtime
+	 * @param settings  the module settings
+	 * @param moduleDir physical path of the module folder
+	 * @param version   module version
+	 */
+	public synchronized void activate( BoxRuntime runtime, Map<?, ?> settings, String moduleDir, String version ) {
+		shutdown();
+		this.runtime	= runtime;
+		this.version	= version == null ? "" : version;
+		this.config		= new LensConfig( settings );
+		this.guard		= new AccessGuard( this.config );
+		this.store		= new RequestStore( this.config.maxRequests );
+		this.renderer	= new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
+		if ( !this.renderer.isComplete() ) {
+			getLogger().warn( "bx-lens assets are missing under [{}]. The bar will not render.", moduleDir );
+		}
+		if ( !this.config.enabled ) {
+			getLogger().info( "bx-lens is installed but disabled. Set modules.bxLens.settings.enabled to true to turn it on." );
+			// The lifecycle collector still registers so a runtime config reload can be picked up later
+		}
+		for ( ILensCollector c : builtIns() ) {
+			if ( c instanceof LifecycleCollector || this.config.isCollectorEnabled( c.id(), c.enabledByDefault() ) ) {
+				register( c );
+			}
+		}
+		announceRegister();
+		getLogger().info( "bx-lens {} active: enabled={}, collectors={}", this.version, this.config.enabled, collectorIds() );
+	}
+
+	/**
+	 * Unregister all collectors and clear history.
+	 */
+	public synchronized void shutdown() {
+		synchronized ( collectors ) {
+			for ( ILensCollector c : collectors ) {
+				try {
+					if ( c instanceof BaseCollector bc && runtime != null ) {
+						runtime.getInterceptorService().unregister( bc );
+					}
+				} catch ( Throwable t ) {
+					// Already gone
+				}
+			}
+			collectors.clear();
+		}
+		store.clear();
+		registry.clear();
+	}
+
+	/**
+	 * Register an additional collector, for example from a Java extension.
+	 */
+	public void register( ILensCollector collector ) {
+		if ( collector instanceof BaseCollector bc && runtime != null ) {
+			runtime.getInterceptorService().register( bc );
+		}
+		collectors.add( collector );
+	}
+
+	/**
+	 * Let applications and modules declare panels. Fires the onLensRegister interception point.
+	 */
+	public void announceRegister() {
+		if ( runtime == null ) {
+			return;
+		}
 		try {
-			collector.configure( settings );
-			runtime.getInterceptorService().register( collector );
-			collectors.put( collector.getName(), collector );
-		} catch ( Exception e ) {
-			// Log but don't fail
+			registry.clear();
+			runtime.getInterceptorService().announce( Keys.onLensRegister, Struct.of( "registry", registry ) );
+		} catch ( Throwable t ) {
+			getLogger().warn( "onLensRegister listener failed: {}", t.toString() );
 		}
 	}
 
-	/**
-	 * Get all registered collectors.
-	 */
-	public Collection<BaseCollector> getAllCollectors() {
-		return Collections.unmodifiableCollection( this.collectors.values() );
-	}
+	// ---------------------------------------------------------------------------------------------
+	// Request lifecycle
+	// ---------------------------------------------------------------------------------------------
 
 	/**
-	 * Check if a collector with the given name is registered.
+	 * Start tracking a request when Lens is enabled, the caller is allowed and the path is not excluded.
 	 *
-	 * @param name collector name (e.g. "queries", "http", "scopes")
+	 * @return the tracked request or null
 	 */
-	public boolean hasCollector( String name ) {
-		return this.collectors.containsKey( name );
-	}
-
-	/**
-	 * Get a collector by name.
-	 *
-	 * @param name collector name (e.g. "queries", "http", "scopes")
-	 *
-	 * @return the collector, or null if not found
-	 */
-	public BaseCollector getCollector( String name ) {
-		return this.collectors.get( name );
-	}
-
-	/**
-	 * Get the count of registered collectors.
-	 */
-	public int getCollectorCount() {
-		return this.collectors.size();
-	}
-
-	// -------------------------------------------------------------------------
-	// JVM utilities
-	// -------------------------------------------------------------------------
-
-	/**
-	 * Returns a formatted thread dump for all live JVM threads.
-	 *
-	 * @return multi-line string
-	 */
-	public String getThreadDump() {
-		ThreadMXBean	bean	= ManagementFactory.getThreadMXBean();
-		ThreadInfo[]	threads	= bean.dumpAllThreads( true, true );
-		StringBuilder	sb		= new StringBuilder();
-		for ( ThreadInfo t : threads ) {
-			sb.append( t.toString() );
+	public LensRequest begin( RequestBoxContext rc ) {
+		if ( !config.enabled || rc == null ) {
+			return null;
 		}
-		return sb.toString();
-	}
-
-	/**
-	 * Returns the thread dump for a specific thread ID.
-	 *
-	 * @param threadId JVM thread ID
-	 *
-	 * @return thread info string or not-found message
-	 */
-	public String getThreadDump( long threadId ) {
-		ThreadMXBean	bean	= ManagementFactory.getThreadMXBean();
-		ThreadInfo		info	= bean.getThreadInfo( threadId, Integer.MAX_VALUE );
-		return info != null ? info.toString() : "Thread " + threadId + " not found";
-	}
-
-	/**
-	 * Returns current JVM heap and non-heap memory usage.
-	 * FYI: We return always native types in order to avoid any performance issues.
-	 *
-	 * @return Map with keys heapUsed, heapCommitted, heapMax, nonHeapUsed (all bytes as Long)
-	 */
-	public Map<String, Long> getMemoryInfo() {
-		MemoryMXBean		m		= ManagementFactory.getMemoryMXBean();
-		MemoryUsage			h		= m.getHeapMemoryUsage();
-		MemoryUsage			nh		= m.getNonHeapMemoryUsage();
-		Map<String, Long>	result	= new HashMap<>();
-		result.put( "heapUsed", h.getUsed() );
-		result.put( "heapCommitted", h.getCommitted() );
-		result.put( "heapMax", h.getMax() );
-		result.put( "nonHeapUsed", nh.getUsed() );
-		return result;
-	}
-
-	/**
-	 * Dumps the JVM heap to a .hprof file. Requires a HotSpot JVM.
-	 *
-	 * @return outputPath on success
-	 *
-	 * @throws Exception if the JVM does not support HotSpotDiagnosticMXBean or write fails
-	 */
-	public String dumpHeap() throws Exception {
-		return dumpHeap( null );
-	}
-
-	/**
-	 * Dumps the JVM heap to a .hprof file. Requires a HotSpot JVM.
-	 *
-	 * @param outputPath absolute path for the .hprof file, or null to use a temporary file
-	 *
-	 * @return outputPath on success
-	 *
-	 * @throws Exception if the JVM does not support HotSpotDiagnosticMXBean or write fails
-	 */
-	public String dumpHeap( String outputPath ) throws Exception {
-		// If no output path provided, create a temp file
-		if ( outputPath == null || outputPath.isEmpty() ) {
-			Path tempFile = Files.createTempFile( "heapdump", ".hprof" );
-			outputPath = tempFile.toAbsolutePath().toString();
+		LensRequest existing = rc.getAttachment( Keys.requestAttach );
+		if ( existing != null ) {
+			return existing;
 		}
-
-		// Use HotSpotDiagnosticMXBean to dump the heap
-		com.sun.management.HotSpotDiagnosticMXBean bean = ManagementFactory
-		    .getPlatformMXBean( com.sun.management.HotSpotDiagnosticMXBean.class );
-		if ( bean == null ) {
-			throw new UnsupportedOperationException( "HotSpotDiagnosticMXBean not available on this JVM" );
+		WebExchange ex = WebExchange.of( rc );
+		if ( ex == null ) {
+			return null;
 		}
-		bean.dumpHeap( outputPath, true );
-		return outputPath;
-	}
-
-	/**
-	 * --------------------------------------------------------------------------
-	 * Helper methods
-	 * --------------------------------------------------------------------------
-	 */
-
-	/**
-	 * Get the shared GlobalStats instance for recording and reporting metrics.
-	 *
-	 * @return GlobalStats instance
-	 */
-	public GlobalStats getGlobalStats() {
-		return this.stats;
-	}
-
-	/**
-	 * Get the bxLens logger that logs to the "bxLens" category.
-	 */
-	public BoxLangLogger getLogger() {
-		if ( this.logger == null ) {
-			synchronized ( LensService.class ) {
-				if ( this.logger == null ) {
-					this.logger = runtime.getLoggingService().getLogger( "bxLens" );
+		String uri = ex.uri();
+		if ( config.isExcluded( uri ) ) {
+			return null;
+		}
+		if ( !guard.isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( guard.requiredHeader() ) ) ) {
+			return null;
+		}
+		LensRequest req = new LensRequest();
+		req.requestContext	= rc;
+		req.method			= ex.method();
+		req.url				= ex.url();
+		req.uri				= uri;
+		req.queryString		= ex.queryString();
+		req.remoteAddr		= ex.remoteAddr();
+		req.host			= ex.host();
+		String ua = ex.requestHeader( "User-Agent" );
+		req.userAgent	= ua == null ? "" : ua;
+		req.template	= uri;
+		rc.putAttachment( Keys.requestAttach, req );
+		try {
+			ex.setResponseHeader( config.idHeader, req.id );
+		} catch ( Throwable t ) {
+			// Headers already sent
+		}
+		synchronized ( collectors ) {
+			for ( ILensCollector c : collectors ) {
+				try {
+					c.onRequestStart( req );
+				} catch ( Throwable t ) {
+					getLogger().debug( "Collector [{}] failed on request start: {}", c.id(), t.toString() );
 				}
 			}
 		}
-		return this.logger;
+		announce( Keys.onLensRequestStart, Struct.of( "context", rc, "requestId", req.id ) );
+		return req;
+	}
+
+	/**
+	 * Finish a request: stop timing, let collectors gather final data, find issues, store it in the history and, for HTML responses, inject the bar.
+	 */
+	public void finish( RequestBoxContext rc, Trigger trigger ) {
+		LensRequest req = rc.getAttachment( Keys.requestAttach );
+		if ( req == null || !req.finished.compareAndSet( false, true ) ) {
+			return;
+		}
+		req.endNanos = System.nanoTime();
+		req.closeAll();
+		WebExchange ex = WebExchange.of( rc );
+		if ( ex != null ) {
+			try {
+				req.status = ex.status();
+				String ct = ex.responseHeader( "Content-Type" );
+				req.contentType = ct == null ? "" : ct;
+			} catch ( Throwable t ) {
+				// Exchange recycled
+			}
+		}
+		if ( trigger == Trigger.ERROR && req.status < 400 ) {
+			req.status = 500;
+		}
+		req.html = config.isInjectable( req.contentType );
+		try {
+			req.appName = rc.getApplicationListener().getAppName().getName();
+		} catch ( Throwable t ) {
+			req.appName = "";
+		}
+		synchronized ( collectors ) {
+			for ( ILensCollector c : collectors ) {
+				try {
+					c.onRequestFinish( req );
+				} catch ( Throwable t ) {
+					getLogger().debug( "Collector [{}] failed on request finish: {}", c.id(), t.toString() );
+				}
+			}
+		}
+		announce( Keys.onLensCollect, Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
+		IssueEngine.analyze( req, config );
+		stats.recordRequest( Math.round( req.durationNs() / 1_000_000.0 ) );
+
+		Map<String, Object>	snapshot	= Snapshot.build( req, config, ex );
+		String				json		= Json.write( snapshot );
+		if ( req.html || config.trackNonHtml ) {
+			store.add( new RequestStore.Entry( req.id, Snapshot.summary( req ), json ) );
+		}
+		if ( trigger == Trigger.END && req.html && renderer != null && renderer.isComplete() && ex != null && !ex.responseStarted() ) {
+			try {
+				StringBuffer	buffer		= rc.getBuffer();
+				int				markerAt	= buffer.indexOf( MARKER );
+				if ( ( config.inject || markerAt >= 0 ) && req.injected.compareAndSet( false, true ) ) {
+					String block = renderer.render( pagePayload( json ) );
+					if ( markerAt >= 0 ) {
+						buffer.replace( markerAt, markerAt + MARKER.length(), block );
+					} else {
+						BarRenderer.insert( buffer, block );
+					}
+				}
+			} catch ( Throwable t ) {
+				getLogger().warn( "bx-lens could not inject the bar: {}", t.toString() );
+			}
+		}
+		announce( Keys.onLensRequestFinish, Struct.of( "context", rc, "requestId", req.id ) );
+	}
+
+	/**
+	 * The tracked request for a context, or null when this request is not tracked.
+	 */
+	public LensRequest current( IBoxContext context ) {
+		if ( context == null ) {
+			return null;
+		}
+		RequestBoxContext rc = context.getRequestContext();
+		if ( rc == null ) {
+			return null;
+		}
+		LensRequest r = rc.getAttachment( Keys.requestAttach );
+		return r != null && r.enabled ? r : null;
+	}
+
+	/**
+	 * Build the JSON for the page: the request snapshot, recent history and UI settings.
+	 */
+	String pagePayload( String requestJson ) {
+		Map<String, Object> ui = new LinkedHashMap<>();
+		ui.put( "version", version );
+		ui.put( "theme", config.getString( "ui.theme", "auto" ) );
+		ui.put( "startOpen", config.getBool( "ui.startOpen", false ) );
+		ui.put( "autoOpenOnException", config.getBool( "ui.autoOpenOnException", true ) );
+		ui.put( "defaultTab", config.getString( "ui.defaultTab", "timeline" ) );
+		ui.put( "height", config.getInt( "ui.height", 360 ) );
+		ui.put( "allowDetach", config.getBool( "ui.allowDetach", true ) );
+		ui.put( "hotkey", config.getString( "ui.hotkey", "Ctrl+`" ) );
+		ui.put( "editorLink", config.getString( "editor.linkPattern", "vscode://file/{path}:{line}" ) );
+		ui.put( "remoteBase", config.getString( "editor.remoteBase", "" ) );
+		ui.put( "localBase", config.getString( "editor.localBase", "" ) );
+		ui.put( "maxRequests", config.maxRequests );
+		ui.put( "slowQueryMs", config.slowQueryMs );
+		ui.put( "slowRequestMs", config.slowRequestMs );
+		Map<String, Object> page = new LinkedHashMap<>();
+		page.put( "ui", ui );
+		page.put( "declared", registry.list() );
+		page.put( "history", store.summaries() );
+		StringBuilder sb = new StringBuilder( requestJson.length() + 4096 );
+		sb.append( "{\"data\":" ).append( requestJson );
+		String pageJson = Json.write( page );
+		sb.append( ',' ).append( pageJson, 1, pageJson.length() );
+		return sb.toString();
+	}
+
+	private void announce( ortus.boxlang.runtime.scopes.Key point, IStruct data ) {
+		try {
+			if ( runtime != null ) {
+				runtime.getInterceptorService().announce( point, data );
+			}
+		} catch ( Throwable t ) {
+			getLogger().debug( "Listener for [{}] failed: {}", point.getName(), t.toString() );
+		}
+	}
+
+	private List<ILensCollector> builtIns() {
+		return List.of( new LifecycleCollector(), new TemplateCollector(), new FunctionCollector(), new QueryCollector(), new HttpCollector(),
+		    new ExceptionCollector(), new LogCollector(), new TransactionCollector(), new ScopesCollector(), new JvmCollector(), new CacheCollector(),
+		    new ModulesCollector() );
+	}
+
+	private List<String> collectorIds() {
+		List<String> ids = new ArrayList<>();
+		synchronized ( collectors ) {
+			collectors.forEach( c -> ids.add( c.id() ) );
+		}
+		return ids;
+	}
+
+	// ---------------------------------------------------------------------------------------------
+	// Accessors
+	// ---------------------------------------------------------------------------------------------
+
+	public LensConfig getConfig() {
+		return config;
+	}
+
+	public GlobalStats getStats() {
+		return stats;
+	}
+
+	public RequestStore getStore() {
+		return store;
+	}
+
+	public LensRegistry getRegistry() {
+		return registry;
+	}
+
+	public String getVersion() {
+		return version;
+	}
+
+	public boolean isEnabled() {
+		return config.enabled;
+	}
+
+	public List<ILensCollector> getCollectors() {
+		synchronized ( collectors ) {
+			return new ArrayList<>( collectors );
+		}
+	}
+
+	/**
+	 * The bxLens logger.
+	 */
+	public BoxLangLogger getLogger() {
+		BoxLangLogger l = logger;
+		if ( l == null ) {
+			l		= ( runtime != null ? runtime : BoxRuntime.getInstance() ).getLoggingService().getLogger( "bxLens" );
+			logger	= l;
+		}
+		return l;
 	}
 
 }

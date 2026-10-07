@@ -8,59 +8,70 @@
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package ortus.boxlang.modules.bxlens.bifs;
 
-import ortus.boxlang.modules.bxlens.LensRequestData;
-import ortus.boxlang.modules.bxlens.LensService;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+
+import ortus.boxlang.modules.bxlens.model.LensRequest;
+import ortus.boxlang.modules.bxlens.model.Span;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
 import ortus.boxlang.runtime.scopes.Key;
 import ortus.boxlang.runtime.types.Argument;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
- * LensMessage( message [, type] ) — Add a developer message to the current request's debug panel.
+ * Sends a message to the Lens Messages panel.
+ * <p>
+ * Example: <code>lensMessage( "Loaded #orders.len()# orders", "info" )</code>. Structs, arrays and other values are shown as a collapsible tree.
+ *
+ * @argument.message The message: text or any value
+ *
+ * @argument.label The level or label: info, warn, error, debug or any text. Default info.
  */
 @BoxBIF
 public class LensMessage extends BaseLensBIF {
 
-	private static final Key KEY_MAX_MESSAGES = Key.of( "maxMessages" );
+	private static final Key	MESSAGE	= Key.of( "message" );
+	private static final Key	LABEL	= Key.of( "label" );
 
 	public LensMessage() {
 		super();
 		declaredArguments = new Argument[] {
-		    new Argument( true, Argument.STRING, Key.of( "message" ) ),
-		    new Argument( false, Argument.STRING, Key.of( "type" ), "info" )
+		    new Argument( true, Argument.ANY, MESSAGE ),
+		    new Argument( false, Argument.STRING, LABEL, "info" )
 		};
 	}
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		LensRequestData data = getLensData( context );
-		if ( !isEnabled( data ) )
+		LensRequest req = request( context );
+		if ( req == null || !service().getConfig().isCollectorEnabled( "messages", true ) ) {
 			return null;
-
-		int maxMessages = getModuleSettings().getAsInteger( KEY_MAX_MESSAGES );
-		if ( data.messages.size() >= maxMessages )
+		}
+		if ( !req.reserve( "message", service().getConfig().collectorInt( "messages", "max", 200 ) ) ) {
 			return null;
-
-		LensService svc = getLensService();
-		if ( svc != null )
-			svc.getStats().totalMessages.incrementAndGet();
-
-		String				message	= arguments.getAsString( Key.of( "message" ) );
-		String				type	= arguments.getAsString( Key.of( "type" ) );
-
-		Map<String, Object>	entry	= new LinkedHashMap<>();
-		entry.put( "message", message );
-		entry.put( "type", type );
-		entry.put( "offset", System.currentTimeMillis() - data.startedAt );
-		data.messages.add( entry );
-
+		}
+		Object				value	= arguments.get( MESSAGE );
+		Map<String, Object>	m		= new LinkedHashMap<>();
+		m.put( "level", arguments.getAsString( LABEL ).toLowerCase( Locale.ROOT ) );
+		if ( value instanceof CharSequence ) {
+			m.put( "text", sanitizer().text( value ) );
+		} else {
+			m.put( "text", "" );
+			m.put( "data", sanitizer().clean( value ) );
+		}
+		m.put( "at", Span.ms( req.now() ) );
+		req.messages.add( m );
 		return null;
 	}
 

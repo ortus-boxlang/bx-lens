@@ -1,0 +1,11 @@
+<bx:script>
+	request.pageTitle = "Slow query";
+	// 160 x 160 x 160 = 4 million combinations, slow enough to cross the 25 ms threshold on any machine
+	result = queryExecute( "SELECT COUNT(*) AS total FROM numbers a, numbers b, numbers c WHERE a.n + b.n = c.n" );
+</bx:script>
+<bx:include template="/includes/header.bxm" />
+<bx:output>
+<h1>Slow query</h1>
+<p>Counted #result.total# combinations with a triple cross join.</p>
+</bx:output>
+<bx:include template="/includes/footer.bxm" />

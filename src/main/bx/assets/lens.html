@@ -1,0 +1,273 @@
+<div class="lens" :class="'sev-' + sev + (detached ? ' detached' : '')" x-show="d" role="region" aria-label="BX Lens">
+<div class="dock">
+	<div class="bar">
+		<div class="brand">
+			<svg viewBox="0 0 500 500" aria-hidden="true"><defs><linearGradient id="bxlens-g" x1="15" y1="250" x2="485" y2="250" gradientUnits="userSpaceOnUse"><stop stop-color="#00DBFF"/><stop offset="1" stop-color="#00FF75"/></linearGradient></defs>
+				<path fill="url(#bxlens-g)" d="M177.94 75.3152L223.47 37.5453L223.516 37.4998L223.608 37.5681C225.22 37.8185 226.809 38.069 228.421 38.3649C326.228 57.6255 389.56 151.697 370.054 248.228C350.755 343.939 257.278 406.229 160.668 388.721C181.51 384.054 201.546 374.583 219.048 360.081C277.705 311.406 285.374 224.938 236.136 166.951C207.925 133.712 167.14 117.069 126.423 118.048L177.964 75.2925L177.94 75.3152Z"/>
+				<path fill="url(#bxlens-g)" d="M21.6043 419.494C12.5262 408.044 13.9467 390.952 24.7561 381.336C35.5655 371.72 51.7019 373.224 60.7801 384.674C69.8582 396.124 68.4376 413.217 57.6282 422.833C46.8188 432.449 30.6824 430.944 21.6043 419.494Z"/>
+				<path fill="url(#bxlens-g)" d="M276.864 495.023C194.023 511.236 112.53 486.871 53.9785 436.035C57.3953 434.608 60.6727 432.706 63.6479 430.238C69.7843 425.211 73.9217 418.735 75.9439 411.76C88.7745 418.939 102.326 425.052 116.597 429.808C238.488 470.635 371.141 407.39 412.91 288.667C454.819 169.921 389.899 40.6914 268.031 0C374.163 17.0284 458.282 96.1695 479.271 198.725C507.35 335.019 416.768 467.623 276.864 495V495.023Z"/></svg>
+			Lens
+		</div>
+		<button class="chip" :class="statusClass" @click="open('request')" title="Request"><b x-text="r.method + ' ' + r.status"></b></button>
+		<button class="chip" @click="open('request')" title="Request URL"><b x-text="r.uri"></b></button>
+		<button class="chip" @click="open('timeline')" title="Request time">time <b x-text="fmt(r.durationMs)"></b></button>
+		<button class="chip" x-show="d.jvm" @click="open('jvm')" title="Heap used">mem <b x-text="d.jvm ? d.jvm.heapUsedMb + ' MB' : ''"></b></button>
+		<button class="chip" @click="open('queries')" title="Queries">sql <b x-text="d.counts.queries"></b></button>
+		<button class="chip" @click="open('templates')" title="Templates">tpl <b x-text="d.counts.templates"></b></button>
+		<button class="chip issues" :class="sev === 'crit' ? 'crit' : ''" x-show="d.issues.length" @click="open('issues')" title="Open Issues">&#9888; <span x-text="d.issues.length + (d.issues.length === 1 ? ' issue' : ' issues')"></span></button>
+		<span class="grow"></span>
+		<button class="ibtn" x-show="ui.allowDetach && !collapsed" @click="toggleDetach()" :title="detached ? 'Dock to the bottom' : 'Detach as a floating window'" x-text="detached ? '&#9716;' : '&#10697;'"></button>
+		<button class="ibtn" @click="toggleTheme()" title="Toggle theme">&#9680;</button>
+		<button class="ibtn" @click="toggle()" :title="'Collapse / expand (' + hotkeyLabel + ')'" x-text="collapsed ? '&#9652;' : '&#9662;'"></button>
+	</div>
+	<div class="bar tabs" role="tablist" x-show="!collapsed">
+		<template x-for="(t, i) in tabs" :key="t.id">
+			<button class="tab" role="tab" :aria-selected="tab === t.id" @click="tab = t.id; persist()">
+				<span x-text="t.label"></span>
+				<span class="badge" x-show="t.badge !== null" :class="t.sev" x-text="t.badge"></span>
+				<span class="k" x-show="i < 9" x-text="i + 1"></span>
+			</button>
+		</template>
+	</div>
+</div>
+<div class="handle" x-show="!collapsed && !detached" @pointerdown.prevent="startResize($event)" @pointermove="doResize($event)" @pointerup="endResize($event)" title="Drag to resize"></div>
+<div class="panel" x-show="!collapsed" :style="detached ? 'height:' + Math.min(height, 520) + 'px' : 'height:' + height + 'px'" role="tabpanel">
+	<div class="popbar" x-show="detached"><b>BX Lens</b><span class="mono muted">floating window</span><span class="grow"></span><button class="abtn" @click="toggleDetach()">Dock</button></div>
+
+	<!-- Issues -->
+	<template x-if="tab === 'issues'"><div>
+		<h3 x-text="'Issues · ' + d.issues.length"></h3>
+		<div class="empty" x-show="!d.issues.length">Nothing suspicious in this request.</div>
+		<template x-for="(i, n) in sortedIssues" :key="n">
+			<div class="issue">
+				<span class="sev" :class="i.severity" x-text="i.severity === 'crit' ? 'Error' : 'Warn'"></span>
+				<div><b x-text="i.title"></b>
+					<div class="mono muted" x-text="i.detail"></div>
+					<div class="mono" x-show="i.file"><a :href="editorUrl(i.file, i.line)" x-text="shortPath(i.file) + ':' + i.line"></a></div></div>
+				<button class="abtn" x-show="i.tab" @click="goIssue(i)">View</button>
+			</div>
+		</template>
+	</div></template>
+
+	<!-- Timeline -->
+	<template x-if="tab === 'timeline'"><div>
+		<div class="toolbar">
+			<template x-for="k in spanTypes" :key="k.id">
+				<button class="fchip" :class="filters[k.id] ? 'on' : ''" @click="filters[k.id] = !filters[k.id]"><i class="dot" :style="'background:' + color(k.id)"></i><span x-text="k.label"></span></button>
+			</template>
+			<input class="search" id="bxlens-q" placeholder="Search ( / )" x-model="q" aria-label="Search the timeline">
+			<span class="grow"></span>
+			<span class="mono muted" x-text="Math.round(v0) + '–' + Math.round(v1) + ' ms of ' + Math.round(total) + ' ms'"></span>
+			<button class="abtn" @click="zoom('out')" title="Zoom out">&minus;</button>
+			<button class="abtn" @click="zoom('in')" title="Zoom in">+</button>
+			<button class="abtn" @click="zoom('l')" title="Pan left">&#9664;</button>
+			<button class="abtn" @click="zoom('r')" title="Pan right">&#9654;</button>
+			<button class="abtn" @click="zoom('reset')">Reset</button>
+		</div>
+		<div class="scroll"><div class="wf">
+			<div class="axis"><div></div><div class="ticks"><template x-for="t in ticks" :key="t"><span x-text="t + ' ms'"></span></template></div><div></div></div>
+			<template x-for="s in rows" :key="s.id">
+				<div class="r" :class="sel === s.id ? 'sel' : ''" tabindex="0" @click="sel = s.id" @keydown.enter="sel = s.id">
+					<div class="lbl" :style="'padding-left:' + (s.depth * 12) + 'px'" :title="s.label"><span x-text="s.type === 'template' ? shortPath(s.label) : s.label"></span><span class="flag" :class="s.flag ? s.flag[0] : ''" x-show="s.flag" x-text="s.flag ? s.flag[1] : ''"></span></div>
+					<div class="track"><div class="seg" :style="segStyle(s)"></div></div>
+					<div class="ms" x-text="fmt(s.dur)"></div>
+				</div>
+			</template>
+		</div></div>
+		<div class="empty" x-show="!rows.length">No spans match.</div>
+		<template x-if="selSpan"><div class="drawer">
+			<div class="t"><i class="dot" :style="'background:' + color(selSpan.type)"></i><span x-text="typeLabel(selSpan.type)"></span><span class="mono" x-text="selSpan.label"></span>
+				<span class="pill" x-show="selSpan.flag" :class="selSpan.flag ? selSpan.flag[0] : ''" x-text="selSpan.flag ? selSpan.flag[1] : ''"></span></div>
+			<div class="mono muted" x-text="'start ' + fmt(selSpan.start) + ' · ' + fmt(selSpan.dur) + (selSpan.file ? ' · ' + selSpan.file + ':' + selSpan.line : '')"></div>
+			<template x-if="selSpan.detail && selSpan.detail.sql"><div class="sql" x-text="selSpan.detail.sql"></div></template>
+			<template x-if="selSpan.detail && selSpan.detail.url"><div class="mono" x-text="selSpan.detail.url + ' → ' + selSpan.detail.status"></div></template>
+			<div class="actions">
+				<a class="abtn" x-show="selSpan.file" :href="editorUrl(selSpan.file, selSpan.line)">Open in editor</a>
+				<button class="abtn" x-show="selSpan.detail && selSpan.detail.sql" @click="copy(selSpan.detail.sql, 'SQL')">Copy SQL</button>
+				<button class="abtn" x-show="selSpan.file" @click="copy(selSpan.file + ':' + selSpan.line, 'Location')">Copy file:line</button>
+			</div>
+		</div></template>
+		<div class="mono muted" style="margin-top:8px" x-show="!selSpan">Click a row for details. Hover shows the full label.</div>
+	</div></template>
+
+	<!-- Queries -->
+	<template x-if="tab === 'queries'"><div>
+		<h3 x-text="d.queries.length + ' queries · ' + fmt(sum(d.queries, 'ms')) + ' total'"></h3>
+		<div class="empty" x-show="!d.queries.length">No queries ran in this request.</div>
+		<div class="scroll" x-show="d.queries.length"><table>
+			<thead><tr><th>SQL</th><th>Datasource</th><th>Rows</th><th>Time</th><th></th></tr></thead>
+			<tbody><template x-for="(q, n) in d.queries" :key="n">
+				<tr>
+					<td><div class="sql" x-text="q.sql"></div>
+						<div class="mono muted" x-show="q.params && q.params.length" x-text="'params ' + JSON.stringify(q.params)"></div>
+						<div class="mono" x-show="q.file"><a :href="editorUrl(q.file, q.line)" x-text="shortPath(q.file) + ':' + q.line"></a></div>
+						<span class="pill" x-show="q.flag" :class="q.flag ? q.flag[0] : ''" x-text="q.flag ? q.flag[1] + (q.flag[1] === 'N+1' ? ': ran ' + q.count + ' times' : '') : ''"></span></td>
+					<td class="num" x-text="q.datasource"></td><td class="num" x-text="q.rows"></td><td class="num" x-text="fmt(q.ms)"></td>
+					<td><button class="abtn" @click="copy(sqlWithParams(q), 'SQL')">Copy SQL</button></td>
+				</tr>
+			</template></tbody>
+		</table></div>
+	</div></template>
+
+	<!-- Templates -->
+	<template x-if="tab === 'templates'"><div>
+		<h3>Include and call tree</h3>
+		<div class="tree"><template x-for="s in treeSpans" :key="s.id">
+			<div class="row" :style="'padding-left:' + (s.depth * 16) + 'px'"><i class="dot" :style="'background:' + color(s.type)"></i><span x-text="s.type === 'template' ? shortPath(s.label) : s.label" :title="s.label"></span><span class="flag" :class="s.flag ? s.flag[0] : ''" x-show="s.flag" x-text="s.flag ? s.flag[1] : ''"></span><span class="ms" x-text="fmt(s.dur)"></span></div>
+		</template></div>
+		<div class="empty" x-show="!treeSpans.length">No templates were recorded.</div>
+	</div></template>
+
+	<!-- HTTP -->
+	<template x-if="tab === 'http'"><div>
+		<h3 x-text="'Outgoing HTTP · ' + d.http.length + ' calls'"></h3>
+		<div class="empty" x-show="!d.http.length">No outgoing HTTP calls.</div>
+		<div class="scroll" x-show="d.http.length"><table>
+			<thead><tr><th>Request</th><th>Status</th><th>Size</th><th>Time</th><th></th></tr></thead>
+			<tbody><template x-for="(h, n) in d.http" :key="n"><tr>
+				<td class="mono"><span x-text="h.method + ' ' + h.url"></span><div x-show="h.file"><a :href="editorUrl(h.file, h.line)" x-text="shortPath(h.file) + ':' + h.line"></a></div></td>
+				<td><span class="pill plain" :class="h.status >= 500 || h.status === 0 ? 'crit' : (h.status >= 400 ? 'warn' : 'ok')" x-text="h.status || 'error'"></span></td>
+				<td class="num" x-text="bytes(h.size)"></td><td class="num" x-text="fmt(h.ms)"></td>
+				<td><button class="abtn" @click="copy('curl -X ' + h.method + ' \'' + h.url + '\'', 'cURL')">Copy cURL</button></td>
+			</tr></template></tbody>
+		</table></div>
+	</div></template>
+
+	<!-- Exceptions -->
+	<template x-if="tab === 'exceptions'"><div>
+		<h3 x-text="'Exceptions · ' + d.exceptions.length"></h3>
+		<div class="empty" x-show="!d.exceptions.length">No exceptions in this request.</div>
+		<div class="cards"><template x-for="(e, n) in d.exceptions" :key="n"><div class="card">
+			<div class="t"><span style="color:var(--crit)" x-text="e.type"></span><span class="pill info" x-text="e.origin"></span><span class="mono muted" x-text="'at ' + fmt(e.at)"></span></div>
+			<div class="mono" x-text="e.message"></div>
+			<div class="mono muted" x-show="e.detail" x-text="e.detail"></div>
+			<div class="tree"><template x-for="(f, k) in e.frames" :key="k"><div><a :href="editorUrl(f.file, f.line)" x-text="shortPath(f.file) + ':' + f.line"></a></div></template></div>
+			<details><summary class="muted">Java stack</summary><pre x-text="e.java.join('\n')"></pre></details>
+		</div></template></div>
+	</div></template>
+
+	<!-- Messages -->
+	<template x-if="tab === 'messages'"><div>
+		<h3 x-text="'Messages · ' + d.messages.length + ' · lensMessage() and lensDump()'"></h3>
+		<div class="empty" x-show="!d.messages.length">Call lensMessage( "text", "info" ) or lensDump( value ) to see output here.</div>
+		<template x-for="(m, n) in d.messages" :key="n"><div class="msg">
+			<span class="lvl" :class="m.level" x-text="m.level"></span>
+			<div style="flex:1;min-width:0"><span x-text="m.text"></span><pre x-show="m.data !== undefined" x-text="m.data !== undefined ? JSON.stringify(m.data, null, 2) : ''"></pre></div>
+			<span class="mono muted" x-text="fmt(m.at)"></span>
+		</div></template>
+		<template x-if="d.logs && d.logs.length"><div>
+			<h3 style="margin-top:14px" x-text="'Logs · ' + d.logs.length"></h3>
+			<template x-for="(m, n) in d.logs" :key="n"><div class="msg"><span class="lvl" x-text="m.level"></span><span style="flex:1" x-text="m.text"></span><span class="mono muted" x-text="m.log + ' · ' + fmt(m.at)"></span></div></template>
+		</div></template>
+	</div></template>
+
+	<!-- Timers -->
+	<template x-if="tab === 'timers'"><div>
+		<h3>Timers &middot; lensStart() / lensMeasure()</h3>
+		<div class="empty" x-show="!d.timers.length">Wrap code with lensMeasure( "label", () =&gt; ... ) or lensStart() / lensStop().</div>
+		<table x-show="d.timers.length"><thead><tr><th>Label</th><th>Start</th><th>Duration</th></tr></thead>
+			<tbody><template x-for="(t, n) in d.timers" :key="n"><tr><td x-text="t.label"></td><td class="num" x-text="fmt(t.start)"></td><td class="num" x-text="fmt(t.dur)"></td></tr></template></tbody></table>
+	</div></template>
+
+	<!-- Cache -->
+	<template x-if="tab === 'cache'"><div>
+		<h3 x-text="'Caches · ' + (d.cache ? d.cache.length : 0)"></h3>
+		<div class="empty" x-show="!d.cache || !d.cache.length">No caches are registered.</div>
+		<div class="cards"><template x-for="c in (d.cache || [])" :key="c.name"><div class="card">
+			<div class="t"><span x-text="c.name"></span><span class="pill info" x-text="c.provider"></span><span class="pill warn" x-show="!c.enabled">disabled</span></div>
+			<div class="stats">
+				<div><span class="muted">Objects</span><b x-text="c.objects"></b></div>
+				<div><span class="muted">Hit rate</span><b x-text="c.hitRate + '%'"></b></div>
+				<div><span class="muted">Hits</span><b x-text="c.hits"></b></div>
+				<div><span class="muted">Misses</span><b x-text="c.misses"></b></div>
+			</div>
+			<div class="bar-meter" :title="'Lifetime hit rate ' + c.hitRate + '%'"><i :style="'width:' + Math.min(100, c.hitRate) + '%'"></i></div>
+			<div class="mono"><span class="muted">This request:</span> <b x-text="c.requestHits + ' hits'"></b>, <b x-text="c.requestMisses + ' misses'"></b><span x-show="c.requestHitRate >= 0" x-text="' (' + c.requestHitRate + '% hit rate)'"></span><span x-show="c.requestEvictions" x-text="', ' + c.requestEvictions + ' evictions'"></span></div>
+			<div class="mono muted" x-text="'evictions ' + c.evictions + ' · reaps ' + c.reaps + ' · expired ' + c.expired + ' · gcs ' + c.gcs"></div>
+			<details x-show="c.config"><summary class="muted">Configuration</summary><pre x-text="JSON.stringify(c.config, null, 2)"></pre></details>
+		</div></template></div>
+	</div></template>
+
+	<!-- Modules -->
+	<template x-if="tab === 'modules'"><div>
+		<h3 x-text="'Modules · ' + (d.modules ? d.modules.length : 0) + ' loaded'"></h3>
+		<div class="empty" x-show="!d.modules || !d.modules.length">No modules are loaded.</div>
+		<div class="scroll" x-show="d.modules && d.modules.length"><table>
+			<thead><tr><th>Module</th><th>Version</th><th>Author</th><th>Provides</th><th>State</th></tr></thead>
+			<tbody><template x-for="m in (d.modules || [])" :key="m.name"><tr>
+				<td><b x-text="m.name"></b><span class="pill info" x-show="m.self">this module</span><div class="muted" x-text="m.description"></div><a x-show="m.webURL" :href="m.webURL" target="_blank" rel="noopener" x-text="m.webURL"></a></td>
+				<td class="num" x-text="m.version"></td><td x-text="m.author"></td>
+				<td class="mono muted" x-text="provides(m)"></td>
+				<td><span class="pill plain" :class="m.activated ? 'ok' : 'warn'" x-text="m.activated ? 'active' : (m.enabled ? 'registered' : 'disabled')"></span><div class="mono muted" x-text="m.activationMs + ' ms'"></div></td>
+			</tr></template></tbody>
+		</table></div>
+	</div></template>
+
+	<!-- Request -->
+	<template x-if="tab === 'request'"><div>
+		<h3>Request</h3>
+		<div class="grid2">
+			<dl class="kv">
+				<dt>Method</dt><dd x-text="r.method"></dd><dt>URL</dt><dd x-text="r.url + (r.query ? '?' + r.query : '')"></dd>
+				<dt>Status</dt><dd x-text="r.status + ' ' + r.contentType"></dd><dt>Application</dt><dd x-text="r.app || '(none)'"></dd>
+				<dt>Remote address</dt><dd x-text="r.remoteAddr"></dd><dt>Started</dt><dd x-text="r.startedAt"></dd><dt>Request id</dt><dd x-text="r.id"></dd>
+			</dl>
+			<dl class="kv"><template x-for="(v, k) in d.headers" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd :class="v === '[redacted]' ? 'redact' : ''" x-text="v"></dd></div></template></dl>
+		</div>
+		<div class="actions" style="margin-top:10px">
+			<button class="abtn" @click="copy(JSON.stringify(d, null, 2), 'Request JSON')">Copy request JSON</button>
+			<button class="abtn" @click="copy('curl -X ' + r.method + ' \'' + r.url + (r.query ? '?' + r.query : '') + '\'', 'cURL')">Copy as cURL</button>
+		</div>
+	</div></template>
+
+	<!-- Scopes -->
+	<template x-if="tab === 'scopes'"><div>
+		<h3>Scopes (snapshot at request end)</h3>
+		<div class="empty" x-show="!d.scopes || !Object.keys(d.scopes).length">No scopes were captured. Enable them under collectors.scopes.</div>
+		<div class="grid2"><template x-for="(v, k) in (d.scopes || {})" :key="k"><div><b x-text="k"></b> <span class="muted mono" x-text="Object.keys(v).length + ' keys'"></span><pre x-text="JSON.stringify(v, null, 2)"></pre></div></template></div>
+		<p class="mono muted">Keys on the redact list are masked on the server, before they reach this page.</p>
+	</div></template>
+
+	<!-- Runtime -->
+	<template x-if="tab === 'jvm'"><div>
+		<h3>Runtime</h3>
+		<div class="grid2" x-show="d.jvm">
+			<dl class="kv"><dt>BoxLang</dt><dd x-text="d.jvm.boxlangVersion"></dd><dt>Java</dt><dd x-text="d.jvm.javaVersion + ' (' + d.jvm.javaVendor + ')'"></dd><dt>OS</dt><dd x-text="d.jvm.os"></dd><dt>CPU cores</dt><dd x-text="d.jvm.cores"></dd><dt>Uptime</dt><dd x-text="uptime(d.jvm.uptimeMs)"></dd></dl>
+			<dl class="kv"><dt>Heap</dt><dd x-text="d.jvm.heapUsedMb + ' MB of ' + d.jvm.heapMaxMb + ' MB'"></dd><dt>Heap change</dt><dd x-text="(d.jvm.heapDeltaMb >= 0 ? '+' : '') + d.jvm.heapDeltaMb + ' MB during request'"></dd><dt>Non heap</dt><dd x-text="d.jvm.nonHeapUsedMb + ' MB'"></dd><dt>GC</dt><dd x-text="d.jvm.gcCount + ' collections, ' + d.jvm.gcTimeMs + ' ms during request'"></dd><dt>Threads</dt><dd x-text="d.jvm.threads"></dd></dl>
+			<dl class="kv"><dt>Requests tracked</dt><dd x-text="d.jvm.requests.totalRequests"></dd><dt>Average time</dt><dd x-text="d.jvm.requests.avgRequestTimeMs + ' ms'"></dd><dt>Slowest</dt><dd x-text="d.jvm.requests.slowestRequestMs + ' ms'"></dd><dt>Active sessions</dt><dd x-text="d.jvm.requests.activeSessions"></dd></dl>
+		</div>
+	</div></template>
+
+	<!-- History -->
+	<template x-if="tab === 'history'"><div>
+		<h3 x-text="'Recent requests · ' + history.length + ' of ' + ui.maxRequests + ' · in memory, oldest recycled'"></h3>
+		<div class="scroll"><table>
+			<thead><tr><th>Method</th><th>URL</th><th>Type</th><th>Status</th><th>Time</th><th>SQL</th><th>Issues</th></tr></thead>
+			<tbody><template x-for="h in history" :key="h.id"><tr>
+				<td class="mono" x-text="h.method"></td>
+				<td class="mono"><span x-text="h.url"></span><span class="pill ok" x-show="h.id === r.id">current</span></td>
+				<td><span class="pill plain" :class="h.type === 'html' ? 'info' : (h.type === 'json' ? 'ok' : 'warn')" x-text="h.type"></span></td>
+				<td class="num" x-text="h.status"></td><td class="num" x-text="fmt(h.ms)"></td><td class="num" x-text="h.queries"></td>
+				<td class="num"><span class="pill plain" x-show="h.issues" :class="h.severity" x-text="h.issues"></span></td>
+			</tr></template></tbody>
+		</table></div>
+		<p class="mono muted">History lists the requests this server handled before this page was built. JSON, SSE and other non-HTML requests are recorded too. Nothing is saved to disk.</p>
+	</div></template>
+
+	<!-- Custom panels from applications and modules -->
+	<template x-for="p in customPanels" :key="p.id"><div x-show="tab === p.id">
+		<h3 x-text="p.label"></h3>
+		<template x-if="p.renderer === 'table' && p.content.rows">
+			<div class="scroll"><table><thead><tr><template x-for="(c, i) in (p.content.columns || [])" :key="i"><th x-text="c"></th></template></tr></thead>
+			<tbody><template x-for="(row, n) in p.content.rows" :key="n"><tr><template x-for="(cell, i) in cellsOf(row, p.content.columns)" :key="i"><td x-text="cellText(cell)"></td></template></tr></template></tbody></table></div>
+		</template>
+		<template x-if="p.renderer === 'kv'"><dl class="kv"><template x-for="(v, k) in (p.content.kv || {})" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd x-text="cellText(v)"></dd></div></template></dl></template>
+		<template x-if="p.renderer === 'tree'"><div class="tree"><template x-for="(n, i) in flatTree(p.content.tree || [])" :key="i"><div class="row" :style="'padding-left:' + (n.depth * 16) + 'px'"><span x-text="n.label"></span><span class="ms" x-show="n.ms !== undefined" x-text="n.ms !== undefined ? fmt(n.ms) : ''"></span></div></template></div></template>
+		<template x-if="p.renderer === 'spans'"><div class="scroll"><table><thead><tr><th>Label</th><th>Start</th><th>Duration</th></tr></thead><tbody><template x-for="(s, i) in (p.content.spans || [])" :key="i"><tr><td x-text="s.label"></td><td class="num" x-text="fmt(s.start)"></td><td class="num" x-text="fmt(s.dur)"></td></tr></template></tbody></table></div></template>
+		<template x-if="p.renderer === 'messages'"><div><template x-for="(m, i) in (p.content.messages || [])" :key="i"><div class="msg"><span class="lvl" :class="m.level" x-text="m.level || 'info'"></span><span style="flex:1" x-text="m.text"></span><span class="mono muted" x-show="m.ms !== undefined" x-text="m.ms !== undefined ? fmt(m.ms) : ''"></span></div></template></div></template>
+		<template x-if="p.renderer === 'json'"><pre x-text="JSON.stringify(p.content.json, null, 2)"></pre></template>
+		<template x-if="p.renderer === 'text'"><pre x-text="p.content.text"></pre></template>
+	</div></template>
+</div>
+<div class="toast" x-show="toastText" x-text="toastText"></div>
+</div>

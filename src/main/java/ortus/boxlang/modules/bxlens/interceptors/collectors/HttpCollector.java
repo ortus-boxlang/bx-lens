@@ -3,97 +3,156 @@
  *
  * Copyright [2023] [Ortus Solutions, Corp]
  *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the
- * License. You may obtain a copy of the License at
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS"
- * BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language
- * governing permissions and limitations under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package ortus.boxlang.modules.bxlens.interceptors.collectors;
 
-import ortus.boxlang.modules.bxlens.LensRequestData;
-import ortus.boxlang.modules.bxlens.LensService;
+import java.net.http.HttpRequest;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
 import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
+import ortus.boxlang.modules.bxlens.model.LensRequest;
+import ortus.boxlang.modules.bxlens.model.Span;
+import ortus.boxlang.modules.bxlens.util.Callers;
+import ortus.boxlang.modules.bxlens.util.Keys;
 import ortus.boxlang.runtime.events.InterceptionPoint;
 import ortus.boxlang.runtime.scopes.Key;
 import ortus.boxlang.runtime.types.IStruct;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
- * Collects outgoing HTTP call data.
+ * Records outgoing HTTP calls made with the http component or BoxHttpClient.
  */
 @ortus.boxlang.runtime.events.Interceptor( autoLoad = false )
 public class HttpCollector extends BaseCollector {
 
 	@Override
-	public String getName() {
+	public String id() {
 		return "http";
 	}
 
 	@InterceptionPoint
 	public void onHTTPRequest( IStruct event ) {
 		try {
-			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled )
+			LensRequest req = request( event );
+			if ( req == null ) {
 				return;
-
-			long				now		= System.currentTimeMillis();
-			Map<String, Object>	entry	= new LinkedHashMap<>();
-			entry.put( "method", event.getOrDefault( Key.of( "method" ), "GET" ) );
-			entry.put( "url", event.getOrDefault( Key.of( "url" ), "" ) );
-			entry.put( "statusCode", 0 );
-			entry.put( "executionTime", 0L );
-			entry.put( "requestSize", event.getOrDefault( Key.of( "bodyLength" ), 0 ) );
-			entry.put( "responseSize", 0 );
-			entry.put( "offset", now - data.startedAt );
-			entry.put( "_pending", Boolean.TRUE );
-			entry.put( "_startTick", now );
-			data.httpCalls.add( entry );
-		} catch ( Exception e ) {
-			// Fail silently
+			}
+			String	method	= "GET";
+			String	url		= "";
+			if ( event.get( Keys.httpRequest ) instanceof HttpRequest hr ) {
+				method	= hr.method();
+				url		= hr.uri().toString();
+			}
+			Span span = req.begin( Span.HTTP, method + " " + stripQuery( url ), config().collectorInt( id(), "max", 100 ) );
+			if ( span != null ) {
+				Callers.Location where = Callers.current();
+				span.file	= where.file();
+				span.line	= where.line();
+				span.detail.put( "method", method );
+				span.detail.put( "url", url );
+			}
+		} catch ( Throwable t ) {
+			fail( "onHTTPRequest", t );
 		}
 	}
 
 	@InterceptionPoint
 	public void onHTTPResponse( IStruct event ) {
 		try {
-			LensRequestData data = getLensData( event );
-			if ( data == null || !data.enabled )
+			LensRequest req = request( event );
+			if ( req == null ) {
 				return;
-
-			LensService svc = getLensService();
-			if ( svc != null )
-				svc.getStats().totalHttpCalls.incrementAndGet();
-
-			String	url			= ( String ) event.getOrDefault( Key.of( "url" ), "" );
-			long	now			= System.currentTimeMillis();
-			Object	rawExecTime	= event.get( Key.of( "executionTime" ) );
-
-			for ( int i = data.httpCalls.size() - 1; i >= 0; i-- ) {
-				Map<String, Object> h = data.httpCalls.get( i );
-				if ( Boolean.TRUE.equals( h.get( "_pending" ) )
-				    && url.equals( h.get( "url" ) ) ) {
-					h.put( "statusCode", event.getOrDefault( Key.of( "statusCode" ), 0 ) );
-					h.put( "responseSize", event.getOrDefault( Key.of( "responseSize" ), 0 ) );
-					long startTick = h.get( "_startTick" ) instanceof Number
-					    ? ( ( Number ) h.get( "_startTick" ) ).longValue()
-					    : now;
-					h.put( "executionTime", rawExecTime instanceof Number
-					    ? ( ( Number ) rawExecTime ).longValue()
-					    : now - startTick );
-					h.put( "_pending", Boolean.FALSE );
-					h.remove( "_startTick" );
-					break;
-				}
 			}
-		} catch ( Exception e ) {
-			// Fail silently
+			Span span = req.open( Span.HTTP );
+			req.end( span );
+			if ( span == null ) {
+				return;
+			}
+			int		status	= 0;
+			long	size	= 0;
+			if ( event.get( Keys.result ) instanceof IStruct r ) {
+				Object s = firstNonNull( r.get( Key.of( "statusCode" ) ), r.get( Key.of( "status_code" ) ) );
+				status = s instanceof Number n ? n.intValue() : parseInt( s );
+				Object content = r.get( Key.of( "fileContent" ) );
+				size = content == null ? 0 : content.toString().length();
+			}
+			span.detail.put( "status", status );
+			span.detail.put( "size", size );
+			if ( status >= 500 ) {
+				span.flag( "crit", String.valueOf( status ) );
+			} else if ( status >= 400 ) {
+				span.flag( "warn", String.valueOf( status ) );
+			}
+			Map<String, Object> h = new LinkedHashMap<>();
+			h.put( "span", span.id );
+			h.put( "method", span.detail.get( "method" ) );
+			h.put( "url", span.detail.get( "url" ) );
+			h.put( "status", status );
+			h.put( "size", size );
+			h.put( "ms", Span.ms( span.durationNs() ) );
+			h.put( "file", span.file );
+			h.put( "line", span.line );
+			req.http.add( h );
+		} catch ( Throwable t ) {
+			fail( "onHTTPResponse", t );
 		}
+	}
+
+	@InterceptionPoint
+	public void onHTTPError( IStruct event ) {
+		try {
+			LensRequest req = request( event );
+			if ( req == null ) {
+				return;
+			}
+			Span span = req.open( Span.HTTP );
+			req.end( span );
+			if ( span != null ) {
+				span.flag( "crit", "Error" );
+				span.detail.put( "status", 0 );
+				Map<String, Object> h = new LinkedHashMap<>();
+				h.put( "span", span.id );
+				h.put( "method", span.detail.get( "method" ) );
+				h.put( "url", span.detail.get( "url" ) );
+				h.put( "status", 0 );
+				h.put( "size", 0 );
+				h.put( "ms", Span.ms( span.durationNs() ) );
+				h.put( "file", span.file );
+				h.put( "line", span.line );
+				h.put( "error", true );
+				req.http.add( h );
+			}
+		} catch ( Throwable t ) {
+			fail( "onHTTPError", t );
+		}
+	}
+
+	private static Object firstNonNull( Object a, Object b ) {
+		return a != null ? a : b;
+	}
+
+	private static int parseInt( Object o ) {
+		try {
+			return o == null ? 0 : Integer.parseInt( o.toString().trim() );
+		} catch ( NumberFormatException e ) {
+			return 0;
+		}
+	}
+
+	private static String stripQuery( String url ) {
+		int q = url.indexOf( '?' );
+		return q > 0 ? url.substring( 0, q ) : url;
 	}
 
 }

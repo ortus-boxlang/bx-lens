@@ -1,154 +1,149 @@
 /**
- * BoxLang Lens Module
- * ---
- * A module can have the following folders that will be automatically registered:
- * + bifs - Custom BIFs that will be registered into the runtime
- * + interceptors - Custom interceptors that will be registered into the runtime via the configure() method
- * + libs - Custom java libraries that your module leverages
- * + tags - Custom tags that will be registered into the runtime
+ * BX Lens: a request level debug bar for BoxLang web applications.
  *
- * Every module will have its own classloader that will be used to load the module libs and dependencies.
+ * Everything that collects data is Java (see src/main/java). This file only declares settings and wires the module lifecycle.
+ * Settings go in boxlang.json under modules.bxLens.settings. Lens is OFF by default.
  */
+import java:ortus.boxlang.modules.bxlens.LensService;
+
 class {
 
 	property name="moduleRecord";
 	property name="boxRuntime";
 	property name="log";
 
-	/**
-	 * --------------------------------------------------------------------------
-	 * Module Properties
-	 * --------------------------------------------------------------------------
-	 * Here is where you define the properties of your module that the module service
-	 * will use to register and activate your module
-	 */
+	this.version      = "@build.version@+@build.number@";
+	this.mapping      = "bxlens";
+	this.author       = "Ortus Solutions";
+	this.description  = "A request level debug bar for BoxLang web applications: timeline, queries, templates, cache, modules and more.";
+	this.webURL       = "https://github.com/ortus-boxlang/bx-lens";
+	this.enabled      = true;
+	this.dependencies = [];
 
 	/**
-	 * Your module version. Try to use semantic versioning
-	 * @mandatory
-	 */
-	this.version = "@build.version@+@build.number@"
-
-	/**
-	 * The BoxLang mapping for your module.  All BoxLang modules are registered with an internal
-	 * mapping prefix of : bxModules.{this.mapping}, /bxmodules/{this.mapping}. Ex: bxModules.test, /bxmodules/test
-	 */
-	this.mapping = "bxlens"
-
-	/**
-	 * The public mapping for your module.  This is the public facing mapping
-	 * that users will use to access your module features.
-	 * For us it will be /~bxlens -> public mapping
-	 */
-	this.publicMapping = {
-		name      : "~bxlens",
-		usePrefix : false,
-		path      : "public"
-	}
-
-	/**
-	 * Who built the module
-	 */
-	this.author = "Luis Majano"
-
-	/**
-	 * The module description
-	 */
-	this.description = "A debugging and profiling lens bar for BoxLang applications."
-
-	/**
-	 * The module web URL
-	 */
-	this.webURL = "https://www.ortussolutions.com"
-
-	/**
-	 * This boolean flag tells the module service to skip the module registration/activation process.
-	 */
-	this.enabled = true
-
-    /**
-	 * The module dependencies that this module needs to be activated before this module is activated
-	 */
-	this.dependencies = []
-
-	/**
-	 * --------------------------------------------------------------------------
-	 * Module Methods
-	 * --------------------------------------------------------------------------
-	 */
-
-	/**
-	 * Called by the ModuleService on module registration.
-	 * Declare settings, interceptors, and custom interception points here.
+	 * Settings and interception points. All settings are documented in docs/configuration.md.
 	 */
 	function configure() {
 		settings = {
-			// Master on/off switch. Per-request override via LensEnable() / LensDisable().
-			enabled : true,
+			// Master switch. Lens is off by default. Never turn it on for a public site.
+			enabled : false,
 
-			// Collector toggles — control which data is collected
-			collectors : {
-				queries       : true,
-				http          : true,
-				soap          : true,
-				messages      : true,
-				exceptions    : true,
-				timeline      : true,
-				bifCalls      : false,   // expensive - off by default
-				functionCalls : false,   // expensive - off by default
-				scopes : {
-					enabled : true,
-					form    : true,
-					session : false,
-					request : false
-				},
-				boxlangInfo : true
+			// Who may be tracked and shown the bar
+			access : {
+				// Exact IPs, CIDR ranges, or "*" for everyone (dangerous)
+				allowedIPs           : [ "127.0.0.1", "::1" ],
+				// Also allow private network ranges (10/8, 172.16/12, 192.168/16, fc00::/7, link-local)
+				allowPrivateNetworks : true,
+				// Restrict to these Host header names. Empty means any host
+				allowedHosts         : [],
+				// Require a request header: "Name" or "Name=value". Empty means none
+				requireHeader        : ""
 			},
 
-			// Collection limits (prevent unbounded memory use on long requests)
-			maxQueries        : 100,
-			maxExceptions     : 50,
-			maxTemplates      : 200,
-			maxMessages       : 200,
-			maxTimings        : 200,
-			maxBifCalls       : 500,
-			maxFunctionCalls  : 500,
+			// Inject the bar before </body> on HTML responses. Set false and call lensRender() to place it yourself
+			inject       : true,
+			contentTypes : [ "text/html" ],
+			excludePaths : [ "/~bxlens/*", "/favicon.ico" ],
 
-			// UI theme sent to the client: "dark" | "light" | "auto"
-			theme : "dark",
+			// In-memory history ring buffer. The oldest request is recycled when full. Nothing is written to disk
+			history : {
+				trackNonHtml : true,
+				header       : "X-BxLens-Id",
+				maxRequests  : 50
+			},
 
-			// CSS variable overrides for custom branding (applied as inline style on #bxlens-root)
-			// Example: { "--bxl-accent" : "#00ff88" }
-			themeOverrides : {},
+			ui : {
+				// auto follows the OS, or dark | light
+				theme               : "auto",
+				// Start with the panel open instead of the collapsed health strip
+				startOpen           : false,
+				// Open the panel to Issues when an exception was caught
+				autoOpenOnException : true,
+				defaultTab          : "timeline",
+				height              : 360,
+				allowDetach         : true,
+				// Toggle the panel. Modifiers: Ctrl, Alt, Shift, Meta
+				hotkey              : "Ctrl+`"
+			},
 
-			// Editor deep-link pattern. {path} and {line} are replaced at render time.
-			// Set to "" to disable clickable links.
-			// Examples:
-			//   vscode://file/{path}:{line}
-			//   phpstorm://open?file={path}&line={line}
-			editorLinkPattern : "vscode://file/{path}:{line}",
+			// What counts as slow or suspicious
+			thresholds : {
+				slowRequestMs  : 500,
+				slowQueryMs    : 25,
+				slowTemplateMs : 100,
+				nPlusOneMin    : 3
+			},
 
-			// Internal — populated in onLoad()
-			alpineSource : ""
+			// Click-to-editor links. {path} and {line} are replaced. Map container paths with remoteBase/localBase
+			editor : {
+				linkPattern : "vscode://file/{path}:{line}",
+				remoteBase  : "",
+				localBase   : ""
+			},
+
+			// Values under these keys are masked on the server before they reach the page
+			redact : {
+				keys : [ "password", "pwd", "passwd", "token", "secret", "apikey", "api_key", "authorization", "cookie", "credential" ],
+				mask : "[redacted]"
+			},
+
+			// Caps for any value sent to the page
+			limits : {
+				maxString : 2000,
+				maxDepth  : 4,
+				maxItems  : 100
+			},
+
+			collectors : {
+				templates    : { enabled : true, max : 300 },
+				// Hot path, off by default
+				functions    : { enabled : false, max : 1000, minMs : 0 },
+				queries      : { enabled : true, max : 200, includeParams : true, captureCaller : true },
+				http         : { enabled : true, max : 100 },
+				exceptions   : { enabled : true, max : 50 },
+				messages     : { enabled : true, max : 200 },
+				timers       : { enabled : true, max : 200 },
+				transactions : { enabled : true, max : 50 },
+				logs         : { enabled : false, max : 200 },
+				scopes       : { enabled : true, url : true, form : true, cookie : false, session : false, request : false, application : false, variables : false },
+				jvm          : { enabled : true },
+				cache        : { enabled : true },
+				modules      : { enabled : true }
+			}
 		};
 
+		// Extension points for applications and other modules. See docs/guides/extending.md
+		customInterceptionPoints = [
+			"onLensRegister",
+			"onLensRequestStart",
+			"onLensCollect",
+			"onLensRequestFinish"
+		];
+
+		interceptors = [];
 	}
 
 	/**
-	 * Called by the ModuleService on module activation.
+	 * Activate: parse the settings, register the collectors.
 	 */
 	function onLoad() {
-		// Embed Alpine.js source so LensRender() can include it inline
-		var alpinePath = moduleRecord.physicalPath & "/assets/alpine.min.js";
-		if ( fileExists( alpinePath ) ) {
-			settings.alpineSource = fileRead( alpinePath );
-		}
+		LensService.getInstance().activate(
+			boxRuntime,
+			settings,
+			moduleRecord.physicalPath.toString(),
+			moduleRecord.version
+		);
 	}
 
 	/**
-	 * Called by the ModuleService on module deactivation.
+	 * Other modules may have loaded after us, so ask for panel declarations again once all are active.
 	 */
+	function afterModuleActivations( data ) {
+		LensService.getInstance().announceRegister();
+	}
+
 	function onUnload() {
+		LensService.getInstance().shutdown();
 	}
 
 }

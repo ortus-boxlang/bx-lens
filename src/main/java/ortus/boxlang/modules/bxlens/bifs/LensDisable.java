@@ -8,31 +8,33 @@
  * You may obtain a copy of the License at
  *
  * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package ortus.boxlang.modules.bxlens.bifs;
 
-import ortus.boxlang.modules.bxlens.LensRequestData;
+import ortus.boxlang.modules.bxlens.model.LensRequest;
 import ortus.boxlang.runtime.bifs.BoxBIF;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.scopes.ArgumentsScope;
 
 /**
- * LensDisable() — Disable the bx-lens debug bar for the current request.
+ * Turns Lens off for the rest of this request: nothing more is collected and the bar is not injected.
  */
 @BoxBIF
 public class LensDisable extends BaseLensBIF {
 
-	public LensDisable() {
-		super();
-	}
-
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
-		LensRequestData data = getLensData( context );
-		if ( data != null ) {
-			data.enabled = false;
+		LensRequest req = request( context );
+		if ( req != null ) {
+			req.enabled = false;
 		}
-		return Boolean.TRUE;
+		return null;
 	}
 
 }

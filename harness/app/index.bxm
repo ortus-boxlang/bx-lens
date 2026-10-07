@@ -1,0 +1,23 @@
+<bx:script>request.pageTitle = "Lens harness";</bx:script>
+<bx:include template="/includes/header.bxm" />
+<bx:output>
+<h1>BX Lens harness</h1>
+<p>A demo shop that produces every kind of data Lens can show. Open a scenario, then open the Lens bar at the bottom.</p>
+<ul>
+	<li><a href="/orders.bxm">Orders</a>: a healthy page with one query, a cache hit and a timer.</li>
+	<li><a href="/n-plus-one.bxm">N+1</a>: one query per order, flagged as a problem.</li>
+	<li><a href="/slow.bxm">Slow query</a>: a heavy cross join.</li>
+	<li><a href="/caught-exception.bxm">Caught exception</a>: errors handled in code, recorded with lensException().</li>
+	<li><a href="/error.bxm">Uncaught error</a>: core's error page. Lens records it in History.</li>
+	<li><a href="/http.bxm">HTTP</a>: outgoing calls, one succeeds and one returns 404.</li>
+	<li><a href="/cache.bxm">Cache</a>: hits and misses against the default cache.</li>
+	<li><a href="/timers.bxm">Timers and messages</a>: lensStart, lensMeasure, lensMessage, lensDump.</li>
+	<li><a href="/functions.bxm">Functions</a>: nested user function calls.</li>
+	<li><a href="/forms.bxm">Form</a>: a POST with a password field to show redaction.</li>
+	<li><a href="/session.bxm">Session</a>: session scope snapshot.</li>
+	<li><a href="/transaction.bxm">Transaction</a>: a committed and a rolled back transaction.</li>
+	<li><a href="/extend.bxm">Extend</a>: a custom panel from application code, plus one from a module.</li>
+	<li><a href="/api/orders.json.bxm">JSON endpoint</a> and <a href="/events.bxm">SSE endpoint</a>: recorded in History without a bar.</li>
+</ul>
+</bx:output>
+<bx:include template="/includes/footer.bxm" />

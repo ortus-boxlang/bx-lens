@@ -1,0 +1,13 @@
+----------------------------------------------------------------
+Wed Oct 07 21:14:01 UTC 2026:
+Booting Derby version The Apache Software Foundation - Apache Derby - 10.16.1.1 - (1901046): instance a816c00e-01a1-1837-53c2-000001e575d0 
+on database directory memory:/home/user/bx-lens/harness/lensdemo with class loader ortus.boxlang.runtime.loader.DynamicClassLoader@61f39bb 
+Loaded from file:/tmp/boxlang-jars/bx-derby-1.0.0-all-f93da355800bec3f-1718284300000.jar
+java.vendor=Ubuntu
+java.runtime.version=21.0.12.1+1-1-24.04.4-Ubuntu
+user.dir=/home/user/bx-lens/harness
+os.name=Linux
+os.arch=amd64
+os.version=6.18.44-fc-v77
+derby.system.home=null
+Database Class Loader started - derby.database.classpath=''

@@ -1,0 +1,36 @@
+{
+	"modules": {
+		"bxLens": {
+			"settings": {
+				"enabled": true,
+				"ui": {
+					"startOpen": false,
+					"autoOpenOnException": true
+				},
+				"thresholds": {
+					"slowQueryMs": 15,
+					"slowRequestMs": 3000
+				},
+				"collectors": {
+					"functions": {
+						"enabled": true,
+						"max": 500
+					},
+					"logs": {
+						"enabled": true
+					},
+					"scopes": {
+						"enabled": true,
+						"url": true,
+						"form": true,
+						"session": true,
+						"request": true
+					}
+				},
+				"dev": {
+					"reloadAssets": true
+				}
+			}
+		}
+	}
+}
