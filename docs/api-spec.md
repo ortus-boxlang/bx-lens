@@ -71,9 +71,9 @@ Not available in core, so removed from the current code: `onException`, `onSOAPR
   "injectPosition": "bodyEnd",
   "contentTypes": [ "text/html" ],
   "excludePaths": [ "/~bxlens/*", "/favicon.ico" ],
-  "ajax": { "track": true, "header": "X-BxLens-Id" },
-  "storage": { "maxRequests": 50 },
-  "ui": { "theme": "auto", "position": "bottom", "startOpen": false, "defaultTab": "timeline", "height": 340 },
+  "history": { "trackNonHtml": true, "header": "X-BxLens-Id", "maxRequests": 50 },
+  "ui": { "theme": "auto", "startOpen": false, "autoOpenOnException": true, "defaultTab": "timeline", "height": 360, "allowDetach": true, "hotkey": "Ctrl+`" },
+  "thresholds": { "slowRequestMs": 500, "slowQueryMs": 25, "slowTemplateMs": 100, "nPlusOneMin": 3 },
   "editor": { "linkPattern": "vscode://file/{path}:{line}", "remoteBase": "", "localBase": "" },
   "redact": { "keys": [ "password", "pwd", "token", "secret", "apikey", "authorization", "cookie" ], "mask": "[redacted]" },
   "collectors": {
@@ -123,7 +123,7 @@ Removed from the default surface: `lensDumpHeap`, `lensThreadDump`. They stay be
 - Hook: interceptor on `onRequestEnd` with fallbacks on `onError` and `onAbort`. Pattern follows web-support `HtmlBody`.
 - Inject only when: lens enabled, caller allowed, response `Content-Type` starts with an entry in `contentTypes`, status is not a redirect, response not already committed, request not matched by `excludePaths`.
 - Place before the last `</body>` (case-insensitive search from the end, no full DOM parse). If absent, append.
-- Non-HTML (JSON, SSE, files, redirects): no bar. When `ajax.track` is on, the request is still stored and the id is returned in the `X-BxLens-Id` header so the bar can list it under History.
+- Non-HTML (JSON, SSE, files, redirects): no bar. When `history.trackNonHtml` is on (default), the request is still collected and stored, and the id is returned in the `X-BxLens-Id` header so it appears under History. History is a ring buffer: when full, the oldest request is recycled.
 - The bar markup is a small container plus a JSON payload (`<script type="application/json">`, `</` escaped). Behavior and styles load from `/~bxlens/` so they are cached across pages.
 
 ## 7. Security
@@ -136,6 +136,17 @@ Removed from the default surface: `lensDumpHeap`, `lensThreadDump`. They stay be
 - JSON is embedded with `<`, `>`, `&`, U+2028, U+2029 escaped as unicode escapes, not HTML entities.
 
 ## 8. UI
+
+Decisions (from design review):
+- Collapsed health strip by default: status, time, memory, query and template counts. Strip border and an issues chip turn amber or red on slow request, N+1, caught exception, or 4xx/5xx.
+- Auto-opens to the relevant tab when an exception is caught or thrown (`ui.autoOpenOnException`).
+- Hero view is a unified waterfall: templates, functions, queries and HTTP calls on one time axis with nesting. Must-haves: hover details and click-to-expand drawer, zoom and pan the time axis, filter by type plus text search, open in editor from any row.
+- Issues tab lists everything suspicious (exceptions, N+1, slow queries, slow templates) ranked, each linking to its row.
+- Docked at the bottom, resizable by dragging the top edge, and detachable into its own window. Open tab, height and collapsed state persist per browser.
+- Hotkeys: Ctrl+` toggles, 1-9 switch tabs, / focuses search.
+- Copy actions: SQL with params, file:line, request JSON, cURL.
+- History shows HTML, JSON, SSE and other requests, with type, status, time and issue count. Compare-two-requests is post-v1.
+- Compact devtools density. Brand gradient used sparingly (active tab, healthy status), not as a wash.
 
 Alpine.js (kept per decision). Mockup: https://claude.ai/artifact/AQsvxZRZrKqWraet41gKno
 
