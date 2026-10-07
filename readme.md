@@ -1,4 +1,4 @@
-# ⚡︎ BoxLang Module: BoxLang Lens
+# ⚡︎ BoxLang Module: BX Lens
 
 ```
 |:------------------------------------------------------:|
@@ -16,122 +16,120 @@
 
 <p>&nbsp;</p>
 
-This template can be used to create Ortus based BoxLang Modules. To use, just click the `Use this Template` button in the github repository: https://github.com/ortus-boxlang/boxlang-module-template and run the setup task from where you cloned it.
+A request level debug bar for BoxLang web applications. Install the module, turn it on, and every HTML page gets a bar at the bottom with the request timeline, queries, templates, exceptions, HTTP calls, cache, modules, scopes and more. Everything is collected by Java code in memory. Nothing is written to disk.
+
+![BX Lens on an N+1 page](docs/assets/screenshots/overview.png)
+
+Lens works with the BoxLang MiniServer, CommandBox and servlet deployments, because it hooks the request lifecycle that web support already provides.
+
+## Install
 
 ```bash
-box task run taskFile=src/build/SetupTemplate
+# OS binary
+install-bx-module bx-lens
+
+# CommandBox
+box install bx-lens
 ```
 
-The `SetupTemplate` task will ask you for your module name, id and description and configure the template for you! Enjoy!
+Lens is **off by default** and only serves callers on loopback and private networks. Turn it on in `boxlang.json`:
 
-## Install Skills
+```json
+{
+	"modules": {
+		"bxLens": {
+			"settings": {
+				"enabled": true
+			}
+		}
+	}
+}
+```
 
-If you are using the Copilot agent workflow with this template, restore the project skills from `skills-lock.json` when you first start working in the project:
+Never enable it on a public site. See [Security](docs/security.md).
+
+## What you get
+
+| Panel | Shows |
+|---|---|
+| **Issues** | Everything suspicious, ranked: exceptions, N+1 queries, slow queries, slow templates, failed HTTP calls |
+| **Timeline** | One waterfall of templates, functions, queries, HTTP calls and transactions. Hover, click for detail, zoom, pan, filter, search, open the file in your editor |
+| **Queries** | Every statement with its parameters, rows, time, datasource and the template line that ran it. Copy SQL |
+| **Templates** | The include and call tree |
+| **HTTP** | Outgoing HTTP calls with status, size and time |
+| **Exceptions** | Caught and uncaught exceptions with BoxLang locations and the Java stack |
+| **Messages and Timers** | What your code sends with `lensMessage()`, `lensDump()`, `lensMeasure()` |
+| **Cache** | Every BoxCache cache with hit rate, objects, evictions and what this request did to it |
+| **Modules** | Loaded modules with version, author, what they provide and activation time |
+| **Request, Scopes, Runtime** | Headers, redacted scope snapshots, memory, GC, threads and versions |
+| **History** | The last 50 requests, including JSON and SSE, recycled in memory |
+| Your panels | Applications and other modules add panels with `lensPanel()` or the `onLensCollect` interception point |
+
+A collapsed health strip turns amber or red when something is wrong and opens on Issues when an exception was caught. Resize it, detach it as a floating window, switch themes, and use the keyboard: <kbd>Ctrl</kbd>+<kbd>`</kbd> toggles, <kbd>1</kbd> to <kbd>9</kbd> switch tabs, <kbd>/</kbd> searches.
+
+## Send things to the bar
+
+```javascript
+lensMessage( "Loaded #orders.len()# orders", "info" );
+lensDump( order, "order after pricing" );
+
+id = lensStart( "price calculation" );
+// ...
+lensStop( id );
+
+orders = lensMeasure( "load orders", () => orderService.list() );
+
+try {
+	risky();
+} catch ( any e ) {
+	lensException( e );
+}
+
+lensPanel( "orm", "ORM" ).columns( [ "Entity", "ms" ] ).rows( rows ).badge( rows.len(), "none" );
+```
+
+## Documentation
+
+The full documentation is built with [bx-sites](https://github.com/ortus-boxlang/bx-sites) from the `docs/` folder: configuration reference, every panel, the BIFs, extending Lens from your own module, security, the core event inventory, and troubleshooting.
 
 ```bash
-npx skills experimental_install
+bxSites serve
 ```
 
-Run the command from the project root so the workspace restores the pinned skills defined for this template.
+## Try it: the demo harness
 
-## Directory Structure
-
-Here is a brief overview of the directory structure:
-
-- `.github/workflows` - These are the github actions to test and build the module via CI
-- `build` - This is a temporary non-sourced folder that contains the build assets for the module that gradle produces
-- `gradle` - The gradle wrapper and configuration
-- `src` - Where your module source code lives
-- `.cfformat.json` - A CFFormat using the Ortus Standards
-- `.editorconfig` - Smooth consistency between editors
-- `.gitattributes` - Git attributes
-- `.gitignore` - Basic ignores. Modify as needed.
-- `.markdownlint.json` - A linting file for markdown docs
-- `.ortus-java-style.xml` - Ortus Java Style for IntelliJ, VScode, Eclipse.
-- `box.json` - The box.json for your module used to publish to ForgeBox
-- `build.gradle` - The gradle build file for the module
-- `changelog.md` - A nice changelog tracking file
-- `CONTRIBUTING.md` - A contribution guideline
-- `gradlew` - The gradle wrapper
-- `gradlew.bat` - The gradle wrapper for windows
-- `ModuleConfig.cfc` - Your module's configuration. Modify as needed.
-- `readme.md` - Your module's readme. Modify as needed.
-- `settings.gradle` - The gradle settings file
-
-Here is a brief overview of the source directory structure:
-
-- `build` - Build scripts and assets
-- `main` - The main module source code
-  - `bx` - The BoxLang source code
-  - `ModuleConfig.bx` - The BoxLang module configuration
-    - `bifs` - BoxLang built-in functions
-    - `components` - BoxLang components
-    - `config` - BoxLang configuration, schedulers, etc.
-    - `interceptors` - BoxLang interceptors
-    - `libs` - Java libraries to use that are NOT managed by gradle
-    - `models` - BoxLang models
-  - `java` - Java source code
-  - `resources` - Resources for the module placed in final jar
-- `test`
-  - `bx` - The BoxLang test code
-  - `java` - Java test code
-  - `resources` - Resources for testing
-    - `libs` - BoxLang binary goes here for now.
-
-## Project Properties
-
-The project name is defined in the `settings.gradle` file. You can change it there.
-The project version, BoxLang Version and JDK version is defined in the `build.gradle` file. You can change it there.
-
-## Gradle Tasks
-
-Before you get started, you need to run the `downloadBoxLang` task in order to download the latest BoxLang binary until we publish to Maven.
+`harness/` is a small shop app with a Derby in-memory database that produces every kind of data Lens can show: a healthy page, an N+1 loop, a slow query, caught and uncaught errors, outgoing HTTP, cache hits and misses, JSON and SSE endpoints, a form with a password, a session, transactions and custom panels.
 
 ```bash
-gradle downloadBoxLang
+./harness/start.sh          # builds the module and starts MiniServer on http://localhost:8085
+DEV=1 SKIP_BUILD=1 ./harness/start.sh   # serve the UI files from src/main/bx/assets, edit and refresh
 ```
 
-This will store the binary under `/src/test/resources/libs` for you to use in your tests and compiler. Here are some basic tasks
+## Development
 
-| Task                | Description                                                                                                       |
-| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `build`             | The default lifecycle task that triggers the build process, including tasks like `clean`, `assemble`, and others. |
-| `clean`             | Deletes the `build` folders. It helps ensure a clean build by removing any previously generated artifacts.        |
-| `compileJava`       | Compiles Java source code files located in the `src/main/java` directory                                          |
-| `compileTestJava`   | Compiles Java test source code files located in the `src/test/java` directory                                     |
-| `dependencyUpdates` | Checks for updated versions of all dependencies                                                                   |
-| `downloadBoxLang`   | Downloads the latest BoxLang binary for testing                                                                   |
-| `jar`               | Packages your project's compiled classes and resources into a JAR file `build/libs` folder                        |
-| `javadoc`           | Generates the Javadocs for your project and places them in the `build/docs/javadoc` folder                        |
-| `serviceLoader`     | Generates the ServiceLoader file for your project                                                                 |
-| `spotlessApply`     | Runs the Spotless plugin to format the code                                                                       |
-| `spotlessCheck`     | Runs the Spotless plugin to check the formatting of the code                                                      |
-| `tasks`             | Show all the available tasks in the project                                                                       |
-| `test`              | Executes the unit tests in your project and produces the reports in the `build/reports/tests` folder              |
+```bash
+./gradlew downloadBoxLang          # BoxLang and web support jars, once
+./gradlew shadowJar test           # build the module and run the Java tests
+./gradlew spotlessApply            # Ortus Java formatting, run before every commit
 
-## Tests
+cd e2e
+npm ci
+npx playwright install chromium
+npm run e2e                        # starts the harness and drives every feature in a browser
+npx playwright test screens.spec.ts   # regenerates docs/assets/screenshots
+```
 
-Please use the `src/test` folder for your unit tests. You can either test using TestBox o JUnit if it's Java.
+Set `LENS_CHROMIUM` to use a Chromium you already have. CI runs the Java tests on Linux and Windows and the Playwright suite on Linux, and uploads the report and the screenshots.
 
-## VSCode Tests
+How it fits together:
 
-If you will be running tests for modules using the VSCode test explorer, then you need to make sure you remove the `/src/main/resources` line item from the configured class path, if not, the BoxLang core will try loading any service loaders it finds in that class path resolution.
+- `src/main/java/.../LensService` owns the settings, the collectors, the in-memory history and the injector.
+- `interceptors/collectors/*` are the Java collectors, one per panel. They run as BoxLang interceptors.
+- `model/` holds the per request data, the issue engine and the snapshot that the UI reads.
+- `src/main/bx/assets/` is the UI: Alpine.js, one CSS file and one template. The data travels as JSON inside the page.
+- `src/main/bx/ModuleConfig.bx` declares every setting with its default.
 
-> Please note, this IS ONLY FOR MODULE DEVELOPMENT.
-
-Go to the `Java Projects` panel, click on the 3 dots and click on `Configure Classpath`. Remove the `/src/main/resources` line item and hit `APPLY SETTINGS` on the bottom left.
-
-## Github Actions Automation
-
-The github actions will clone, test, package, deploy your module to ForgeBox and the Ortus S3 accounts for API Docs and Artifacts. So please make sure the following environment variables are set in your repository.
-
-> Please note that most of them are already defined at the org level
-
-- `FORGEBOX_TOKEN` - The Ortus ForgeBox API Token
-- `AWS_ACCESS_KEY` - The travis user S3 account
-- `AWS_ACCESS_SECRET` - The travis secret S3
-
-> Please contact the admins in the `#infrastructure` channel for these credentials if needed
+Lens is request level and open source. BX Insights is the separate, licensed observability product.
 
 ## Ortus Sponsors
 

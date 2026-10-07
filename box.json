@@ -11,13 +11,17 @@
 	},
 	"bugs": "https://ortussolutions.atlassian.net/browse/BLMODULES",
 	"slug": "bx-lens",
-	"shortDescription": "BoxLang Debug Bar — request profiling panel for web pages",
+	"shortDescription": "BoxLang request level debug bar: timeline, queries, templates, cache, modules and more",
 	"type": "boxlang-modules",
 	"keywords": [
-		"boxlang"
+		"boxlang",
+		"debug",
+		"debugbar",
+		"profiler",
+		"lens"
 	],
 	"boxlang": {
-		"minimumVersion": "1.0.0",
+		"minimumVersion": "1.19.0",
 		"moduleName": "bxLens"
 	},
 	"private": false,
@@ -39,7 +43,11 @@
 		"gradlew",
 		"build.gradle",
 		"/src/**",
-		"gradle/**"
+		"gradle/**",
+		"/e2e/**",
+		"/harness/**",
+		"/docs/**",
+		"bxsites.yaml"
 	],
 	"scripts": {}
 }
