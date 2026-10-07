@@ -12,7 +12,7 @@ No. It ships disabled and you should never enable it in production. See [Securit
 :::
 
 ::: expandable "Does Lens store data?"
-Only in memory. History keeps the last 50 requests and clears on restart. There is no disk or database storage.
+Only in memory. History keeps the last 50 requests and clears on restart or module reload. There is no disk or database storage.
 :::
 
 ::: expandable "Does it work with APIs and JSON responses?"
@@ -20,11 +20,11 @@ Those responses get no bar, but Lens collects and stores them by default. Find t
 :::
 
 ::: expandable "Does it work with ColdBox, Quick or CBWIRE?"
-Lens works at the request level, so it sees what core announces. First-party panels for ColdBox, cbwire and Quick are candidates in the spec, not shipped features.
+Lens works at the request level, so it sees what core announces. Panels for ColdBox, cbwire and Quick are ideas, not shipped features.
 :::
 
 ::: expandable "How do I add my own panel?"
-Use `lensPanel` in app code or the Tier 1 interception points in a module. See [Extending Lens](guides/extending.md).
+Use `lensPanel` in app code or the interception points in a module. See [Extending Lens](guides/extending.md).
 :::
 
 ::: expandable "Can I turn Lens off for one request?"
@@ -32,13 +32,17 @@ Yes. Call `lensDisable()` early in the request.
 :::
 
 ::: expandable "How is Lens different from BX Insights?"
-Lens is an open source, request-level debug bar. BX Insights is a separate commercial observability product. See the [Roadmap](project/roadmap.md#relation-to-bx-insights).
+Lens is an open source, request-level debug bar. BX Insights is the separate, licensed observability product. See the [Roadmap](project/roadmap.md#relation-to-bx-insights).
 :::
 
-::: expandable "Why does the Cache panel lack hit and miss events?"
-Core does not announce them yet. See [Core gaps](reference/events.md#core-gaps).
+::: expandable "How does the Cache panel count hits and misses for a request?"
+Core announces no cache read events. Lens subtracts the cache statistics at request start from those at request end. See [Cache](panels/cache.md).
+:::
+
+::: expandable "Why is there no bar on my error page?"
+Core renders its own page for uncaught exceptions and skips the event Lens uses. The request is still in [History](panels/history.md).
 :::
 
 ::: expandable "Does it need Node or a build step in my app?"
-No. Lens serves its own assets from `/~bxlens/`.
+No. Lens inlines its own assets into each HTML response, about 110 KB.
 :::

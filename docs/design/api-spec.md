@@ -2,6 +2,38 @@
 
 Request-level debug bar for BoxLang web apps (MiniServer, servlet, CommandBox). In-memory only. HTML responses only. Open source. Observability across requests is out of scope (that is BX Insights).
 
+## Status (v1 as implemented)
+
+This page is the original design draft. Where it disagrees with the shipped module, the user docs win: see [Configuration](../configuration.md), [BIF Reference](../guides/bifs.md), [Extending Lens](../guides/extending.md) and [Core Event Inventory](../reference/events.md).
+
+**Implemented in v1**
+
+- Collectors: templates, functions (opt in), queries, HTTP, exceptions, messages, timers, transactions, logs (opt in), scopes, JVM (Runtime), cache, modules, plus request lifecycle data.
+- Panels: Issues, Timeline, Queries, Templates, HTTP, Exceptions, Messages, Timers, Cache, Modules, Request, Scopes, Runtime and History.
+- BIFs: `lensMessage`, `lensDump`, `lensStart`, `lensStop`, `lensMeasure`, `lensAddMeasure`, `lensException`, `lensEnable`, `lensDisable`, `lensIsEnabled`, `lensRender`, `lensPanel`.
+- Tier 1 extension: `onLensRegister`, `onLensRequestStart`, `onLensCollect`, `onLensRequestFinish`, with the table, kv, tree, spans, messages, json and text renderers.
+- Editor links with `editor.remoteBase` and `editor.localBase` path mapping.
+- In-memory History ring buffer (default 50) with JSON, SSE and other non-HTML requests.
+
+**Changed from this draft**
+
+- The settings are exactly the keys in `ModuleConfig.bx`. There is no `injectPosition`, no `X-BxLens` cookie or header override, no `collectors.request`, `timeline` or `session`, and slow thresholds live only under `thresholds`. Added: `limits`, `collectors.transactions`, `collectors.logs.max`, `collectors.queries.captureCaller`, `collectors.scopes.variables` and `dev.reloadAssets`. `collectors.cache` is on by default.
+- There is no `/~bxlens/` asset endpoint. Lens inlines CSS, JavaScript and data into the HTML response, about 110 KB each.
+- Detach opens a floating window inside the page with a Dock button, not a separate browser window.
+- History shows summaries only. Loading the detail of an earlier request is not available.
+- Uncaught exceptions and aborts skip `onRequestEnd`, and the web context does not announce `onRequestFlushBuffer`, so no bar is injected on core's error page. The request is still recorded in History.
+- The Cache panel computes per-request numbers from the difference of cache statistics, because core announces no cache read events.
+- Redaction matches any key that contains a redact key, ignoring case.
+- The JVM panel is named Runtime.
+
+**Planned, not implemented**
+
+- `lensDumpHeap`, `lensThreadDump`, `allowHeapDump`, `collectors.jvm.threadDump`.
+- The `bx:lens` component.
+- Tier 2 (Java collectors) and Tier 3 (custom UI, `ui.allowCustomPanels`).
+- Compare two requests.
+- BIF call collector, components panel and SOAP events, which need core changes (section 3.7).
+
 ## 1. Architecture
 
 | Piece | Responsibility |
@@ -11,7 +43,7 @@ Request-level debug bar for BoxLang web apps (MiniServer, servlet, CommandBox). 
 | `ILensCollector` | SPI. One class per panel. Java only. Registered as interceptors by the service. |
 | `RequestStore` | Bounded ring buffer of finished `LensRequest` snapshots (default 50). No disk, no DB. |
 | `LensInjector` | Interceptor that renders the bar into HTML responses at end of request. |
-| Asset endpoint | Serves `lens.js`, `lens.css`, `alpine.min.js` and JSON for stored requests from `/~bxlens/`. |
+| Asset endpoint | Planned in this draft, not implemented. v1 inlines the assets in the page instead. |
 
 Request flow: `onRequestStart` creates `LensRequest` (if allowed) then collectors fill it then `onRequestEnd` / `onError` / `onAbort` finalize, store, and inject.
 
@@ -172,7 +204,7 @@ Removed from the default surface: `lensDumpHeap`, `lensThreadDump`. They stay be
 - Inject only when: lens enabled, caller allowed, response `Content-Type` starts with an entry in `contentTypes`, status is not a redirect, response not already committed, request not matched by `excludePaths`.
 - Place before the last `</body>` (case-insensitive search from the end, no full DOM parse). If absent, append.
 - Non-HTML (JSON, SSE, files, redirects): no bar. When `history.trackNonHtml` is on (default), the request is still collected and stored, and the id is returned in the `X-BxLens-Id` header so it appears under History. History is a ring buffer: when full, the oldest request is recycled.
-- The bar markup is a small container plus a JSON payload (`<script type="application/json">`, `</` escaped). Behavior and styles load from `/~bxlens/` so they are cached across pages.
+- The bar markup is a small container plus a JSON payload (`<script type="application/json">`, `</` escaped). In this draft, behavior and styles load from `/~bxlens/`. v1 inlines them instead.
 
 ## 7. Security
 
@@ -190,7 +222,7 @@ Decisions (from design review):
 - Auto-opens to the relevant tab when an exception is caught or thrown (`ui.autoOpenOnException`).
 - Hero view is a unified waterfall: templates, functions, queries and HTTP calls on one time axis with nesting. Must-haves: hover details and click-to-expand drawer, zoom and pan the time axis, filter by type plus text search, open in editor from any row.
 - Issues tab lists everything suspicious (exceptions, N+1, slow queries, slow templates) ranked, each linking to its row.
-- Docked at the bottom, resizable by dragging the top edge, and detachable into its own window. Open tab, height and collapsed state persist per browser.
+- Docked at the bottom, resizable by dragging the top edge, and detachable into a floating window inside the page. Open tab, height and collapsed state persist per browser.
 - Hotkeys: Ctrl+` toggles, 1-9 switch tabs, / focuses search.
 - Copy actions: SQL with params, file:line, request JSON, cURL.
 - History shows HTML, JSON, SSE and other requests, with type, status, time and issue count. Compare-two-requests is post-v1.
