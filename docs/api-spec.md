@@ -38,23 +38,71 @@ Rules:
 - Time uses `System.nanoTime()` offsets from request start.
 - Third parties can add collectors via `LensService.register( ILensCollector )` from their own module.
 
-## 3. Events used (verified against BoxLang 1.19 `BoxEvent`)
+## 3. Event inventory (BoxLang core 1.19, read from source)
 
-| Collector | Events |
-|---|---|
-| request | `onRequestStart`, `onRequestEnd`, `onError`, `onAbort` |
-| timeline | all collectors feed spans |
-| templates | `preTemplateInvoke`, `postTemplateInvoke` |
-| functions | `preFunctionInvoke`, `postFunctionInvoke`, `onFunctionException` (stack per thread, off by default) |
-| queries | `preQueryExecute`, `postQueryExecute`, `onTransaction*` |
-| http | `onHTTPRequest`, `onHTTPRawResponse`, `onHTTPResponse`, `onHTTPError` |
-| exceptions | `onError`, `onFunctionException`, plus `lensException()` |
-| cache | `afterCacheElementInsert`, `afterCacheElementUpdated`, `afterCacheElementRemoved` (hit/miss needs a core event; see open items) |
-| logs | `logMessage` |
-| session | `onSessionCreated`, `onSessionDestroyed` |
-| app | `onApplicationStart`, `onApplicationEnd`, `onApplicationRestart` |
+Payload keys below are what core actually sends. The current collectors read keys that do not exist (for example `params`/`recordCount` on `postQueryExecute`, `bodyLength` on `onHTTPRequest`), so they must be rewritten against this table.
 
-Not available in core, so removed from the current code: `onException`, `onSOAPRequest`, `onSOAPResponse`.
+### 3.1 Request lifecycle (announced globally and per app with `Key.*`)
+| Event | Payload | Use |
+|---|---|---|
+| `onRequestStart` | `context, args, application, listener` | create `LensRequest`, access check |
+| `onRequest` | same | template/class entry |
+| `onRequestEnd` | same | finalize, store, inject. **Skipped on unhandled exceptions and aborts** (`WebRequestExecutor`) |
+| `onError` | same (`args` holds the exception) | exception capture, finalize and inject on error pages |
+| `onAbort` | same | finalize and inject on abort |
+| `onMissingTemplate` | same | 404 issue |
+| `onSessionStart`, `onSessionEnd` | same | session panel |
+| `onRequestFlushBuffer` | `context, output` (mutable) | alternative injection point, fires on every flush so only the last flush may be modified |
+| `onApplicationStart/End/Restart/Defined`, `beforeApplicationListenerLoad`, `afterApplicationListenerLoad` | app data | App panel |
+| `onWebExecutorRequest` (web-support) | `context, appListener, requestString, exchange, updatedRequest` | route rewrites, request identity |
+
+### 3.2 Execution
+| Event | Payload | Use |
+|---|---|---|
+| `preTemplateInvoke`, `postTemplateInvoke` | `context, template, templatePath` | templates/includes tree. No `executionTime`, we time it ourselves |
+| `preFunctionInvoke`, `postFunctionInvoke` | `context, arguments, function, name` (+ `result` on post) | functions panel (opt in, hot path) |
+| `onFunctionException` | same + `exception` | exceptions |
+| `onBIFInvocation` | `context, arguments, bif, name` (+ `result` on 2nd call) | BIF panel. **Core bug**: the post-call re-announces `onBIFInvocation` instead of `postBIFInvocation`, so the post event never fires. Workaround: detect the call carrying `result`. File a Jira |
+| `onPreSourceInvoke`, `onPostSourceInvoke` | script/source execution | eval/script timing |
+| `afterBoxClassCreation`, `afterBoxClassInit`, `afterDynamicObjectCreation`, `onCreateObjectRequest` | object created | Objects panel (opt in) |
+| `onComponentInstance`, `onBIFInstance` | descriptor | startup only |
+| `onComponentInvocation` | declared in `BoxEvent`, **never announced by core** | cannot be used today. Needs a core change for a Components panel |
+
+### 3.3 Data
+| Event | Payload | Use |
+|---|---|---|
+| `onQueryBuild` | query build data | builder usage |
+| `preQueryExecute` | `sql, bindings, pendingQuery, context` | start time, SQL text |
+| `postQueryExecute` | `sql, bindings, executionTime, data, result (meta), pendingQuery, executedQuery, context` | queries panel; row count from `data`, datasource from `pendingQuery` |
+| `queryAddRow` | query row | ignore |
+| `onTransactionBegin/Acquire/Commit/Rollback/SetSavepoint/Release/End` | `connection, transaction, context` | transactions panel, shown as spans on the waterfall |
+| `onDatasourceConfigLoad`, `onDatasourceStartup`, `onDatasourceInitialized`, service start/stop | datasource | JVM/Runtime panel |
+| `afterCacheElementInsert/Updated/Removed`, `beforeCacheElementRemoved`, `afterCacheClearAll` | cache element | cache writes only. **No read/hit/miss event** |
+| `onCacheComponentAction` | cache component action | output cache usage |
+
+### 3.4 I/O and misc
+| Event | Payload | Use |
+|---|---|---|
+| `onHTTPRequest` | `result, httpClient, httpRequest` | HTTP panel start |
+| `onHTTPRawResponse`, `onHTTPResponse` | `result, response, httpClient, httpRequest` | status, size, time |
+| `onHTTPError` | error data | issue |
+| `onFileComponentAction` | file action | Files panel (opt in) |
+| `logMessage` | `text, log, type` | Logs panel |
+| `onBXDump` / `onMissingDumpOutput` | dump data | route `bx:dump` output into Messages instead of the page body |
+| `beforeObjectMarshallSerialize` etc. | serialization | ignore |
+
+### 3.5 Global, not per request (Runtime/Admin panels)
+`onSchedulerStartup/Shutdown/Restart`, `schedulerBeforeAnyTask`, `schedulerAfterAnyTask`, `schedulerOnAnyTaskSuccess`, `schedulerOnAnyTaskError`, `onSchedulerRegistration/Removal`, `onAllSchedulersStarted`, `onWatcher*`, module events (`preModuleLoad`, `postModuleLoad`, ...), `onRuntimeStart`, `onRuntimeShutdown`, `onConfigurationLoad`. These feed a rolling global activity view (scheduled tasks, executors, watchers) kept in `LensService`, not in `LensRequest`.
+
+### 3.6 Removed from the current code
+`onException`, `onSOAPRequest`, `onSOAPResponse` do not exist in core.
+
+### 3.7 Core gaps to request
+1. `postBIFInvocation` is never announced (bug).
+2. `onComponentInvocation` is never announced.
+3. No cache read/hit/miss event.
+4. No SOAP events.
+5. Template events lack execution time (cheap to add, optional).
 
 ## 4. Settings (`boxlang.json` > modules > bxLens > settings)
 
@@ -152,6 +200,56 @@ Alpine.js (kept per decision). Mockup: https://claude.ai/artifact/AQsvxZRZrKqWra
 
 Palette from `ortus-artwork/boxlang`: gradient `#00DBFF` to `#00FF75`, dark ground derived from `#303446`. Light and dark themes. Panels: Timeline (waterfall), Queries, Templates (include/call tree), HTTP, Exceptions, Messages, Timers, Request, Scopes, JVM, History.
 
+## 8b. Module extension API (modules contribute collectors and panels)
+
+Problem: every BoxLang module has its own class loader, so another module cannot implement Java interfaces that live inside bx-lens. The contract therefore has to be data-first, with Java as an optional second tier.
+
+**Tier 1: data-only contributions (v1).** No shared classes. Works from BoxLang or Java modules.
+
+1. bx-lens registers its own interception points in `configure()` of `ModuleConfig.bx`:
+
+| Point | When | Payload |
+|---|---|---|
+| `onLensRegister` | at bx-lens activation and again on `postModuleLoad` | `registry` with `registry.panel( id, label, icon, order, renderer )` |
+| `onLensRequestStart` | per request, after `LensRequest` exists | `context, requestId` |
+| `onLensCollect` | per request, before render | `context, requestId, panel( id )` handle to add data |
+| `onLensRequestFinish` | per request, after store | `requestId, summary` |
+
+2. A module declares panels once and fills them per request:
+
+```javascript
+// in another module's ModuleConfig.bx
+function configure() {
+  interceptors = [ { class: "#moduleMapping#.interceptors.MyLens", name: "MyLens@mymodule" } ];
+}
+// MyLens.bx
+@InterceptionPoint
+function onLensRegister( event ) {
+  event.registry.panel( id: "orm", label: "ORM", icon: "database", order: 40, renderer: "table" );
+}
+@InterceptionPoint
+function onLensCollect( event ) {
+  event.panel( "orm" )
+    .columns( [ "Entity", "Action", "ms" ] )
+    .rows( ormStats.rows )
+    .badge( ormStats.count, ormStats.slow ? "warn" : "none" );
+}
+```
+
+3. App code can use the same thing without a module through BIFs: `lensPanel( id, label ).table( ... )`, `.kv( ... )`, `.tree( ... )`, `.spans( ... )`, `.messages( ... )`, `.json( ... )`.
+
+4. Renderers are built in, so module panels need no JavaScript: `table`, `kv`, `tree`, `spans` (feeds the waterfall with a type, label, start, duration), `messages`, `json`, `text`. Spans from any panel can appear in the Timeline with their own color and filter chip.
+
+5. Contributions can add Issues (`panel.issue( severity, title, detail, file, line )`) which show on the Issues tab and drive the strip color.
+
+6. Safety: payloads go through the same redaction, size caps and JSON escaping as built-in collectors. Text is always escaped by the UI. No module-supplied HTML or script in Tier 1.
+
+**Tier 2: Java collectors (v1.x).** For hot paths where a module wants typed, fast collection. Options, to decide: publish a tiny `bx-lens-api` jar (interfaces only) that modules include in their own `libs/`, and bx-lens talks to it reflectively or via a `ServiceLoader` keyed on interface name; or keep Java modules on Tier 1 and let them call a static facade. This needs a spike on module class loader parents before we commit.
+
+**Tier 3: custom UI (later).** A module may ship a small ES module served from `/~bxlens/ext/{module}/` and declared with `renderer: "custom"`. Disabled by default behind `ui.allowCustomPanels`, since it runs script in the page.
+
+Candidate first-party contributors: bx-orm (entity loads and flushes), bx-redis (commands), bx-mail (sent mail), bx-ai (calls and tokens), bx-jdbc drivers (pool stats), Quick/qb, ColdBox/cbwire (event, handler, layout, view).
+
 ## 9. Delivery plan
 
 | # | Task | Output |
@@ -168,7 +266,7 @@ Palette from `ortus-artwork/boxlang`: gradient `#00DBFF` to `#00FF75`, dark grou
 
 ## 10. Open items
 
-1. Cache hit/miss and SOAP need new core events, or we skip them. Needs a decision.
+1. Cache hit/miss, SOAP, `onComponentInvocation` and `postBIFInvocation` need core changes (section 3.7). Decide: file Jira issues and skip in v1, or fix in core first.
 2. Confirm servlet and CommandBox paths run the same `onRequestEnd` flow as MiniServer.
 3. Should `History` survive an app reinit (global store) or reset with it?
 4. Editor link path mapping for Docker/remote (`remoteBase` to `localBase`) is included; confirm it is wanted in v1.
