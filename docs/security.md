@@ -13,21 +13,28 @@ icon: lucide:shield
 ## Defaults
 
 - `enabled` is `false`. Nothing runs until you turn it on.
-- When enabled, only loopback addresses (`127.0.0.1`, `::1`) and private networks may see the bar. Control this with `access.allowedIPs`, `access.allowPrivateNetworks`, `access.allowedHosts` and `access.requireHeader`.
-- A per-request override (`lensEnable()`, or the `X-BxLens: on|off` cookie or header) works only when `access` allows the caller.
+- When enabled, only loopback addresses (`127.0.0.1`, `::1`) and private networks may be tracked and see the bar.
+- A disallowed caller is not tracked at all.
 
-## Redaction
+## Access rules
 
-Lens redacts values on the server, before it serializes anything. This covers scopes, headers, params and messages. Any key that matches an entry in `redact.keys` is replaced with `redact.mask`.
+| Setting | Default | Meaning |
+|---|---|---|
+| `access.allowedIPs` | `["127.0.0.1", "::1"]` | Exact IPs or CIDR ranges. `"*"` allows everyone. Avoid it. |
+| `access.allowPrivateNetworks` | `true` | Also allow 10/8, 172.16/12, 192.168/16, fc00::/7 and link-local. |
+| `access.allowedHosts` | `[]` | Restrict to these `Host` header names. Empty means any host. |
+| `access.requireHeader` | `""` | Require a request header: `"Name"` or `"Name=value"`. |
 
-```json title="boxlang.json"
+```json title="Only allow a VPN range and require a header"
 {
 	"modules": {
 		"bxLens": {
 			"settings": {
-				"redact": {
-					"keys": [ "password", "pwd", "token", "secret", "apikey", "authorization", "cookie", "ssn" ],
-					"mask": "[redacted]"
+				"enabled": true,
+				"access": {
+					"allowedIPs": [ "127.0.0.1", "10.8.0.0/24" ],
+					"allowPrivateNetworks": false,
+					"requireHeader": "X-Dev=1"
 				}
 			}
 		}
@@ -35,23 +42,35 @@ Lens redacts values on the server, before it serializes anything. This covers sc
 }
 ```
 
+## Redaction
+
+Lens masks values on the server before they reach the page. A key is masked when its name contains any `redact.keys` entry, compared case-insensitively. This covers scopes, request headers, query params, messages and panel data. The `Cookie` and `Authorization` headers are masked by default.
+
+```json title="Default redact settings"
+{
+	"redact": {
+		"keys": [ "password", "pwd", "passwd", "token", "secret", "apikey", "api_key", "authorization", "cookie", "credential" ],
+		"mask": "[redacted]"
+	}
+}
+```
+
+Add your own keys, for example `ssn`. Because matching is by substring, `token` also masks `apiToken` and `csrfToken`.
+
 ## Size caps
 
-Each collector has a `max` count, and scopes also have `maxDepth` and `maxBytes`. These caps keep a large request from flooding the page.
+`limits.maxString` (2000), `limits.maxDepth` (4) and `limits.maxItems` (100) cap every value sent to the page. Each collector also has a `max` count. These caps keep a large request from flooding the page.
 
 ## Safe output
 
-- The UI uses the Alpine CSP build, so it needs no `eval`. Assets come from the module under `/~bxlens/`, and the bar uses no inline handlers.
-- JSON embedded in the page escapes `<`, `>`, `&`, U+2028 and U+2029 as unicode escapes.
-- Text from your app and from modules is always escaped. Tier 1 extensions cannot supply HTML or script.
-
-## Dumps
-
-Heap dump and thread dump are off. Thread dump sits behind `collectors.jvm.threadDump`. Heap dump needs a separate opt-in setting named `allowHeapDump`. Neither writes outside the temp directory.
+- Text from your app and from modules is always shown as text. The end to end suite checks that markup in messages, dumps and SQL never runs.
+- JSON embedded in the page cannot be broken out of with a closing script tag.
+- The bar adds one root element and makes no extra network requests.
+- Panels contributed by modules and app code cannot supply HTML or script.
 
 ## Checklist
 
 1. Keep `enabled` false in every shared or production config.
 2. Keep the default `access` rules. Add hosts or IPs only when you need them.
 3. Add your own sensitive keys to `redact.keys`.
-4. Leave the `cookie`, `session`, `request` and `application` scope dumps off unless you need them.
+4. Leave the `cookie`, `session`, `request`, `application` and `variables` scope dumps off unless you need them.

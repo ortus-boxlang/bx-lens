@@ -1,16 +1,14 @@
 ---
-title: JVM and Runtime
+title: Runtime
 order: 9
-description: Runtime, memory and global activity.
+description: JVM, memory and request statistics.
 icon: lucide:cpu
 ---
 
-# JVM and Runtime
+# Runtime
 
-The JVM panel shows runtime and memory information. The health strip uses the memory figure.
+The Runtime panel (collector `jvm`) shows the BoxLang and Java versions, the OS, CPU cores and uptime. It also shows heap use, the heap change during the request, non-heap memory, garbage collections and threads, plus request statistics: total requests tracked, average and slowest time, and active sessions. The health strip uses the heap figure.
 
-Global activity such as scheduled tasks, executors, watchers and module loads is not tied to one request. Lens keeps a rolling view of it in the service, fed by the scheduler, watcher and module events. See [Core events](../reference/events.md#global-events).
+![The Runtime panel](../assets/screenshots/runtime.png)
 
-## Thread dump
-
-Thread dumps are off. Enable `collectors.jvm.threadDump` to allow them. Heap dumps need the separate `allowHeapDump` opt-in. Neither writes outside the temp directory. See [Security](../security.md#dumps).
+Lens does not offer heap dumps or thread dumps in v1.

@@ -7,7 +7,7 @@ icon: lucide:radio
 
 # Core Event Inventory
 
-This page is for module authors. It lists the BoxLang core 1.19 events that Lens uses, with the payload keys core actually sends. The data comes from the [design spec](../design/api-spec.md), which read them from the core source.
+This page is for module authors. It lists the BoxLang core 1.19 events that Lens uses, with the payload keys core actually sends. The data comes from the [design spec](../design/api-spec.md), which read them from the core source. Lens does not use every event listed here. See the spec status section for what v1 implements.
 
 ## Request lifecycle
 
@@ -33,7 +33,7 @@ Core announces these globally and per application.
 | `preTemplateInvoke`, `postTemplateInvoke` | `context, template, templatePath` | Template tree. No `executionTime`, so Lens times it. |
 | `preFunctionInvoke`, `postFunctionInvoke` | `context, arguments, function, name` (+ `result` on post) | Functions panel (opt in, hot path). |
 | `onFunctionException` | same + `exception` | Exceptions. |
-| `onBIFInvocation` | `context, arguments, bif, name` (+ `result` on the second call) | BIF timing. See the bug note below. |
+| `onBIFInvocation` | `context, arguments, bif, name` (+ `result` on the second call) | Not used in v1. See the core gaps below. |
 | `onPreSourceInvoke`, `onPostSourceInvoke` | script or source execution | Eval and script timing. |
 | `afterBoxClassCreation`, `afterBoxClassInit`, `afterDynamicObjectCreation`, `onCreateObjectRequest` | object created | Objects (opt in). |
 | `onComponentInstance`, `onBIFInstance` | descriptor | Startup only. |
@@ -78,12 +78,13 @@ These are not per request. They feed a rolling global activity view in the Lens 
 
 Lens needs these core changes. Until they land, the matching features are limited.
 
-1. `postBIFInvocation` is never announced. The post call re-announces `onBIFInvocation`, so Lens detects the call that carries `result`.
-2. `onComponentInvocation` is never announced.
-3. There is no cache read, hit or miss event.
+1. `postBIFInvocation` is never announced. `BIF.java` announces `onBIFInvocation` twice, so Lens does not collect BIF calls.
+2. `onComponentInvocation` is declared but never announced.
+3. There are no cache hit or miss events. Lens computes per-request cache numbers from the difference of cache statistics instead.
 4. There are no SOAP events.
-5. Template events lack execution time. This is optional and cheap to add.
+5. The web context does not announce `onRequestFlushBuffer`, so Lens cannot inject a bar into core's error pages.
+6. Template events lack execution time. This is optional and cheap to add. Lens times templates itself.
 
 ## Lens interception points
 
-Lens adds its own points for extension. See [Extending Lens](../guides/extending.md#interception-points).
+Lens adds its own points for extension: `onLensRegister`, `onLensRequestStart`, `onLensCollect` and `onLensRequestFinish`. See [Extending Lens](../guides/extending.md#interception-points).

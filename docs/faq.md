@@ -28,7 +28,7 @@ Use `lensPanel` in app code or the Tier 1 interception points in a module. See [
 :::
 
 ::: expandable "Can I turn Lens off for one request?"
-Yes. Call `lensDisable()`, or send `X-BxLens: off` if `access` allows you.
+Yes. Call `lensDisable()` early in the request.
 :::
 
 ::: expandable "How is Lens different from BX Insights?"

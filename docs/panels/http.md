@@ -7,6 +7,10 @@ icon: lucide:globe
 
 # HTTP
 
-The HTTP panel lists outgoing calls made with `bx:http` or the `http` functions during the request. Each row shows the status, size and time. HTTP errors raise an issue. Calls also appear as spans on the [Timeline](timeline.md).
+The HTTP panel lists outgoing calls made with `bx:http` during the request. Each row shows the status, size and time.
 
-`collectors.http.max` caps the number of entries (default 100).
+![The HTTP panel with a successful call and a 404](../assets/screenshots/http.png)
+
+An outgoing 4xx response warns. A 5xx response or a transport failure is critical. Calls also appear as spans on the [Timeline](timeline.md).
+
+`collectors.http.max` caps the entries (default 100).

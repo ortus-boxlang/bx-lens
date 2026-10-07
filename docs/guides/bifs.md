@@ -21,7 +21,7 @@ These functions work whenever the module is loaded. When Lens is disabled for th
 | [`lensIsEnabled`](#lensisenabled) | `()` | boolean |
 | [`lensRender`](#lensrender) | `()` | string |
 | [`lensDump`](#lensdump) | `( value, label="" )` | nothing |
-| [`lensPanel`](#lenspanel) | `( id, label )` | a panel builder |
+| [`lensPanel`](#lenspanel) | `( id, label, renderer )` | a panel builder |
 
 ## lensMessage
 
@@ -103,7 +103,7 @@ if ( lensIsEnabled() ) {
 
 ## lensRender
 
-Returns the bar markup as a string. Use it with `inject` set to `false` when you want to place the bar yourself.
+Use it with `inject` set to `false` when you want to place the bar yourself. It returns a placeholder that Lens replaces with the bar when the request ends.
 
 ```javascript
 writeOutput( lensRender() );
@@ -119,21 +119,17 @@ lensDump( session.cart, "cart" );
 
 ## lensPanel
 
-Creates or fetches a custom panel from app code. No module needed. The panel uses one of the built-in renderers and the builder methods shown in [Extending Lens](extending.md#from-app-code).
+Creates a custom panel from app code. No module is needed. `renderer` is optional and defaults to `table`. The builder methods set the renderer for you. See [Extending Lens](extending.md#from-app-code).
 
 ```javascript
-lensPanel( "jobs", "Jobs" )
+lensPanel( "jobs", "Jobs", "table" )
 	.columns( [ "Job", "ms" ] )
-	.rows( [ [ "email", 12 ], [ "report", 340 ] ] );
+	.rows( [ [ "email", 12 ], [ "report", 340 ] ] )
+	.badge( 2, "none" );
 ```
 
-## The bx:lens component
+Builder methods: `columns`, `rows`, `kv`, `tree`, `spans`, `messages`, `json`, `text`, `label`, `icon`, `order`, `badge( count, severity )` and `issue( severity, title, detail, file, line )`.
 
-Templates can use the component form. The `action` attribute accepts `message`, `start`, `stop` or `dump`.
+## Not available
 
-```html
-<bx:lens action="message" message="Header rendered">
-```
-
-!!! note
-    The spec defines the `action` values. The other attributes are assumed to mirror the BIF arguments.
+These are not implemented in v1: `lensDumpHeap`, `lensThreadDump` and the `bx:lens` component. Use the BIFs above in templates inside `<bx:script>` blocks.
