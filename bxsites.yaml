@@ -1,0 +1,34 @@
+name: "BX Lens"
+description: "A request-level debug bar for BoxLang web apps. See templates, queries, HTTP calls, exceptions, timers and more on every page."
+source: docs
+baseURL: "/"
+theme:
+    name: bootstrap
+    options:
+        {
+            navCollapsible: true,
+            navExpandAll: false,
+            tocPosition: sticky,
+            accentColor: "#00C853",
+            accentColorDark: "#00FF75",
+        }
+    logo: "assets/boxlang-icon-full.svg"
+search: true
+repo:
+    url: "https://github.com/ortus-boxlang/bx-lens"
+    editUri: "edit/main/docs/"
+social:
+    - url: "https://github.com/ortus-boxlang/bx-lens"
+      icon: github
+      label: "BX Lens on GitHub"
+    - url: "https://www.ortussolutions.com/community/slack"
+      icon: slack
+      label: "Slack Community"
+footer: true
+lastUpdated: true
+pageActions: true
+imageGallery: true
+mermaid: true
+markdown:
+    enableFootnotes: true
+    enableDefinitionLists: true

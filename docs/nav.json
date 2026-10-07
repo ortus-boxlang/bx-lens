@@ -1,0 +1,59 @@
+[
+	"index.md",
+	{
+		"title": "Start Here",
+		"children": [
+			"getting-started.md",
+			"configuration.md",
+			"ui.md",
+			"security.md"
+		]
+	},
+	{
+		"title": "Panels",
+		"children": [
+			"panels/index.md",
+			"panels/timeline.md",
+			"panels/queries.md",
+			"panels/templates.md",
+			"panels/http.md",
+			"panels/exceptions.md",
+			"panels/messages-and-timers.md",
+			"panels/request-and-scopes.md",
+			"panels/jvm.md",
+			"panels/cache.md",
+			"panels/modules.md",
+			"panels/history.md",
+			"panels/issues.md"
+		]
+	},
+	{
+		"title": "Guides",
+		"children": [
+			"guides/bifs.md",
+			"guides/extending.md"
+		]
+	},
+	{
+		"title": "Reference",
+		"children": [
+			"reference/events.md",
+			"design/api-spec.md"
+		]
+	},
+	{
+		"title": "Help",
+		"children": [
+			"troubleshooting.md",
+			"faq.md"
+		]
+	},
+	{
+		"title": "Project",
+		"children": [
+			"project/roadmap.md",
+			"project/contributing.md",
+			"project/changelog.md"
+		]
+	}
+]
