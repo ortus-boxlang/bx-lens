@@ -162,6 +162,7 @@ class {
 				tasks        : { enabled : true },
 				datasources  : { enabled : true },
 				caches       : { enabled : true },
+				logfiles     : { enabled : true },
 				system       : { enabled : true },
 				threads      : { enabled : true }
 			}

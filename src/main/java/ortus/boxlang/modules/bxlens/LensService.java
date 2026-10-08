@@ -111,6 +111,7 @@ public final class LensService {
 	private volatile HeapDumper										heapDumper			= new HeapDumper();
 	private final DatasourceData									datasources			= new DatasourceData();
 	private final CacheData											caches				= new CacheData( this );
+	private final LogData											logs				= new LogData();
 
 	private LensService() {
 	}
@@ -148,7 +149,7 @@ public final class LensService {
 		this.baseConfig		= new LensConfig( settings );
 		allBuiltIns.clear();
 		allBuiltIns.addAll( builtIns() );
-		List<String> ids = new ArrayList<>( List.of( "executors", "tasks", "datasources", "caches", "system", "threads" ) );
+		List<String> ids = new ArrayList<>( List.of( "executors", "tasks", "datasources", "caches", "logfiles", "system", "threads" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
 				ids.add( c.id() );
@@ -765,6 +766,10 @@ public final class LensService {
 			auditLogger	= l;
 		}
 		return l;
+	}
+
+	public LogData getLogs() {
+		return logs;
 	}
 
 	public CacheData getCaches() {

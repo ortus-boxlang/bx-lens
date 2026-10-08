@@ -101,7 +101,9 @@
 					this.disconnect();
 					if (!window.EventSource) { return; }
 					var topics = ["requests"].concat(["executors", "tasks", "datasources", "system"].filter(function (t) { return self.has(t); })).join(",");
-					this.es = new EventSource(base() + "/stream?topics=" + topics, { withCredentials: true });
+					var extra = "";
+					if (this.tab === "logfiles" && this.lfile && this.llive) { topics += ",log"; extra = "&logfile=" + encodeURIComponent(this.lfile) + "&logoffset=" + this.loffset; }
+					this.es = new EventSource(base() + "/stream?topics=" + topics + extra, { withCredentials: true });
 					this.es.addEventListener("tick", function (e) { self.streamOk = true; self.onTick(JSON.parse(e.data)); });
 					this.es.onerror = function () { self.streamOk = false; };
 				},
@@ -113,6 +115,7 @@
 					if (d.tasks) { this.tasks = d.tasks; if (!this.ksel && this.allTasks().length) { this.ksel = this.allTasks()[0].scheduler + "/" + this.allTasks()[0].name; } }
 					if (d.system) { this.setSystem(d.system); }
 					if (d.datasources) { this.dsl = d.datasources; }
+					if (d.log) { this.loffset = d.log.offset; this.onLogLines(d.log.lines); }
 				},
 				load: async function () {
 					this.state = await (await this.api("state")).json();
@@ -133,6 +136,32 @@
 						if (this.has("tasks")) { this.tasks = await (await this.api("tasks")).json(); }
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
+				},
+				logl: null, lfile: "", llines: [], lq: "", llevel: "", lcount: "500", lcut: false, llive: true, loffset: 0, lastLevel: "",
+				logHref: function () { return base() + "/api/logfiles/download?file=" + encodeURIComponent(this.lfile); },
+				lineClass: function (l) { return /\[\s*ERROR\s*]/.test(l) ? "lerr" : /\[\s*WARN\s*]/.test(l) ? "lwarn" : /^\s+(at |\.\.\.|Caused by)/.test(l) ? "lmute" : ""; },
+				loadLogs: async function () { this.logl = await (await this.api("logfiles")).json(); if (!this.lfile && this.logl.files.length) { this.pickLog(this.logl.files[0].name); } else if (this.lfile) { this.readLog(); } },
+				pickLog: function (n) { this.lfile = n; this.lq = ""; this.llevel = ""; this.readLog(); },
+				readLog: async function () {
+					if (!this.lfile) { return; }
+					var r = await this.api("logfiles/read?file=" + encodeURIComponent(this.lfile) + "&lines=" + this.lcount + "&q=" + encodeURIComponent(this.lq) + "&level=" + this.llevel);
+					if (!r.ok) { return; }
+					var j = await r.json();
+					this.llines = j.lines; this.lcut = j.cut; this.loffset = j.offset;
+					this.connect();
+					this.scrollLog();
+				},
+				scrollLog: function () { var self = this; this.$nextTick(function () { var el = self.$refs.logview; if (el) { el.scrollTop = el.scrollHeight; } }); },
+				onLogLines: function (lines) {
+					var q = this.lq.toLowerCase(), order = ["TRACE", "DEBUG", "INFO", "WARN", "ERROR"], min = this.llevel ? order.indexOf(this.llevel) : 0, add = [];
+					for (var i = 0; i < lines.length; i++) {
+						var l = lines[i], m = /\[\s*(TRACE|DEBUG|INFO|WARN|ERROR)\s*]/.exec(l);
+						if (m) { this.lastLevel = m[1]; }
+						if (min > 0 && order.indexOf(this.lastLevel || "TRACE") < min) { continue; }
+						if (q && l.toLowerCase().indexOf(q) < 0) { continue; }
+						add.push(l);
+					}
+					if (add.length) { this.llines = this.llines.concat(add).slice(-3000); this.scrollLog(); }
 				},
 				cachel: null, csel: "", ckeys: null, cfilter: "", cvalue: null, cconfirm: false, cmsg: "",
 				loadCaches: async function () { this.cachel = await (await this.api("caches")).json(); if (!this.csel && this.cachel.caches.length) { this.pickCache(this.cachel.caches[0].name); } },
@@ -187,6 +216,8 @@
 					var self = this;
 					clearInterval(this.threadTimer);
 					if (this.tab === "system") { this.loadHd(); }
+					if (this.tab === "logfiles") { this.loadLogs(); }
+					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
 					if (this.tab === "threads") {

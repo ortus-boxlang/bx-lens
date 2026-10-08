@@ -261,6 +261,27 @@
         </template>
       </section>
 
+      <!-- Logs -->
+      <section x-show="tab === 'logfiles'">
+        <h1 class="h1">Logs <small>every file in the BoxLang logs directory, with a live tail</small></h1>
+        <template x-if="logl">
+          <div class="split narrow">
+            <div class="card"><h3>Files <span class="mono" x-text="logl.dir"></span></h3>
+              <div class="scroll" style="max-height:520px"><table><tbody>
+                <template x-for="f in logl.files" :key="f.name"><tr class="row" :class="lfile === f.name ? 'sel' : ''" @click="pickLog(f.name)"><td class="mono" style="word-break:break-all" x-text="f.name"></td><td class="num mute" x-text="bytes(f.size)"></td></tr></template></tbody></table></div>
+              <p class="sub" x-show="!logl.files.length">No log files yet.</p></div>
+            <div class="card" x-show="lfile"><h3><span class="mono" x-text="lfile"></span><span x-text="llines.length + ' lines' + (lcut ? ' (older lines not shown)' : '')"></span></h3>
+              <div class="tools"><input type="text" placeholder="Search this file" x-model="lq" @input.debounce.400ms="readLog()" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px">
+                <select x-model="llevel" @change="readLog()" style="background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px"><option value="">All levels</option><option value="DEBUG">DEBUG and up</option><option value="INFO">INFO and up</option><option value="WARN">WARN and up</option><option value="ERROR">ERROR only</option></select>
+                <select x-model="lcount" @change="readLog()" style="background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px"><option value="200">200 lines</option><option value="500">500 lines</option><option value="1000">1000 lines</option><option value="2000">2000 lines</option></select>
+                <button class="btn" @click="llive = !llive; if (llive) { connect(); } else { disconnect(); connect(); }" x-text="llive ? 'Live: on' : 'Live: paused'"></button>
+                <a class="btn" :class="state && state.role === 'viewer' ? 'disabled' : ''" :href="state && state.role !== 'viewer' ? logHref() : null"><svg class="ic"><use href="#ph-download-simple"/></svg>Download</a></div>
+              <pre class="code logview" x-ref="logview"><template x-for="(l, i) in llines" :key="i"><div :class="lineClass(l)" x-text="l"></div></template></pre>
+            </div>
+          </div>
+        </template>
+      </section>
+
       <!-- System -->
       <section x-show="tab === 'system'">
         <h1 class="h1">System <small>JVM and host numbers, live</small></h1>

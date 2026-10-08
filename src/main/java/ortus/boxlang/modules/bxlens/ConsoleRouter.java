@@ -265,6 +265,8 @@ public final class ConsoleRouter {
 			service.getAudit().log( "cache.value", s.role, ex.remoteAddr(), "cache=" + name + " key=" + ex.urlParam( "key" ) );
 			Map<String, Object> v = service.getCaches().value( name, ex.urlParam( "key" ) );
 			json( context, ex, v == null ? 404 : 200, v == null ? Map.of( "error", "Unknown cache" ) : v );
+		} else if ( route.startsWith( "logfiles" ) && method.equals( "GET" ) && panelOn( "logfiles" ) ) {
+			logFiles( context, ex, route, s );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
 			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
@@ -296,7 +298,7 @@ public final class ConsoleRouter {
 		}
 	}
 
-	private static final List<String> ADMIN_ONLY = List.of( "threads/dump", "heapdump", "logs/download", "bundle", "cachevalue" );
+	private static final List<String> ADMIN_ONLY = List.of( "threads/dump", "heapdump", "logfiles/download", "bundle", "cachevalue" );
 
 	private static boolean isAdmin( ConsoleAuth.Session s ) {
 		return s != null && "admin".equals( s.role );
@@ -346,6 +348,7 @@ public final class ConsoleRouter {
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
 		    { "datasources", "Datasources", "database", "Runtime" },
 		    { "caches", "Caches", "package", "Runtime" },
+		    { "logfiles", "Logs", "file-text", "Runtime" },
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },
 		    { "designer", "Bar designer", "layout", "Config" },
@@ -400,6 +403,45 @@ public final class ConsoleRouter {
 			}
 		}
 		json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+	}
+
+	/**
+	 * <code>logfiles</code> lists the files, <code>logfiles/read?file=&lines=&q=&level=</code> reads the tail, <code>logfiles/download?file=</code>
+	 * sends the whole file (admin only).
+	 */
+	private void logFiles( IBoxContext context, WebExchange ex, String route, ConsoleAuth.Session s ) {
+		LogData logs = service.getLogs();
+		try {
+			if ( route.equals( "logfiles" ) ) {
+				json( context, ex, 200, logs.list() );
+			} else if ( route.equals( "logfiles/read" ) ) {
+				int lines = 500;
+				try {
+					lines = Integer.parseInt( String.valueOf( ex.urlParam( "lines" ) ) );
+				} catch ( NumberFormatException e ) {
+					// Default
+				}
+				Map<String, Object> r = logs.read( ex.urlParam( "file" ), lines, ex.urlParam( "q" ), ex.urlParam( "level" ) );
+				json( context, ex, r == null ? 404 : 200, r == null ? Map.of( "error", "No such log file" ) : r );
+			} else if ( route.equals( "logfiles/download" ) ) {
+				java.nio.file.Path p = logs.resolve( ex.urlParam( "file" ) );
+				if ( p == null ) {
+					json( context, ex, 404, Map.of( "error", "No such log file" ) );
+					return;
+				}
+				service.getAudit().log( "logfile.download", s.role, ex.remoteAddr(), "file=" + p.getFileName() );
+				ex.setResponseHeader( "Content-Type", "text/plain; charset=UTF-8" );
+				ex.setResponseHeader( "Content-Disposition",
+				    "attachment; filename=\"" + p.getFileName().toString().replaceAll( "[^A-Za-z0-9._-]", "_" ) + "\"" );
+				ex.setResponseHeader( "Cache-Control", "no-store" );
+				ex.setResponseHeader( "X-Content-Type-Options", "nosniff" );
+				ex.sendFile( p.toFile() );
+			} else {
+				json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+			}
+		} catch ( java.io.IOException e ) {
+			json( context, ex, 500, Map.of( "error", "Could not read the log file" ) );
+		}
 	}
 
 	private void heapDump( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
@@ -670,7 +712,22 @@ public final class ConsoleRouter {
 		}
 		String		topics	= ex.urlParam( "topics" ) == null ? "executors,tasks,system" : ex.urlParam( "topics" );
 		Set<String>	want	= new java.util.HashSet<>( List.of( topics.split( "," ) ) );
-		int			mine	= s.streamGen.incrementAndGet();
+		String		logFile	= want.contains( "log" ) ? ex.urlParam( "logfile" ) : null;
+		long		logPos	= 0;
+		try {
+			logPos = Long.parseLong( String.valueOf( ex.urlParam( "logoffset" ) ) );
+		} catch ( NumberFormatException e ) {
+			// Starts at the end of the file below
+		}
+		if ( logFile != null && logPos <= 0 ) {
+			java.nio.file.Path lp = service.getLogs().resolve( logFile );
+			try {
+				logPos = lp == null ? 0 : java.nio.file.Files.size( lp );
+			} catch ( java.io.IOException e ) {
+				logPos = 0;
+			}
+		}
+		int mine = s.streamGen.incrementAndGet();
 		service.getStreams().incrementAndGet();
 		try {
 			ex.setStatus( 200 );
@@ -698,6 +755,15 @@ public final class ConsoleRouter {
 				}
 				if ( want.contains( "system" ) && panelOn( "system" ) ) {
 					tick.put( "system", service.getData().system() );
+				}
+				if ( logFile != null && panelOn( "logfiles" ) ) {
+					Map<String, Object> more = service.getLogs().since( logFile, logPos );
+					if ( more != null ) {
+						logPos = ( Long ) more.get( "offset" );
+						if ( ! ( ( List<?> ) more.get( "lines" ) ).isEmpty() ) {
+							tick.put( "log", more );
+						}
+					}
 				}
 				if ( want.contains( "requests" ) ) {
 					tick.put( "requests", service.getStore().summaries() );
