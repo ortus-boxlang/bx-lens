@@ -76,9 +76,14 @@ public final class Licensing {
 	}
 
 	/**
-	 * Is a feature available? Every feature is available for now. The free and Plus split is decided later and plugs in here.
+	 * Is a feature available? Plus and a trial get everything. Free keeps the live console and a short request history in memory, but not
+	 * the disk store (saved errors, reports and trends) or the long request history. Other features are open to everyone for now.
 	 */
 	public boolean has( String feature ) {
+		if ( "diskStore".equals( feature ) || "fullHistory".equals( feature ) ) {
+			String state = String.valueOf( status().get( "state" ) );
+			return "plus".equals( state ) || "trial".equals( state );
+		}
 		return true;
 	}
 

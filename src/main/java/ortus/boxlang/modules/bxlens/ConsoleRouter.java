@@ -293,6 +293,21 @@ public final class ConsoleRouter {
 		} else if ( route.startsWith( "inflight/" ) && method.equals( "GET" ) && panelOn( "inflight" ) ) {
 			Map<String, Object> st = service.inflightStack( decode( route.substring( "inflight/".length() ) ) );
 			json( context, ex, st == null ? 404 : 200, st == null ? Map.of( "error", "That request has finished" ) : st );
+		} else if ( route.equals( "errors" ) && method.equals( "GET" ) && panelOn( "errors" ) ) {
+			json( context, ex, 200, service.getErrors().list() );
+		} else if ( route.startsWith( "errors/" ) && method.equals( "GET" ) && panelOn( "errors" ) ) {
+			Map<String, Object> g = service.getErrors().get( decode( route.substring( "errors/".length() ) ) );
+			json( context, ex, g == null ? 404 : 200, g == null ? Map.of( "error", "That error is no longer kept" ) : g );
+		} else if ( route.equals( "errors/reset" ) && method.equals( "POST" ) && panelOn( "errors" ) ) {
+			service.getErrors().reset();
+			service.getAudit().log( "errors.reset", s.role, ex.remoteAddr(), "" );
+			json( context, ex, 200, service.getErrors().list() );
+		} else if ( route.equals( "reports" ) && method.equals( "GET" ) && panelOn( "reports" ) ) {
+			json( context, ex, 200, service.getReports().snapshot( service.diskStoreOn() ) );
+		} else if ( route.equals( "reports/reset" ) && method.equals( "POST" ) && panelOn( "reports" ) ) {
+			service.getReports().reset();
+			service.getAudit().log( "reports.reset", s.role, ex.remoteAddr(), "" );
+			json( context, ex, 200, service.getReports().snapshot( service.diskStoreOn() ) );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
 			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
@@ -355,6 +370,8 @@ public final class ConsoleRouter {
 		m.put( "actions", cfg.getBool( "console.actions", true ) && canChange( s ) );
 		m.put( "readOnly", !canChange( s ) );
 		m.put( "role", s.role );
+		m.put( "diskStore", service.diskStoreOn() );
+		m.put( "historyCap", service.getStore().capacity() );
 		m.put( "insecure", !ex.secure() && !AccessGuard.isLoopback( ex.remoteAddr() ) );
 		m.put( "liveStreams", service.getStreams().get() );
 		m.put( "license", license() );
@@ -371,6 +388,8 @@ public final class ConsoleRouter {
 		    { "overview", "Overview", "squares-four", "Inspect" },
 		    { "requests", "Requests", "list-bullets", "Inspect" },
 		    { "inflight", "In flight", "hourglass", "Inspect" },
+		    { "errors", "Errors", "bug", "Inspect" },
+		    { "reports", "Reports", "chart-bar", "Inspect" },
 		    { "queries", "Queries", "table", "Inspect" },
 		    { "executors", "Executors", "lightning", "Runtime" },
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },

@@ -346,6 +346,66 @@
         </template>
       </section>
 
+      <!-- Errors -->
+      <section x-show="tab === 'errors'">
+        <h1 class="h1">Errors <small>requests that went wrong, grouped by cause</small></h1>
+        <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="state && !state.diskStore">Kept in memory only, so a restart clears them. BoxLang+ saves them to disk.</div>
+        <template x-if="errl">
+          <div class="split narrow">
+            <div class="card"><h3>Groups <span x-text="errl.groups.length + ' groups, ' + errl.occurrences + ' occurrences'"></span> <button class="btn mini" :disabled="!state || state.readOnly" @click="resetErrors()">Clear</button></h3>
+              <p class="sub" x-show="!errl.groups.length">No errors since the server started. Good.</p>
+              <div class="scroll" style="max-height:560px"><table><tbody>
+                <template x-for="g in errl.groups" :key="g.id"><tr class="row" :class="esel === g.id ? 'sel' : ''" @click="pickError(g.id)"><td><div class="mono" style="word-break:break-word" x-text="g.type"></div><div class="mute" style="font-size:12px" x-text="g.message"></div><div class="mute" style="font-size:11px" x-text="g.file ? g.file + ':' + g.line : ''"></div></td><td class="num"><div x-text="g.count + '×'"></div><div class="mute" style="font-size:11px" x-text="ago(g.lastSeen)"></div><span class="chipx hid" x-show="g.handled">handled</span></td></tr></template></tbody></table></div></div>
+            <div class="card" x-show="egroup"><h3><span class="mono" x-text="egroup ? egroup.type : ''"></span><span x-text="egroup ? egroup.count + ' occurrences, first ' + ago(egroup.firstSeen) : ''"></span></h3>
+              <p x-text="egroup ? egroup.message : ''"></p>
+              <p class="sub" x-show="egroup">Affected: <template x-for="(n, u) in (egroup ? egroup.urls : {})" :key="u"><span class="chipx hid" style="margin-right:4px" x-text="u + ' ×' + n"></span></template></p>
+              <div class="tools" x-show="egroup && egroup.samples.length > 1"><template x-for="(sm, i) in (egroup ? egroup.samples : [])" :key="i"><button class="btn mini" :class="esample === i ? 'primary' : ''" @click="esample = i" x-text="'Sample ' + (i + 1)"></button></template></div>
+              <template x-if="cur()">
+                <div>
+                  <dl class="kv"><dt>Request</dt><dd class="mono" x-text="cur().method + ' ' + cur().uri + (cur().query ? '?' + cur().query : '')"></dd><dt>Status</dt><dd x-text="cur().status + ' after ' + cur().ms + ' ms'"></dd><dt>From</dt><dd class="mono" x-text="cur().remoteAddr"></dd><dt>When</dt><dd x-text="new Date(cur().at).toLocaleString()"></dd><dt x-show="cur().template">Template</dt><dd class="mono" x-show="cur().template" x-text="cur().template"></dd><dt x-show="cur().sql">Statement</dt><dd class="mono" x-show="cur().sql" x-text="cur().sql"></dd></dl>
+                  <p x-show="cur().detail" class="sub" x-text="cur().detail"></p>
+                  <h3 style="margin-top:10px">Stack</h3>
+                  <pre class="code" style="max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all"><template x-for="(f, i) in (cur().frames || [])" :key="'b' + i"><div style="color:var(--cyan)" x-text="(f.file || '') + ':' + (f.line || '') + (f.name ? '  ' + f.name : '')"></div></template><template x-for="(j, i) in (cur().java || [])" :key="'j' + i"><div style="color:var(--dim)" x-text="j"></div></template></pre>
+                  <div x-show="cur().lastQueries && cur().lastQueries.length"><h3 style="margin-top:10px">Last queries</h3><pre class="code" style="white-space:pre-wrap;word-break:break-all"><template x-for="(q, i) in cur().lastQueries" :key="i"><div x-text="q"></div></template></pre></div>
+                  <div x-show="cur().messages && cur().messages.length"><h3 style="margin-top:10px">Messages before it failed</h3><pre class="code" style="white-space:pre-wrap"><template x-for="(m, i) in cur().messages" :key="i"><div x-text="m"></div></template></pre></div>
+                  <div class="tools" style="margin-top:8px"><button class="btn" @click="openRequest(cur().requestId)">Open the request</button></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Reports -->
+      <section x-show="tab === 'reports'">
+        <h1 class="h1">Reports <small>totals for this server</small></h1>
+        <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="rep && !rep.persisted">Totals are since the server started and are kept in memory. BoxLang+ keeps totals since first install across restarts.</div>
+        <template x-if="rep">
+          <div>
+            <div class="tiles">
+              <div class="card"><h3>Requests</h3><div class="big" x-text="rep.session.requests"></div><div class="sub" x-text="'up ' + dur(rep.uptimeMs / 1000)"></div></div>
+              <div class="card"><h3>Errors</h3><div class="big" :style="rep.session.errors ? 'color:var(--crit)' : ''" x-text="rep.session.errors"></div><div class="sub" x-text="(rep.session.requests ? (rep.session.errors * 100 / rep.session.requests).toFixed(1) : 0) + '% of requests'"></div></div>
+              <div class="card"><h3>Average</h3><div class="big"><span x-text="rep.session.avgMs"></span><small>ms</small></div><div class="sub" x-text="'max ' + rep.session.maxMs + ' ms'"></div></div>
+              <div class="card"><h3>p95 / p99</h3><div class="big"><span x-text="rep.session.p95"></span><small>ms</small></div><div class="sub" x-text="'p99 ' + rep.session.p99 + ' ms, p50 ' + rep.session.p50 + ' ms'"></div></div>
+              <div class="card"><h3>Slow</h3><div class="big" x-text="rep.session.slow"></div><div class="sub">over the slow request limit</div></div>
+            </div>
+            <div class="card" x-show="rep.lifetime" style="margin-top:10px"><h3>Since first install <span x-text="rep.lifetime ? new Date(rep.lifetime.since).toLocaleDateString() + ', ' + rep.lifetime.runs + ' starts' : ''"></span></h3>
+              <dl class="kv" x-show="rep.lifetime"><dt>Requests</dt><dd x-text="rep.lifetime ? rep.lifetime.requests : ''"></dd><dt>Errors</dt><dd x-text="rep.lifetime ? rep.lifetime.errors : ''"></dd><dt>Slow requests</dt><dd x-text="rep.lifetime ? rep.lifetime.slow : ''"></dd><dt>Queries</dt><dd x-text="rep.lifetime ? rep.lifetime.queries : ''"></dd><dt>Exceptions</dt><dd x-text="rep.lifetime ? rep.lifetime.exceptions : ''"></dd></dl></div>
+            <div class="grid2" style="margin-top:10px">
+              <div class="card"><h3>Requests per minute <span x-text="'last ' + (rep.seriesMinutes >= 120 ? Math.round(rep.seriesMinutes / 60) + ' hours' : rep.seriesMinutes + ' minutes')"></span></h3>
+                <svg viewBox="0 0 400 90" width="100%" height="90" role="img" aria-label="Requests per minute"><template x-for="(p, i) in repBars()" :key="i"><g><rect :x="p.x" :y="p.y" :width="p.w" :height="p.h" fill="var(--cyan)" opacity=".8"/><rect :x="p.x" :y="p.ey" :width="p.w" :height="p.eh" fill="var(--crit)"/></g></template></svg>
+                <p class="sub">Red is failed requests.</p></div>
+              <div class="card"><h3>Status codes</h3><template x-for="c in ['2xx', '3xx', '4xx', '5xx']" :key="c"><div><div class="rowbar" style="margin:6px 0 3px"><span class="mono" x-text="c"></span><span class="mute mono" x-text="rep.session.status[c]"></span></div><div class="bar" :class="c === '5xx' ? 'crit' : c === '4xx' ? 'warn' : ''"><div :style="'width:' + (rep.session.requests ? rep.session.status[c] * 100 / rep.session.requests : 0) + '%'"></div></div></div></template></div>
+              <div class="card"><h3>Slowest URLs</h3><table><thead><tr><th>URL</th><th class="num">Max</th><th class="num">Avg</th><th class="num">Hits</th></tr></thead><tbody><template x-for="u in rep.slowestUrls" :key="u.url"><tr><td class="mono" style="word-break:break-all" x-text="u.url"></td><td class="num" x-text="u.maxMs + ' ms'"></td><td class="num" x-text="u.avgMs"></td><td class="num" x-text="u.count"></td></tr></template></tbody></table></div>
+              <div class="card"><h3>Busiest URLs</h3><table><thead><tr><th>URL</th><th class="num">Hits</th><th class="num">Avg</th><th class="num">Errors</th></tr></thead><tbody><template x-for="u in rep.busiestUrls" :key="u.url"><tr><td class="mono" style="word-break:break-all" x-text="u.url"></td><td class="num" x-text="u.count"></td><td class="num" x-text="u.avgMs"></td><td class="num" x-text="u.errors"></td></tr></template></tbody></table></div>
+              <div class="card" x-show="rep.failingUrls.some(function (u) { return u.errors > 0; })"><h3>Most failing URLs</h3><table><thead><tr><th>URL</th><th class="num">Errors</th><th class="num">Hits</th></tr></thead><tbody><template x-for="u in rep.failingUrls.filter(function (x) { return x.errors > 0; })" :key="u.url"><tr><td class="mono" style="word-break:break-all" x-text="u.url"></td><td class="num" style="color:var(--crit)" x-text="u.errors"></td><td class="num" x-text="u.count"></td></tr></template></tbody></table></div>
+              <div class="card"><h3>Work done</h3><dl class="kv"><dt>Queries</dt><dd x-text="rep.session.queries + ' (' + rep.session.queryMs + ' ms in total)'"></dd><dt>Outgoing HTTP calls</dt><dd x-text="rep.session.httpCalls"></dd><dt>Exceptions</dt><dd x-text="rep.session.exceptions"></dd></dl>
+                <div class="tools" style="margin-top:8px"><button class="btn" :disabled="!state || state.readOnly" @click="resetReports()">Reset the counters</button></div></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
       <!-- System -->
       <section x-show="tab === 'system'">
         <h1 class="h1">System <small>JVM and host numbers, live</small></h1>

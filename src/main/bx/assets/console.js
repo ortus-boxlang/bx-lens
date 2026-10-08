@@ -139,6 +139,21 @@
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
 				},
+				errl: null, esel: "", egroup: null, esample: 0, rep: null, repTimer: null,
+				ago: function (t) { var sec = Math.max(0, Math.round((Date.now() - t) / 1000)); return sec < 5 ? "just now" : this.dur(sec) + " ago"; },
+				cur: function () { return this.egroup && this.egroup.samples.length ? this.egroup.samples[Math.min(this.esample, this.egroup.samples.length - 1)] : null; },
+				loadErrors: async function () { this.errl = await (await this.api("errors")).json(); if (!this.esel && this.errl.groups.length) { this.pickError(this.errl.groups[0].id); } else if (this.esel) { this.pickError(this.esel, true); } },
+				pickError: async function (id, keep) { this.esel = id; if (!keep) { this.esample = 0; } var r = await this.api("errors/" + encodeURIComponent(id)); this.egroup = r.ok ? await r.json() : null; if (this.egroup && this.esample >= this.egroup.samples.length) { this.esample = Math.max(0, this.egroup.samples.length - 1); } },
+				resetErrors: async function () { if (!confirm("Forget every error group?")) { return; } this.errl = await (await this.api("errors/reset", { method: "POST" })).json(); this.esel = ""; this.egroup = null; },
+				loadReports: async function () { this.rep = await (await this.api("reports")).json(); },
+				resetReports: async function () { if (!confirm("Reset the counters for this run? Totals since first install are kept.")) { return; } this.rep = await (await this.api("reports/reset", { method: "POST" })).json(); },
+				repBars: function () {
+					var s = this.rep ? this.rep.series : [], n = Math.max(1, this.rep ? this.rep.seriesMinutes : 60), max = 1, out = [], w = 400 / Math.min(n, 120);
+					s = s.slice(-120);
+					s.forEach(function (p) { if (p.requests > max) { max = p.requests; } });
+					s.forEach(function (p, i) { var h = p.requests * 80 / max, eh = p.errors * 80 / max; out.push({ x: i * w, w: Math.max(1, w - 1), y: 88 - h, h: h, ey: 88 - eh, eh: eh }); });
+					return out;
+				},
 				inf: null, isel: "", istack: null, qs: null, qsort: "max", qfilter: "", qpick: null,
 				loadInflight: async function () { this.inf = await (await this.api("inflight")).json(); if (this.isel) { this.pickInflight(this.isel); } },
 				pickInflight: async function (id) { this.isel = id; var r = await this.api("inflight/" + encodeURIComponent(id)); this.istack = await r.json(); },
@@ -236,6 +251,11 @@
 					if (this.tab === "system") { this.loadHd(); }
 					if (this.tab === "logfiles") { this.loadLogs(); }
 					if (this.tab === "inflight") { this.loadInflight(); }
+					clearInterval(this.repTimer);
+					if (this.tab === "errors" || this.tab === "reports") {
+						var load = function () { if (self.tab === "errors") { self.loadErrors(); } else { self.loadReports(); } };
+						load(); this.repTimer = setInterval(function () { if (!document.hidden) { load(); } }, 5000);
+					}
 					if (this.tab === "queries") { this.loadQueries(); }
 					if (this.tab === "environment" && !this.envd) { this.loadEnv(); }
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }

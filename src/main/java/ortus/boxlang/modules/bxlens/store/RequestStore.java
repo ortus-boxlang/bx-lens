@@ -36,7 +36,7 @@ public final class RequestStore {
 	public record Entry( String id, Map<String, Object> summary, String json ) {
 	}
 
-	private final int					capacity;
+	private volatile int				capacity;
 	private final ArrayDeque<Entry>		ring	= new ArrayDeque<>();
 	private final Map<String, Entry>	byId	= new HashMap<>();
 
@@ -79,6 +79,17 @@ public final class RequestStore {
 
 	public synchronized int size() {
 		return ring.size();
+	}
+
+	/**
+	 * Change how many requests are kept. The oldest are recycled at once when the new limit is lower.
+	 */
+	public synchronized void setCapacity( int next ) {
+		this.capacity = Math.max( 1, next );
+		while ( ring.size() > capacity ) {
+			Entry old = ring.removeFirst();
+			byId.remove( old.id() );
+		}
 	}
 
 	public int capacity() {

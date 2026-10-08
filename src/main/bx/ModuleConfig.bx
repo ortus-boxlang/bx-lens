@@ -64,6 +64,16 @@ class {
 			// Tabs to hide in the bar and the console. A disabled collector hides its tab too
 			tabs : { hide : [] },
 
+			// Plus: errors, reports and trends saved to disk so they survive restarts. Without Plus they stay in memory
+			store : {
+				enabled        : true,
+				// Empty means lens-data in the BoxLang home
+				dir            : "",
+				retentionHours : 72,
+				maxMB          : 50,
+				flushSeconds   : 30
+			},
+
 			// Optional checks
 			checks : {
 				// Notes for missing security headers and cookie flags
@@ -165,6 +175,8 @@ class {
 				logfiles     : { enabled : true },
 				environment  : { enabled : true },
 				inflight     : { enabled : true },
+				errors       : { enabled : true },
+				reports      : { enabled : true },
 				system       : { enabled : true },
 				threads      : { enabled : true }
 			}

@@ -29,6 +29,6 @@ export default defineConfig( {
 		timeout: 240_000,
 		reuseExistingServer: !process.env.CI,
 		stdout: 'pipe',
-		env: { PORT, SKIP_BUILD: process.env.SKIP_BUILD ?? '1' },
+		env: { PORT, SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: process.env.LENS_LICENSE ?? 'plus' },
 	},
 } );

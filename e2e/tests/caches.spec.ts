@@ -22,7 +22,7 @@ test.describe( 'caches', () => {
 		await page.fill( 'input[placeholder="Filter keys"]', first.slice( 0, 6 ) );
 		await expect( rows.first() ).toContainText( first.slice( 0, 6 ) );
 		await rows.first().locator( 'button:has-text("View")' ).click();
-		await expect( page.locator( 'pre.code' ).last() ).toBeVisible();
+		await expect( page.locator( '.main section:visible pre.code' ).last() ).toBeVisible();
 		await rows.first().locator( 'button:has-text("Evict")' ).click();
 		await expect( page.locator( '.main section:visible .sub', { hasText: 'Evicted' } ) ).toBeVisible();
 	} );

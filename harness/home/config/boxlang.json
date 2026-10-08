@@ -16,6 +16,9 @@
 				"collect": {
 					"level": "full"
 				},
+				"store": {
+					"flushSeconds": 5
+				},
 				"ui": {
 					"startOpen": false,
 					"autoOpenOnException": true

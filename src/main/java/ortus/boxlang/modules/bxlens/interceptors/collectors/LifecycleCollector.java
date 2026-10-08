@@ -19,6 +19,8 @@ package ortus.boxlang.modules.bxlens.interceptors.collectors;
 
 import ortus.boxlang.modules.bxlens.LensService;
 import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
+import ortus.boxlang.modules.bxlens.model.LensRequest;
+import ortus.boxlang.modules.bxlens.util.Keys;
 import ortus.boxlang.runtime.context.RequestBoxContext;
 import ortus.boxlang.runtime.events.InterceptionPoint;
 import ortus.boxlang.runtime.types.IStruct;
@@ -57,6 +59,18 @@ public class LifecycleCollector extends BaseCollector {
 
 	@InterceptionPoint
 	public void onError( IStruct event ) {
+		// This collector runs before the exception collector, so file the exception first or it would miss the finished request
+		try {
+			RequestBoxContext	rc		= requestContext( event );
+			LensRequest			req		= rc == null ? null : rc.getAttachment( Keys.requestAttach );
+			Object				args	= event.get( Keys.args );
+			if ( req != null && config().isCollectorEnabled( "exceptions", true ) && args instanceof Object[] arr && arr.length > 0
+			    && arr[ 0 ] instanceof Throwable t ) {
+				ExceptionCollector.record( req, t, "uncaught", config() );
+			}
+		} catch ( Throwable t ) {
+			fail( "onError", t );
+		}
 		finish( event, LensService.Trigger.ERROR );
 	}
 

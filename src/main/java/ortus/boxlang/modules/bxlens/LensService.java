@@ -114,6 +114,10 @@ public final class LensService {
 	private final LogData											logs				= new LogData();
 	private final EnvironmentData									environment			= new EnvironmentData( this );
 	private final QueryStats										queryStats			= new QueryStats();
+	private final ErrorStore										errors				= new ErrorStore();
+	private final Reports											reports				= new Reports();
+	private volatile java.nio.file.Path								storeDir;
+	private volatile long											lastFlush;
 
 	private LensService() {
 	}
@@ -152,7 +156,8 @@ public final class LensService {
 		allBuiltIns.clear();
 		allBuiltIns.addAll( builtIns() );
 		List<String> ids = new ArrayList<>(
-		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "system", "threads" ) );
+		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "errors", "reports", "system",
+		        "threads" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
 				ids.add( c.id() );
@@ -186,8 +191,9 @@ public final class LensService {
 		if ( this.config.consoleEnabled ) {
 			runtime.getInterceptorService().register( this.outcomes );
 		}
-		this.store		= new RequestStore( this.config.maxRequests );
-		this.renderer	= new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
+		this.store = new RequestStore( this.config.maxRequests );
+		loadStore();
+		this.renderer = new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
 		if ( !this.renderer.isComplete() ) {
 			getLogger().warn( "bx-lens assets are missing under [{}]. The bar will not render.", moduleDir );
 		}
@@ -215,6 +221,7 @@ public final class LensService {
 	 * Unregister all collectors and clear history.
 	 */
 	public synchronized void shutdown() {
+		flushStore( true );
 		heapDumper.shutdown();
 		heapDumper = new HeapDumper();
 		if ( watchdog != null ) {
@@ -500,6 +507,8 @@ public final class LensService {
 		announce( Keys.onLensCollect, Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
 		IssueEngine.analyze( req, config );
 		queryStats.record( req, config.slowQueryMs );
+		errors.record( req, config );
+		reports.record( req, config.slowRequestMs );
 		if ( ex != null ) {
 			try {
 				ortus.boxlang.modules.bxlens.model.SecurityChecks.analyze( req, config, ex.responseHeaders(), ex.responseCookies(), ex.secure() );
@@ -543,7 +552,10 @@ public final class LensService {
 	/**
 	 * Once a request runs longer than the slow request limit, take one stack sample of its thread, so the issue can say where it was stuck.
 	 */
-	private int tick;
+	/** Requests kept in memory without a Plus license. */
+	public static final int	FREE_HISTORY	= 25;
+
+	private int				tick;
 
 	private void startWatchdog() {
 		watchdog = java.util.concurrent.Executors.newSingleThreadScheduledExecutor( r -> {
@@ -553,8 +565,18 @@ public final class LensService {
 		} );
 		watchdog.scheduleWithFixedDelay( () -> {
 			try {
-				if ( config.consoleEnabled && ++tick % 25 == 0 ) {
-					datasources.attachAll();
+				if ( ++tick % 25 == 0 ) {
+					if ( config.consoleEnabled ) {
+						datasources.attachAll();
+					}
+					int allowed = licensing.has( "fullHistory" ) ? config.maxRequests : Math.min( config.maxRequests, FREE_HISTORY );
+					if ( store.capacity() != allowed ) {
+						store.setCapacity( allowed );
+					}
+					if ( System.currentTimeMillis() - lastFlush >= Math.max( 5, config.getInt( "store.flushSeconds", 30 ) ) * 1000L ) {
+						lastFlush = System.currentTimeMillis();
+						flushStore( false );
+					}
 				}
 				if ( !config.active || config.slowRequestMs <= 0 || !config.getBool( "checks.slowSample", true ) ) {
 					return;
@@ -770,6 +792,80 @@ public final class LensService {
 			auditLogger	= l;
 		}
 		return l;
+	}
+
+	public ErrorStore getErrors() {
+		return errors;
+	}
+
+	public Reports getReports() {
+		return reports;
+	}
+
+	/**
+	 * Is the Plus disk store in use? It needs the license, <code>store.enabled</code> and a folder to write to.
+	 */
+	public boolean diskStoreOn() {
+		return storeDir != null && config.getBool( "store.enabled", true ) && licensing.has( "diskStore" );
+	}
+
+	private void loadStore() {
+		String dir = baseConfig.getString( "store.dir", "" );
+		try {
+			storeDir = dir.isBlank() ? runtime.getRuntimeHome().resolve( "lens-data" ) : java.nio.file.Path.of( dir );
+		} catch ( Throwable t ) {
+			storeDir = null;
+		}
+		int hours = Math.max( 1, baseConfig.getInt( "store.retentionHours", 72 ) );
+		reports.keepMinutes( diskStoreOn() ? hours * 60 : 60 );
+		if ( !diskStoreOn() ) {
+			return;
+		}
+		try {
+			java.nio.file.Path f = storeDir.resolve( "reports.json" );
+			if ( java.nio.file.Files.exists( f ) ) {
+				reports.load( ortus.boxlang.modules.bxlens.util.Plain.map( ortus.boxlang.modules.bxlens.util.Plain
+				    .parse( java.nio.file.Files.readString( f, java.nio.charset.StandardCharsets.UTF_8 ) ) ) );
+			}
+			f = storeDir.resolve( "errors.json" );
+			if ( java.nio.file.Files.exists( f ) ) {
+				errors.load( ortus.boxlang.modules.bxlens.util.Plain.list( ortus.boxlang.modules.bxlens.util.Plain
+				    .parse( java.nio.file.Files.readString( f, java.nio.charset.StandardCharsets.UTF_8 ) ) ), System.currentTimeMillis() - hours * 3_600_000L );
+			}
+		} catch ( Throwable t ) {
+			getLogger().warn( "bx-lens: could not read the saved reports and errors from [{}]: {}", storeDir, t.toString() );
+		}
+	}
+
+	/**
+	 * Save reports and errors when the disk store is on and something changed. Old entries are dropped to respect the retention and size
+	 * limits. Never throws.
+	 */
+	public void flushStore( boolean force ) {
+		try {
+			if ( !diskStoreOn() ) {
+				return;
+			}
+			int		hours		= Math.max( 1, config.getInt( "store.retentionHours", 72 ) );
+			long	maxBytes	= Math.max( 1, config.getInt( "store.maxMB", 50 ) ) * 1024L * 1024L;
+			errors.prune( System.currentTimeMillis() - hours * 3_600_000L );
+			if ( force || reports.isDirty() ) {
+				ortus.boxlang.modules.bxlens.util.Plain.writeAtomic( storeDir.resolve( "reports.json" ), Json.write( reports.toPersist() ) );
+			}
+			if ( force || errors.isDirty() ) {
+				List<Map<String, Object>>	all		= errors.toPersist();
+				String						json	= Json.write( all );
+				while ( json.length() > maxBytes && all.size() > 1 ) {
+					all.sort( ( a, b ) -> Long.compare( ortus.boxlang.modules.bxlens.util.Plain.num( a.get( "lastSeen" ), 0 ),
+					    ortus.boxlang.modules.bxlens.util.Plain.num( b.get( "lastSeen" ), 0 ) ) );
+					all		= new ArrayList<>( all.subList( all.size() / 2, all.size() ) );
+					json	= Json.write( all );
+				}
+				ortus.boxlang.modules.bxlens.util.Plain.writeAtomic( storeDir.resolve( "errors.json" ), json );
+			}
+		} catch ( Throwable t ) {
+			getLogger().warn( "bx-lens: could not save reports and errors: {}", t.toString() );
+		}
 	}
 
 	public QueryStats getQueryStats() {
