@@ -262,6 +262,9 @@ public final class ConsoleRouter {
 		} else if ( route.startsWith( "caches" ) && panelOn( "caches" ) ) {
 			caches( context, ex, method, route, s );
 		} else if ( route.startsWith( "cachevalue/" ) && method.equals( "GET" ) && panelOn( "caches" ) ) {
+			if ( plusOnly( context, ex, "cacheActions", "Reading a cache value" ) ) {
+				return;
+			}
 			String name = decode( route.substring( "cachevalue/".length() ) );
 			service.getAudit().log( "cache.value", s.role, ex.remoteAddr(), "cache=" + name + " key=" + ex.urlParam( "key" ) );
 			Map<String, Object> v = service.getCaches().value( name, ex.urlParam( "key" ) );
@@ -273,6 +276,9 @@ public final class ConsoleRouter {
 		} else if ( route.equals( "environment" ) && method.equals( "GET" ) && panelOn( "environment" ) ) {
 			json( context, ex, 200, service.getEnvironment().environment() );
 		} else if ( route.equals( "bundle" ) && method.equals( "GET" ) ) {
+			if ( plusOnly( context, ex, "bundle", "The diagnostic bundle" ) ) {
+				return;
+			}
 			service.getAudit().log( "bundle.download", s.role, ex.remoteAddr(), "" );
 			String name = "lens-diagnostics-" + java.time.LocalDateTime.now().format( java.time.format.DateTimeFormatter.ofPattern( "yyyyMMdd-HHmmss" ) )
 			    + ".zip";
@@ -327,6 +333,8 @@ public final class ConsoleRouter {
 			send( context, ex, 200, "text/plain; charset=UTF-8", service.getData().threadDump(), true );
 		} else if ( route.equals( "bar" ) && method.equals( "GET" ) && panelOn( "designer" ) ) {
 			json( context, ex, 200, bar() );
+		} else if ( route.startsWith( "bar/" ) && method.equals( "POST" ) && !service.getLicensing().has( "barDesigner" ) ) {
+			plusOnly( context, ex, "barDesigner", "Saving a bar layout" );
 		} else if ( route.equals( "bar/layout" ) && method.equals( "POST" ) && panelOn( "designer" ) ) {
 			saveLayout( context, ex );
 		} else if ( route.equals( "bar/reset" ) && method.equals( "POST" ) && panelOn( "designer" ) ) {
@@ -350,13 +358,25 @@ public final class ConsoleRouter {
 		return s != null && "admin".equals( s.role );
 	}
 
+	/**
+	 * Refuse a BoxLang+ feature on Free. Answers 403 and returns true when refused.
+	 */
+	private boolean plusOnly( IBoxContext context, WebExchange ex, String feature, String what ) {
+		if ( service.getLicensing().has( feature ) ) {
+			return false;
+		}
+		json( context, ex, 403, Map.of( "ok", false, "plus", true, "error", what + " is a BoxLang+ feature. A license or trial is needed." ) );
+		return true;
+	}
+
 	private boolean canChange( ConsoleAuth.Session s ) {
 		return isAdmin( s ) && !service.getConfig().getBool( "console.readOnly", false );
 	}
 
 	private Map<String, Object> tasksFor( ConsoleAuth.Session s ) {
 		Map<String, Object> t = service.getData().tasks();
-		t.put( "actions", Boolean.TRUE.equals( t.get( "actions" ) ) && canChange( s ) );
+		t.put( "actions", Boolean.TRUE.equals( t.get( "actions" ) ) && canChange( s ) && service.getLicensing().has( "taskActions" ) );
+		t.put( "locked", !service.getLicensing().has( "taskActions" ) );
 		return t;
 	}
 
@@ -376,6 +396,7 @@ public final class ConsoleRouter {
 		m.put( "readOnly", !canChange( s ) );
 		m.put( "role", s.role );
 		m.put( "diskStore", service.diskStoreOn() );
+		m.put( "plus", service.getLicensing().features() );
 		m.put( "historyCap", service.getStore().capacity() );
 		m.put( "insecure", !ex.secure() && !AccessGuard.isLoopback( ex.remoteAddr() ) );
 		m.put( "liveStreams", service.getStreams().get() );
@@ -450,6 +471,9 @@ public final class ConsoleRouter {
 				return;
 			}
 			if ( method.equals( "POST" ) ) {
+				if ( plusOnly( context, ex, "cacheActions", "Evicting, reaping and clearing a cache" ) ) {
+					return;
+				}
 				String key = ex.formParam( "key" );
 				service.getAudit().log( "cache." + parts[ 2 ], s.role, ex.remoteAddr(), "cache=" + name + ( key == null ? "" : " key=" + key ) );
 				Map<String, Object> r = service.getCaches().action( name, parts[ 2 ], key );
@@ -479,6 +503,9 @@ public final class ConsoleRouter {
 				Map<String, Object> r = logs.read( ex.urlParam( "file" ), lines, ex.urlParam( "q" ), ex.urlParam( "level" ) );
 				json( context, ex, r == null ? 404 : 200, r == null ? Map.of( "error", "No such log file" ) : r );
 			} else if ( route.equals( "logfiles/download" ) ) {
+				if ( plusOnly( context, ex, "logDownload", "Downloading a log file" ) ) {
+					return;
+				}
 				java.nio.file.Path p = logs.resolve( ex.urlParam( "file" ) );
 				if ( p == null ) {
 					json( context, ex, 404, Map.of( "error", "No such log file" ) );
@@ -596,6 +623,11 @@ public final class ConsoleRouter {
 		if ( route.equals( "heapdump" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, hd.info( allowed ) );
 			return;
+		}
+		if ( !route.equals( "heapdump" ) || !method.equals( "GET" ) ) {
+			if ( plusOnly( context, ex, "heapDump", "A heap dump" ) ) {
+				return;
+			}
 		}
 		if ( !allowed ) {
 			json( context, ex, 403, Map.of( "ok", false, "error", "Heap dumps are off. Set console.allowHeapDump to true in boxlang.json." ) );
@@ -820,6 +852,9 @@ public final class ConsoleRouter {
 	 * Tasks actions: <code>{scheduler}/{task}/{pause|resume|run}</code> or <code>{scheduler}/{pauseall|resumeall|reload}</code>.
 	 */
 	private void taskAction( IBoxContext context, WebExchange ex, String route ) {
+		if ( plusOnly( context, ex, "taskActions", "Running, pausing, resuming and reloading tasks" ) ) {
+			return;
+		}
 		if ( !service.getConfig().getBool( "console.actions", true ) ) {
 			json( context, ex, 403, Map.of( "ok", false, "message", "Actions are turned off in the settings" ) );
 			return;

@@ -139,6 +139,7 @@
       <!-- Tasks -->
       <section x-show="tab === 'tasks'">
         <h1 class="h1">Scheduled tasks <small>from <span class="mono" x-text="tasks ? tasks.tasksFile : ''"></span></small></h1>
+        <template x-if="tasks && tasks.locked"><div class="msg plusnote" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> Run now, pause, resume and reload need a BoxLang+ license or trial. You can see every task and its history.</div></template>
         <template x-if="tasks">
           <div>
             <div class="tools">
@@ -245,13 +246,14 @@
               </template>
             </div>
             <div class="card" x-show="csel"><h3><span class="mono" x-text="csel"></span><span x-text="ckeys ? (ckeys.truncated ? 'first ' + ckeys.limit + ' matches' : ckeys.keys.length + ' keys') : ''"></span></h3>
+              <div class="msg plusnote" x-show="state && state.plus && !state.plus.cacheActions" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> Reading a value, evict, reap and clear need a BoxLang+ license or trial.</div>
               <div class="tools"><input type="text" placeholder="Filter keys" x-model="cfilter" @input.debounce.300ms="loadKeys()" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px">
-                <button class="btn" :disabled="!state || state.readOnly" @click="cacheAct('reap')">Reap expired</button>
-                <button class="btn crit" :disabled="!state || state.readOnly" @click="cconfirm = true">Clear all</button></div>
+                <button class="btn" :disabled="!state || state.readOnly || !state.plus.cacheActions" @click="cacheAct('reap')">Reap expired</button>
+                <button class="btn crit" :disabled="!state || state.readOnly || !state.plus.cacheActions" @click="cconfirm = true">Clear all</button></div>
               <div class="confirm" x-show="cconfirm"><span>Remove every object from this cache?</span><button class="btn mini primary" @click="cacheAct('clear'); cconfirm = false">Clear</button><button class="btn mini" @click="cconfirm = false">Cancel</button></div>
               <div class="scroll" style="max-height:340px;margin-top:8px"><table><thead><tr><th>Key</th><th class="num">Hits</th><th class="num">Timeout</th><th></th></tr></thead><tbody>
                 <template x-for="k in (ckeys ? ckeys.keys : [])" :key="k.key"><tr><td class="mono" style="word-break:break-all" x-text="k.key"></td><td class="num" x-text="k.hits === undefined ? '' : k.hits"></td><td class="num" x-text="k.timeout === undefined ? '' : k.timeout"></td>
-                  <td class="num"><button class="btn mini" :disabled="!state || state.role === 'viewer'" @click="viewValue(k.key)">View</button> <button class="btn mini" :disabled="!state || state.readOnly" @click="cacheAct('evict', k.key)">Evict</button></td></tr></template></tbody></table></div>
+                  <td class="num"><button class="btn mini" :disabled="!state || state.role === 'viewer' || !state.plus.cacheActions" @click="viewValue(k.key)">View</button> <button class="btn mini" :disabled="!state || state.readOnly || !state.plus.cacheActions" @click="cacheAct('evict', k.key)">Evict</button></td></tr></template></tbody></table></div>
               <p class="sub" x-show="ckeys && ckeys.keys.length === 0">No keys match.</p>
               <div x-show="cvalue" style="margin-top:10px"><h3 style="margin-bottom:4px"><span class="mono" x-text="cvalue ? cvalue.key : ''"></span><span x-text="cvalue && cvalue.found ? cvalue.type + (cvalue.truncated ? ', cut to 2 KB' : '') : ''"></span></h3>
                 <pre class="code" style="max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all" x-text="cvalue ? (cvalue.found ? cvalue.value : 'Not found or expired') : ''"></pre></div>
@@ -275,7 +277,7 @@
                 <select x-model="llevel" @change="readLog()" style="background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px"><option value="">All levels</option><option value="DEBUG">DEBUG and up</option><option value="INFO">INFO and up</option><option value="WARN">WARN and up</option><option value="ERROR">ERROR only</option></select>
                 <select x-model="lcount" @change="readLog()" style="background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px"><option value="200">200 lines</option><option value="500">500 lines</option><option value="1000">1000 lines</option><option value="2000">2000 lines</option></select>
                 <button class="btn" @click="llive = !llive; if (llive) { connect(); } else { disconnect(); connect(); }" x-text="llive ? 'Live: on' : 'Live: paused'"></button>
-                <a class="btn" :class="state && state.role === 'viewer' ? 'disabled' : ''" :href="state && state.role !== 'viewer' ? logHref() : null"><svg class="ic"><use href="#ph-download-simple"/></svg>Download</a></div>
+                <a class="btn" :class="state && (state.role === 'viewer' || !state.plus.logDownload) ? 'disabled' : ''" :href="state && state.role !== 'viewer' && state.plus.logDownload ? logHref() : null" :title="state && !state.plus.logDownload ? 'BoxLang+ feature' : ''"><svg class="ic"><use href="#ph-download-simple"/></svg>Download<span class="chipx plus" x-show="state && !state.plus.logDownload" style="margin-left:6px">Plus</span></a></div>
               <pre class="code logview" x-ref="logview"><template x-for="(l, i) in llines" :key="i"><div :class="lineClass(l)" x-text="l"></div></template></pre>
             </div>
           </div>
@@ -309,7 +311,7 @@
             <div class="tools" style="margin-bottom:10px">
               <template x-for="v in ['config', 'modules', 'jvm', 'env', 'props']" :key="v"><button class="btn" :class="envView === v ? 'primary' : ''" @click="envView = v" x-text="{config: 'BoxLang config', modules: 'Modules', jvm: 'JVM arguments', env: 'Environment variables', props: 'System properties'}[v]"></button></template>
               <span style="flex:1"></span>
-              <a class="btn" :class="state && state.role === 'viewer' ? 'disabled' : ''" :href="state && state.role !== 'viewer' ? base + '/api/bundle' : null"><svg class="ic"><use href="#ph-download-simple"/></svg>Diagnostic bundle</a></div>
+              <a class="btn" :class="state && (state.role === 'viewer' || !state.plus.bundle) ? 'disabled' : ''" :href="state && state.role !== 'viewer' && state.plus.bundle ? base + '/api/bundle' : null" :title="state && !state.plus.bundle ? 'BoxLang+ feature' : ''"><svg class="ic"><use href="#ph-download-simple"/></svg>Diagnostic bundle<span class="chipx plus" x-show="state && !state.plus.bundle" style="margin-left:6px">Plus</span></a></div>
             <div class="card" x-show="envView === 'config'"><h3>Effective configuration <span>boxlang.json merged with defaults and environment</span></h3><pre class="code" style="max-height:560px;overflow:auto" x-text="JSON.stringify(envd.config, null, 2)"></pre></div>
             <div class="card" x-show="envView === 'modules'"><h3>Modules <span x-text="envd.modules.length"></span></h3><div class="scroll"><table><thead><tr><th>Name</th><th>Version</th><th>State</th><th>Path</th></tr></thead><tbody><template x-for="m in envd.modules" :key="m.name"><tr><td class="mono" x-text="m.name"></td><td x-text="m.version"></td><td><span class="chipx" :class="m.activated ? 'on' : 'hid'" x-text="m.activated ? 'active' : (m.enabled ? 'loaded' : 'disabled')"></span></td><td class="mono mute" x-text="m.path"></td></tr></template></tbody></table></div></div>
             <div class="card" x-show="envView === 'jvm'"><h3>JVM arguments</h3><pre class="code" x-text="envd.jvmArgs.join('\n')"></pre><dl class="kv" style="margin-top:10px"><template x-for="(v, k) in envd.info" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd x-text="v"></dd></div></template></dl></div>
@@ -468,8 +470,9 @@
                 <div class="tools" style="margin-bottom:10px"><button class="btn" :disabled="!state || state.readOnly || gcBusy" @click="runGc()"><svg class="ic"><use href="#ph-arrows-clockwise"/></svg>Run GC</button><span class="sub" x-text="gcResult"></span></div>
                 <template x-if="hd">
                   <div>
-                    <p class="sub" x-show="!hd.enabled">Heap dumps are off. Set <span class="mono">console.allowHeapDump</span> to true in <span class="mono">boxlang.json</span> to turn them on.</p>
-                    <div x-show="hd.enabled">
+                    <p class="sub" x-show="state && !state.plus.heapDump"><span class="chipx plus">BoxLang+</span> Heap dumps need a BoxLang+ license or trial.</p>
+                    <p class="sub" x-show="state && state.plus.heapDump && !hd.enabled">Heap dumps are off. Set <span class="mono">console.allowHeapDump</span> to true in <span class="mono">boxlang.json</span> to turn them on.</p>
+                    <div x-show="hd.enabled && state && state.plus.heapDump">
                       <p class="sub" x-show="hd.state === 'idle' || hd.state === 'failed'">A heap dump holds <b>everything in memory</b>, including passwords and session data. It pauses the JVM while it is written. Estimated size <span class="mono" x-text="bytes(hd.estimateBytes)"></span>, free disk in <span class="mono" x-text="hd.tempDir"></span> <span class="mono" x-text="bytes(hd.freeDiskBytes)"></span>.</p>
                       <div class="msg err" x-show="hd.state === 'failed' || !hd.enoughDisk" x-text="hd.state === 'failed' ? 'The last dump failed: ' + hd.error : 'Not enough free disk space for a dump.'"></div>
                       <div class="tools" x-show="hd.state === 'idle' || hd.state === 'failed'"><button class="btn warnb" :disabled="!hd.enoughDisk || !hd.supported || !state || state.role === 'viewer'" @click="hdConfirm = true"><svg class="ic"><use href="#ph-download-simple"/></svg>Take a heap dump</button></div>
@@ -551,7 +554,7 @@
                     </li>
                   </template>
                 </ul>
-                <div class="tools" style="margin-top:12px"><button class="btn primary" :disabled="!dirty" @click="saveDesign()"><svg class="ic"><use href="#ph-check-circle"/></svg>Save layout</button><button class="btn" @click="resetDesign()">Reset to default</button><span class="sub" x-show="dirty">Unsaved changes</span></div>
+                <div class="tools" style="margin-top:12px"><button class="btn primary" :disabled="!dirty || (state && !state.plus.barDesigner)" @click="saveDesign()"><svg class="ic"><use href="#ph-check-circle"/></svg>Save layout</button><button class="btn" :disabled="state && !state.plus.barDesigner" @click="resetDesign()">Reset to default</button><span class="chipx plus" x-show="state && !state.plus.barDesigner">BoxLang+ to save a layout</span><span class="sub" x-show="dirty">Unsaved changes</span></div>
               </div>
               <div class="card">
                 <h3>Preview <span>how the bar will look</span></h3>

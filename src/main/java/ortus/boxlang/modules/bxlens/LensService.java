@@ -425,7 +425,9 @@ public final class LensService {
 		req.userAgent	= ua == null ? "" : ua;
 		req.template	= uri;
 		req.thread		= Thread.currentThread();
-		req.data.put( "_costStart", ortus.boxlang.modules.bxlens.util.Cost.begin() );
+		if ( licensing.has( "cost" ) ) {
+			req.data.put( "_costStart", ortus.boxlang.modules.bxlens.util.Cost.begin() );
+		}
 		active.put( req.id, req );
 		rc.putAttachment( Keys.requestAttach, req );
 		try {
@@ -568,7 +570,7 @@ public final class LensService {
 						flushStore( false );
 					}
 				}
-				if ( !config.active || config.slowRequestMs <= 0 || !config.getBool( "checks.slowSample", true ) ) {
+				if ( !config.active || config.slowRequestMs <= 0 || !config.getBool( "checks.slowSample", true ) || !licensing.has( "cost" ) ) {
 					return;
 				}
 				long now = System.nanoTime();
@@ -664,6 +666,7 @@ public final class LensService {
 		ui.put( "maxRequests", config.maxRequests );
 		ui.put( "layout", layout.get() );
 		ui.put( "hiddenTabs", config.hiddenTabs );
+		ui.put( "plus", licensing.features() );
 		ui.put( "consoleUrl", consoleUrl );
 		ui.put( "slowQueryMs", config.slowQueryMs );
 		ui.put( "slowRequestMs", config.slowRequestMs );

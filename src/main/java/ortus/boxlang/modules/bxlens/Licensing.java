@@ -76,15 +76,40 @@ public final class Licensing {
 	}
 
 	/**
-	 * Is a feature available? Plus and a trial get everything. Free keeps the live console and a short request history in memory, but not
-	 * the disk store (saved errors, reports and trends), the long request history or the AI calls. Other features are open to everyone for now.
+	 * The features that need BoxLang+ or a trial. Everything else is open to everyone.
+	 * <ul>
+	 * <li><code>diskStore</code>: errors and reports saved to disk, lifetime totals</li>
+	 * <li><code>fullHistory</code>: more than {@link LensService#FREE_HISTORY} requests in memory</li>
+	 * <li><code>ai</code>: Explain with AI and Ask Lens through bx-ai</li>
+	 * <li><code>cost</code>: request cost (CPU, memory) and the slow request sample</li>
+	 * <li><code>taskActions</code>: run, pause, resume and reload scheduled tasks</li>
+	 * <li><code>cacheActions</code>: read a cache value, evict, reap, clear</li>
+	 * <li><code>logDownload</code>, <code>bundle</code>, <code>heapDump</code>, <code>barDesigner</code> (saving a layout)</li>
+	 * </ul>
+	 */
+	public static final java.util.List<String> PLUS_FEATURES = java.util.List.of( "diskStore", "fullHistory", "ai", "cost", "taskActions", "cacheActions",
+	    "logDownload", "bundle", "heapDump", "barDesigner" );
+
+	/**
+	 * Is a feature available? Plus and a trial get everything. Free keeps the bar and the live console, minus the features in {@link #PLUS_FEATURES}.
 	 */
 	public boolean has( String feature ) {
-		if ( "diskStore".equals( feature ) || "fullHistory".equals( feature ) || "ai".equals( feature ) ) {
+		if ( PLUS_FEATURES.contains( feature ) ) {
 			String state = String.valueOf( status().get( "state" ) );
 			return "plus".equals( state ) || "trial".equals( state );
 		}
 		return true;
+	}
+
+	/**
+	 * Every gated feature with whether it is available now, for the UI.
+	 */
+	public Map<String, Object> features() {
+		Map<String, Object> m = new LinkedHashMap<>();
+		for ( String f : PLUS_FEATURES ) {
+			m.put( f, has( f ) );
+		}
+		return m;
 	}
 
 	private Map<String, Object> compute() {
