@@ -1,0 +1,10 @@
+/**
+ * Harness task: pretends to remove expired sessions. Returns a short result so Run now has something to show.
+ */
+class {
+
+	function run() {
+		return "42 expired sessions removed";
+	}
+
+}

@@ -43,5 +43,15 @@
 				}
 			}
 		}
+	},
+	"executors": {
+		"demo-pool": {
+			"type": "fixed",
+			"threads": 2,
+			"description": "Small pool for the harness"
+		}
+	},
+	"mappings": {
+		"/harness": "@HARNESS_APP@"
 	}
 }

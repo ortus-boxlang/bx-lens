@@ -23,11 +23,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import ortus.boxlang.modules.bxlens.ext.CollectHandle;
 import ortus.boxlang.modules.bxlens.ext.LensRegistry;
 import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
 import ortus.boxlang.modules.bxlens.interceptors.ILensCollector;
+import ortus.boxlang.modules.bxlens.interceptors.TaskOutcomes;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.CacheCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.ExceptionCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.FunctionCollector;
@@ -84,6 +86,9 @@ public final class LensService {
 	private volatile AccessGuard		barGuard		= new AccessGuard( config, "bar.access", false );
 	private volatile AccessGuard		consoleGuard	= new AccessGuard( config, "console.access", true );
 	private volatile ConsoleAuth		auth			= new ConsoleAuth( config );
+	private volatile TaskOutcomes		outcomes		= new TaskOutcomes();
+	private final ConsoleData			consoleData		= new ConsoleData( this );
+	private final AtomicInteger			streams			= new AtomicInteger();
 	private volatile RequestStore		store			= new RequestStore( 50 );
 	private volatile BarRenderer		renderer;
 	private volatile String				version			= "0.0.0";
@@ -129,8 +134,12 @@ public final class LensService {
 		this.barGuard		= new AccessGuard( this.config, "bar.access", this.config.getBool( "bar.allowAllIPs", false ) );
 		this.consoleGuard	= new AccessGuard( this.config, "console.access", true );
 		this.auth			= new ConsoleAuth( this.config );
-		this.store			= new RequestStore( this.config.maxRequests );
-		this.renderer		= new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
+		this.outcomes		= new TaskOutcomes();
+		if ( this.config.consoleEnabled ) {
+			runtime.getInterceptorService().register( this.outcomes );
+		}
+		this.store		= new RequestStore( this.config.maxRequests );
+		this.renderer	= new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
 		if ( !this.renderer.isComplete() ) {
 			getLogger().warn( "bx-lens assets are missing under [{}]. The bar will not render.", moduleDir );
 		}
@@ -162,6 +171,13 @@ public final class LensService {
 	 * Unregister all collectors and clear history.
 	 */
 	public synchronized void shutdown() {
+		try {
+			if ( runtime != null ) {
+				runtime.getInterceptorService().unregister( outcomes );
+			}
+		} catch ( Throwable t ) {
+			// Not registered
+		}
 		synchronized ( collectors ) {
 			for ( ILensCollector c : collectors ) {
 				try {
@@ -439,6 +455,18 @@ public final class LensService {
 
 	public ConsoleAuth getAuth() {
 		return auth;
+	}
+
+	public TaskOutcomes getOutcomes() {
+		return outcomes;
+	}
+
+	public ConsoleData getData() {
+		return consoleData;
+	}
+
+	public AtomicInteger getStreams() {
+		return streams;
 	}
 
 	public String getModuleDir() {

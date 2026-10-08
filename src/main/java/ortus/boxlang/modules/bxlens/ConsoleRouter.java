@@ -44,7 +44,6 @@ public final class ConsoleRouter {
 	private static final Set<String>	ASSETS		= Set.of( "console.css", "console.js", "alpine.min.js" );
 	private static final String			CSP			= "default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
 	    + "connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
-	private static final long			STARTED		= System.currentTimeMillis();
 
 	private final LensService			service;
 	private volatile String				hostName;
@@ -82,6 +81,8 @@ public final class ConsoleRouter {
 				login( context, ex );
 			} else if ( path.equals( "/logout" ) && method.equals( "POST" ) ) {
 				logout( context, ex );
+			} else if ( path.equals( "/stream" ) && method.equals( "GET" ) ) {
+				stream( context, ex );
 			} else if ( path.startsWith( "/api/" ) ) {
 				api( context, ex, method, path.substring( "/api/".length() ) );
 			} else {
@@ -203,6 +204,21 @@ public final class ConsoleRouter {
 			}
 		} else if ( route.equals( "settings" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, settings() );
+		} else if ( route.equals( "executors" ) && method.equals( "GET" ) && panelOn( "executors" ) ) {
+			json( context, ex, 200, service.getData().executors() );
+		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
+			json( context, ex, 200, service.getData().tasks() );
+		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
+			json( context, ex, 200, service.getData().system() );
+		} else if ( route.equals( "threads" ) && method.equals( "GET" ) && panelOn( "threads" ) ) {
+			json( context, ex, 200, service.getData().threads() );
+		} else if ( route.equals( "threads/dump" ) && method.equals( "GET" ) && panelOn( "threads" ) ) {
+			String name = "lens-thread-dump-" + java.time.LocalDateTime.now().format( java.time.format.DateTimeFormatter.ofPattern( "yyyyMMdd-HHmmss" ) )
+			    + ".txt";
+			ex.setResponseHeader( "Content-Disposition", "attachment; filename=\"" + name + "\"" );
+			send( context, ex, 200, "text/plain; charset=UTF-8", service.getData().threadDump(), true );
+		} else if ( route.startsWith( "tasks/" ) && method.equals( "POST" ) && panelOn( "tasks" ) ) {
+			taskAction( context, ex, route.substring( "tasks/".length() ) );
 		} else {
 			json( context, ex, 404, Map.of( "error", "Unknown route" ) );
 		}
@@ -214,13 +230,14 @@ public final class ConsoleRouter {
 		m.put( "version", service.getVersion() );
 		m.put( "host", hostName() );
 		m.put( "boxlang", boxlangVersion() );
-		m.put( "uptimeSeconds", ( System.currentTimeMillis() - STARTED ) / 1000 );
 		m.put( "jvmUptimeSeconds", ManagementFactory.getRuntimeMXBean().getUptime() / 1000 );
 		m.put( "csrf", s.csrf );
 		m.put( "idleSeconds", service.getAuth().idleSeconds() );
 		m.put( "collectLevel", cfg.collectLevel );
 		m.put( "barEnabled", cfg.barEnabled );
 		m.put( "tabs", tabs() );
+		m.put( "actions", cfg.getBool( "console.actions", true ) );
+		m.put( "liveStreams", service.getStreams().get() );
 		m.put( "license", license() );
 		return m;
 	}
@@ -234,10 +251,16 @@ public final class ConsoleRouter {
 		String[][]					catalog	= {
 		    { "overview", "Overview", "squares-four", "Inspect" },
 		    { "requests", "Requests", "list-bullets", "Inspect" },
+		    { "executors", "Executors", "lightning", "Runtime" },
+		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
+		    { "system", "System", "cpu", "Runtime" },
+		    { "threads", "Threads", "tree-structure", "Runtime" },
 		    { "settings", "Settings", "gear", "Config" }
 		};
 		for ( String[] t : catalog ) {
-			if ( cfg.hiddenTabs.contains( t[ 0 ] ) && !t[ 0 ].equals( "settings" ) ) {
+			if ( t[ 0 ].equals( "settings" ) ) {
+				// Always there, so the settings can always be read
+			} else if ( cfg.hiddenTabs.contains( t[ 0 ] ) || !cfg.isCollectorEnabled( t[ 0 ], true ) ) {
 				continue;
 			}
 			Map<String, Object> m = new LinkedHashMap<>();
@@ -368,6 +391,103 @@ public final class ConsoleRouter {
 	// ---------------------------------------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------------------------------------
+
+	private boolean panelOn( String id ) {
+		LensConfig cfg = service.getConfig();
+		return cfg.isCollectorEnabled( id, true ) && !cfg.hiddenTabs.contains( id );
+	}
+
+	/**
+	 * Tasks actions: <code>{scheduler}/{task}/{pause|resume|run}</code> or <code>{scheduler}/{pauseall|resumeall|reload}</code>.
+	 */
+	private void taskAction( IBoxContext context, WebExchange ex, String route ) {
+		if ( !service.getConfig().getBool( "console.actions", true ) ) {
+			json( context, ex, 403, Map.of( "ok", false, "message", "Actions are turned off in the settings" ) );
+			return;
+		}
+		String[]	parts	= route.split( "/" );
+		String		scheduler, task = null, action;
+		if ( parts.length == 2 ) {
+			scheduler	= decode( parts[ 0 ] );
+			action		= parts[ 1 ];
+		} else if ( parts.length == 3 ) {
+			scheduler	= decode( parts[ 0 ] );
+			task		= decode( parts[ 1 ] );
+			action		= parts[ 2 ];
+		} else {
+			json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+			return;
+		}
+		service.getLogger().info( "bx-lens console: {} {}{} by {}", action, scheduler, task == null ? "" : "/" + task, ex.remoteAddr() );
+		json( context, ex, 200, service.getData().taskAction( action, scheduler, task ) );
+	}
+
+	/**
+	 * Server sent events. One loop per browser: a newer stream from the same session stops the older one. Ends after ten minutes and the
+	 * browser reconnects by itself.
+	 */
+	private void stream( IBoxContext context, WebExchange ex ) {
+		ConsoleAuth.Session s = session( ex );
+		if ( s == null ) {
+			json( context, ex, 401, Map.of( "error", "Sign in required" ) );
+			return;
+		}
+		int max = Math.max( 1, service.getConfig().getInt( "console.maxStreams", 10 ) );
+		if ( service.getStreams().get() >= max ) {
+			json( context, ex, 429, Map.of( "error", "Too many live streams" ) );
+			return;
+		}
+		String		topics	= ex.urlParam( "topics" ) == null ? "executors,tasks,system" : ex.urlParam( "topics" );
+		Set<String>	want	= new java.util.HashSet<>( List.of( topics.split( "," ) ) );
+		int			mine	= s.streamGen.incrementAndGet();
+		service.getStreams().incrementAndGet();
+		try {
+			ex.setStatus( 200 );
+			ex.setResponseHeader( "Content-Type", "text/event-stream; charset=UTF-8" );
+			ex.setResponseHeader( "Cache-Control", "no-cache, no-transform" );
+			ex.setResponseHeader( "X-Accel-Buffering", "no" );
+			ex.setResponseHeader( "X-Content-Type-Options", "nosniff" );
+			context.writeToBuffer( ": connected\n\n" );
+			context.flushBuffer( true );
+			long end = System.currentTimeMillis() + 5 * 60_000L;
+			while ( System.currentTimeMillis() < end && !Thread.currentThread().isInterrupted() ) {
+				if ( service.getAuth().find( s.id ) == null || s.streamGen.get() != mine ) {
+					break;
+				}
+				Map<String, Object> tick = new LinkedHashMap<>();
+				tick.put( "at", System.currentTimeMillis() );
+				if ( want.contains( "executors" ) && panelOn( "executors" ) ) {
+					tick.put( "executors", service.getData().executors() );
+				}
+				if ( want.contains( "tasks" ) && panelOn( "tasks" ) ) {
+					tick.put( "tasks", service.getData().tasks() );
+				}
+				if ( want.contains( "system" ) && panelOn( "system" ) ) {
+					tick.put( "system", service.getData().system() );
+				}
+				if ( want.contains( "requests" ) ) {
+					tick.put( "requests", service.getStore().summaries() );
+					tick.put( "overview", overview() );
+				}
+				context.writeToBuffer( "event: tick\ndata: " + Json.write( tick ) + "\n\n" );
+				context.flushBuffer( true );
+				if ( ex.writeFailed() ) {
+					break;
+				}
+				Thread.sleep( 1000 );
+			}
+		} catch ( InterruptedException e ) {
+			Thread.currentThread().interrupt();
+		} catch ( Throwable t ) {
+			// The browser went away
+		} finally {
+			service.getStreams().decrementAndGet();
+		}
+	}
+
+	private static String decode( String s ) {
+		return java.net.URLDecoder.decode( s, StandardCharsets.UTF_8 );
+	}
 
 	private Map<String, Object> item( String sev, String text, String go ) {
 		Map<String, Object> m = new LinkedHashMap<>();

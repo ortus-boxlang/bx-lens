@@ -29,6 +29,7 @@ fi
 rm -rf "$RUN/home"
 mkdir -p "$RUN/home/modules"
 cp -R "$HERE/home/." "$RUN/home/"
+sed -i "s|@HARNESS_APP@|$HERE/app|g" "$RUN/home/config/boxlang.json"
 cp -R "$ROOT/build/modules/bx-lens" "$RUN/home/modules/bxLens"
 # DEV=1 serves the UI files straight from src/main/bx/assets, so edits show on refresh (needs dev.reloadAssets)
 if [ -n "${DEV:-}" ]; then

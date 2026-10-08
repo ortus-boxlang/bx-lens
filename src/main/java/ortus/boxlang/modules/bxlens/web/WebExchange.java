@@ -182,6 +182,18 @@ public final class WebExchange {
 		exchange.addResponseCookie( c );
 	}
 
+	/**
+	 * Has a write to the browser failed? True once the browser closed the connection.
+	 */
+	public boolean writeFailed() {
+		try {
+			java.io.PrintWriter w = exchange.getResponseWriter();
+			return w != null && w.checkError();
+		} catch ( Throwable t ) {
+			return true;
+		}
+	}
+
 	public void setStatus( int code ) {
 		exchange.setResponseStatus( code );
 	}

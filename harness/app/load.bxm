@@ -1,0 +1,10 @@
+<bx:output>
+	<h1>Executor load</h1>
+	<bx:script>
+		// Fill the small demo pool so its health report shows saturation in the console
+		for ( i = 1; i <= 8; i++ ) {
+			asyncRun( () => { sleep( 6000 ); return 1; }, "demo-pool" );
+		}
+	</bx:script>
+	<p>Queued 8 tasks of 6 seconds on the 2 thread demo-pool. Open the console and watch Executors.</p>
+</bx:output>

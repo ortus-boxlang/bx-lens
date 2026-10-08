@@ -23,11 +23,13 @@ public final class ConsoleAuth {
 	 */
 	public static final class Session {
 
-		public final String		id;
-		public final String		csrf;
-		public final String		remoteAddr;
-		public final long		createdAt;
-		public volatile long	lastSeen;
+		public final String										id;
+		public final String										csrf;
+		public final String										remoteAddr;
+		public final long										createdAt;
+		public volatile long									lastSeen;
+		/** The newest live stream of this browser wins, older ones stop. */
+		public final java.util.concurrent.atomic.AtomicInteger	streamGen	= new java.util.concurrent.atomic.AtomicInteger();
 
 		Session( String id, String csrf, String remoteAddr, long now ) {
 			this.id			= id;

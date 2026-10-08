@@ -44,8 +44,9 @@ test.describe( 'console', () => {
 	test( 'settings show the effective access rules without the password', async ( { page } ) => {
 		await signIn( page );
 		await page.click( '.nav:has-text("Settings")' );
-		await expect( page.locator( 'dl.kv' ) ).toContainText( 'console.password' );
-		await expect( page.locator( 'dl.kv' ) ).toContainText( 'set' );
+		const kv = page.locator( '.main section:visible dl.kv' ).first();
+		await expect( kv ).toContainText( 'console.password' );
+		await expect( kv ).toContainText( 'set' );
 		expect( await page.content() ).not.toContain( PASSWORD );
 	} );
 

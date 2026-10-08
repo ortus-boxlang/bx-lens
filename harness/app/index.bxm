@@ -16,6 +16,8 @@
 	<li><a href="/forms.bxm">Form</a>: a POST with a password field to show redaction.</li>
 	<li><a href="/session.bxm">Session</a>: session scope snapshot.</li>
 	<li><a href="/transaction.bxm">Transaction</a>: a committed and a rolled back transaction.</li>
+	<li><a href="/load.bxm">Executor load</a>: queues slow tasks on a small pool so its health report goes critical (see the console).</li>
+	<li><a href="/~bxlens/index.bxm">Console</a>: the standalone console. The harness password is lens-demo.</li>
 	<li><a href="/extend.bxm">Extend</a>: a custom panel from application code, plus one from a module.</li>
 	<li><a href="/api/orders.json.bxm">JSON endpoint</a> and <a href="/events.bxm">SSE endpoint</a>: recorded in History without a bar.</li>
 </ul>

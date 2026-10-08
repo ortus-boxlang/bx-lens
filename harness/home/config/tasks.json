@@ -1,0 +1,7 @@
+[
+	{ "task": "cleanup-sessions", "scheduler": "bxschedule", "group": "maintenance", "class": "harness.tasks.CleanupSessions", "method": "run", "interval": "120", "paused": false },
+	{ "task": "sync-prices", "scheduler": "bxschedule", "group": "integrations", "class": "harness.tasks.SyncPrices", "method": "run", "cronTime": "0 0 */6 * * *", "onException": "refire", "paused": false },
+	{ "task": "warm-cache", "scheduler": "bxschedule", "group": "maintenance", "class": "harness.tasks.WarmCache", "method": "run", "interval": "600", "paused": true },
+	{ "task": "nightly-report", "scheduler": "reports", "group": "reports", "class": "harness.tasks.NightlyReport", "method": "run", "cronTime": "0 0 2 * * *", "paused": false },
+	{ "task": "export-orders", "scheduler": "reports", "group": "reports", "class": "harness.tasks.ExportOrders", "method": "run", "cronTime": "0 0 18 * * 1-5", "paused": false }
+]

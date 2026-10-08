@@ -1,0 +1,10 @@
+/**
+ * Harness task that always fails, so the console shows a failing task with its error and stack.
+ */
+class {
+
+	function run() {
+		throw( type = "IntegrationError", message = "Connection refused: api.prices.test:443" );
+	}
+
+}

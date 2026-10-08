@@ -43,7 +43,11 @@ class {
 				access           : "local",
 				sessionMinutes   : 30,
 				maxLoginAttempts : 5,
-				lockoutMinutes   : 5
+				lockoutMinutes   : 5,
+				// Pause, resume, run and reload scheduled tasks from the console
+				actions          : true,
+				runTimeoutSeconds : 60,
+				maxStreams       : 10
 			},
 
 			// off | light | full. Light is for production: no bindings, scopes, headers, stack traces, function or log collectors
@@ -128,7 +132,12 @@ class {
 				scopes       : { enabled : true, url : true, form : true, cookie : false, session : false, request : false, application : false, variables : false },
 				jvm          : { enabled : true },
 				cache        : { enabled : true },
-				modules      : { enabled : true }
+				modules      : { enabled : true },
+				// Console pages. Turn one off and its page disappears
+				executors    : { enabled : true },
+				tasks        : { enabled : true },
+				system       : { enabled : true },
+				threads      : { enabled : true }
 			}
 		};
 
