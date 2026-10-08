@@ -18,7 +18,7 @@ class {
 	this.publicMapping = { name : "~bxlens", usePrefix : false, path : "public" };
 	this.author       = "Ortus Solutions";
 	this.description  = "A request level debug bar for BoxLang web applications: timeline, queries, templates, cache, modules and more.";
-	this.webURL       = "https://github.com/ortus-boxlang/bx-lens";
+	this.webURL       = "https://boxlang.io";
 	this.enabled      = true;
 	this.dependencies = [];
 
@@ -55,6 +55,17 @@ class {
 
 			// Tabs to hide in the bar and the console. A disabled collector hides its tab too
 			tabs : { hide : [] },
+
+			// Optional checks
+			checks : {
+				// Notes for missing security headers and cookie flags
+				securityHeaders : true,
+				// Sample the thread of a request that passes thresholds.slowRequestMs
+				slowSample : true
+			},
+
+			// Developer options: reloadAssets serves the UI files from disk, license forces trial|plus|expired|none
+			dev : { reloadAssets : false, license : "" },
 
 			// Extra checks for both the bar and the console
 			access : {

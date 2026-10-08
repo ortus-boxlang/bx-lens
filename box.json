@@ -3,12 +3,8 @@
 	"version": "@build.version@+@build.number@",
 	"location": "https://downloads.ortussolutions.com/ortussolutions/boxlang-modules/bx-lens/@build.version@/bx-lens-@build.version@.zip",
 	"author": "Ortus Solutions",
-	"homepage": "https://github.com/ortus-boxlang/bx-lens",
-	"documentation": "https://github.com/ortus-boxlang/bx-lens",
-	"repository": {
-		"type": "git",
-		"URL": "https://github.com/ortus-boxlang/bx-lens"
-	},
+	"homepage": "https://boxlang.io",
+	"documentation": "https://boxlang.io",
 	"bugs": "https://ortussolutions.atlassian.net/browse/BLMODULES",
 	"slug": "bx-lens",
 	"shortDescription": "BoxLang debug bar and console: timeline, queries, templates, cache, executors, tasks, threads and more",

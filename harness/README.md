@@ -35,7 +35,7 @@ The `demoLens` module in `home/modules/demoLens` shows how another module adds a
 
 ## Settings
 
-`home/config/boxlang.json` turns Lens on, lowers the slow query limit to 15 ms so the demo is deterministic, enables the functions and logs collectors, captures the session and request scopes, and sets `dev.reloadAssets` so `DEV=1` works.
+`home/config/boxlang.json` enables the bar and the console (login at `/~bxlens/index.bxm`, password `lens-demo`), defines the `demo-pool` executor, takes `dev.license` from the `LENS_LICENSE` environment variable (`trial`, `plus`, `expired`, `none`), lowers the slow query limit to 15 ms so the demo is deterministic, enables the functions and logs collectors, captures the session and request scopes, and sets `dev.reloadAssets` so `DEV=1` works.
 
 ## Presenting
 

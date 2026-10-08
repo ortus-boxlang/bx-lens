@@ -7,7 +7,7 @@ icon: lucide:git-pull-request
 
 # Development
 
-Read `CONTRIBUTING.md` in the repository first. BX Lens lives in a private Ortus repository (`ortus-solutions-private/bx-lens`), so access is limited to Ortus staff and partners. Questions and problems go through [Ortus Solutions support](https://www.ortussolutions.com/services/support).
+Read `CONTRIBUTING.md` in the repository first. BX Lens lives in a private Ortus repository (`ortus-solutions-private/bx-lens`), so access is limited to Ortus staff and partners. Bugs and requests go in the [BLMODULES Jira project](https://ortussolutions.atlassian.net/browse/BLMODULES). Support questions go through [Ortus Solutions support](https://www.ortussolutions.com/services/support).
 
 Requirements: Java 21 and BoxLang 1.19 or newer. The module is built against 1.19.0-snapshot.
 

@@ -41,6 +41,7 @@ If you have any questions on usage, professional support or just ideas to bounce
 -   Ortus Community Discourse: https://community.ortussolutions.com
 -   Box Slack Team: http://boxteam.ortussolutions.com/
 -   Professional Support: https://www.ortussolutions.com/services/support
+-   Bugs and feature requests: the BLMODULES Jira project, https://ortussolutions.atlassian.net/browse/BLMODULES
 
 ## Pull Request Guidelines
 

@@ -14,13 +14,10 @@ theme:
         }
     logo: "assets/boxlang-icon-full.svg"
 search: true
-repo:
-    url: "https://github.com/ortus-boxlang/bx-lens"
-    editUri: "edit/main/docs/"
 social:
-    - url: "https://github.com/ortus-boxlang/bx-lens"
-      icon: github
-      label: "BX Lens on GitHub"
+    - url: "https://ortussolutions.atlassian.net/browse/BLMODULES"
+      icon: bug
+      label: "Report an issue (BLMODULES)"
     - url: "https://www.ortussolutions.com/community/slack"
       icon: slack
       label: "Slack Community"

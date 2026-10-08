@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-08
+
+First release. BX Lens is a commercial Ortus Solutions product. Report issues in the BLMODULES Jira project.
+
 ### Added
 
 * Standalone console at `/~bxlens/index.bxm`: password login (`bxsecret:` value), in-memory sessions, CSRF token, per-IP lockout, strict Content-Security-Policy, no external requests. Pages: Overview, Requests, Executors, Tasks, System, Threads, Bar designer, Settings

@@ -71,4 +71,4 @@ Lens inlines its assets, about 110 KB per HTML response. Exclude paths with `exc
 
 ## Report a problem
 
-Contact [Ortus Solutions support](https://www.ortussolutions.com/services/support). Include your BoxLang version (1.19 or newer), runtime (MiniServer, servlet or CommandBox) and relevant settings (never the console password).
+File an issue in the [BLMODULES Jira project](https://ortussolutions.atlassian.net/browse/BLMODULES) or contact [Ortus Solutions support](https://www.ortussolutions.com/services/support). Include your BoxLang version (1.19 or newer), runtime (MiniServer, servlet or CommandBox) and relevant settings (never the console password).
