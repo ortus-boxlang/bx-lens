@@ -38,6 +38,14 @@ if [ -n "${DEV:-}" ]; then
 	rm -rf "$RUN/home/modules/bxLens/assets"
 	ln -s "$ROOT/src/main/bx/assets" "$RUN/home/modules/bxLens/assets"
 fi
+# WITH_AI=1 installs bx-ai and turns on ai.enabled with the provider in LENS_AI_PROVIDER (default ollama, at localhost:11434, see harness/mock-ai.py)
+if [ -n "${WITH_AI:-}" ]; then
+	fetch "$DL/boxlang-modules/bx-ai/${BX_AI_VERSION:-3.0.0}/bx-ai-${BX_AI_VERSION:-3.0.0}.zip" "bx-ai-${BX_AI_VERSION:-3.0.0}.zip"
+	mkdir -p "$RUN/home/modules/bxai"
+	unzip -q -o "$CACHE/bx-ai-${BX_AI_VERSION:-3.0.0}.zip" -d "$RUN/home/modules/bxai"
+	sed -i "s|\"ai\": { \"enabled\": false|\"ai\": { \"enabled\": true|; s|@LENS_AI_PROVIDER@|${LENS_AI_PROVIDER:-ollama}|" "$RUN/home/config/boxlang.json"
+fi
+sed -i "s|@LENS_AI_PROVIDER@||" "$RUN/home/config/boxlang.json"
 mkdir -p "$RUN/home/modules/derby"
 unzip -q -o "$CACHE/bx-derby.zip" -d "$RUN/home/modules/derby"
 

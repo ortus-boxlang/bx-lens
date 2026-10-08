@@ -45,3 +45,14 @@ The `demoLens` module in `home/modules/demoLens` shows how another module adds a
 4. Open `/cache.bxm`, then the Cache tab. Open the Modules tab.
 5. Open `/extend.bxm` and show the custom panels, then the demo module panel that every page has.
 6. Hit `/api/orders.json.bxm` and `/events.bxm` in another tab, then open History on any page.
+
+## Trying the AI features
+
+```bash
+python3 mock-ai.py &                         # a stand-in for a local Ollama server on localhost:11434
+WITH_AI=1 SKIP_BUILD=1 ./start.sh            # installs bx-ai (BX_AI_VERSION, default 3.0.0) and sets ai.enabled
+```
+
+Then open the console, go to Ask Lens, or open an error and press Explain with AI. The mock answers with the start of the prompt it received.
+
+`LENS_LICENSE=plus` (the default in the e2e config), `trial`, `expired` or `none` shows each license state. Plus and trial turn on the disk store (`harness/.run/home/lens-data`) and the longer request history.
