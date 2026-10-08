@@ -38,7 +38,7 @@ The panel is off by default. Turn it on with `collectors.bifs.enabled`:
 }
 ```
 
-Restart the runtime. Until then the BIFs tab does not exist.
+Restart the runtime, or switch it on from the console [Settings](../console/settings.md) page, where collector switches apply at once. While the collector is off, the BIFs tab does not exist.
 
 !!! warning "It costs time on every BIF call"
     Core announces `postBIFInvocation` and `onBIFException` only when something listens. While this collector is on, every BIF call in the runtime allocates an event, for every request, not only the one you look at. Turn it on to hunt a slow function, then turn it off. It is a heavy collector, so `collect.level: "light"` skips it.

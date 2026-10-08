@@ -36,7 +36,7 @@ Pick a row to see:
 - What it provides: functions (BIFs), components, member methods, interceptors and custom interception points. Each list shows up to 80 names.
 
 !!! note
-    A module that core registers through the Java service loader, like Lens itself, may show empty function lists. Core only fills these lists for modules it loads from a folder.
+    A module that core registers through the Java service loader, like Lens itself, may show empty function lists.
 
 ## Settings
 
