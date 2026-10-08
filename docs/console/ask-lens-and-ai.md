@@ -17,7 +17,7 @@ Lens can help you read an error, a failing query or a deadlock, and can answer q
 |---|---|---|
 | **Copy prompt** | Lens builds a prompt from redacted data and puts it on your clipboard. You paste it where you like. | Nothing. |
 | **Ask ChatGPT** and **Ask Claude** | Lens copies the prompt, then opens `https://chatgpt.com/` or `https://claude.ai/new` in a new tab. You paste the prompt there. The server sends nothing. | Nothing. Turn the buttons off with `ai.links`. |
-| **Explain with AI** and **Ask** on the Ask Lens page | The server sends the prompt to a model through the `bx-ai` module and shows the answer. | `ai.enabled`, the `bx-ai` module, and an admin. |
+| **Explain with AI** and **Ask** on the Ask Lens page | The server sends the prompt to a model through the `bx-ai` module and shows the answer. | `ai.enabled`, BoxLang+ or a trial, and an admin. The `bx-ai` module ships inside Lens. |
 
 The buttons appear where they help: on an [error](errors-and-reports.md#errors), on a [statement](in-flight-and-queries.md#queries) and on the [deadlock banner](system-and-threads.md#deadlock) of the Threads page. The Ask Lens page takes a free question of up to 1000 characters.
 
@@ -36,7 +36,7 @@ Passwords, parameter values and the configuration are not in a prompt. Credentia
 
 ## Let the server call a model
 
-Install the `bx-ai` module, then set:
+`bx-ai` is already inside Lens. Set:
 
 ```json title="boxlang.json"
 {
@@ -65,7 +65,7 @@ Install the `bx-ai` module, then set:
 
 A local provider such as Ollama keeps the prompt inside your network. A hosted provider receives it. These settings can only be changed in `boxlang.json`, not from the Settings page.
 
-`bx-ai` is a soft dependency. `box.json` lists it, but the module loads without it, and then **Explain with AI** is hidden and the Ask page says that the server is not set to call a model. Lens was checked against `bx-ai` 3.0.0 with a mock Ollama server (`harness/mock-ai.py`). Version 2.0.0 fails to start on the current BoxLang snapshot.
+BoxLang AI (`bx-ai` 3.4.0) ships inside Lens, in the module's `modules` folder, and is Apache 2.0 licensed. If a server removes it, Lens still loads, **Explain with AI** is hidden and the Ask page says the server is not set to call a model. Lens was checked against `bx-ai` 3.4.0 with a mock Ollama server (`harness/mock-ai.py`).
 
 ### Limits on the calls
 

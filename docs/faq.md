@@ -24,7 +24,7 @@ Run `boxlang generatesecret "your password"` and put the `bxsecret:` value in `c
 :::
 
 ::: expandable "Is BX Lens open source? Does it need a license?"
-BX Lens is a product of Ortus Solutions and license terms apply. Today BoxLang+ or a trial adds two things: the disk store for errors and reports, and a request history longer than 25. Everything else works in every license state. This split is the current state and may change. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today).
+No, it is not open source. BX Lens is freeware with limits under a BoxLang+ license. Free keeps the bar and the whole console, with the last 25 requests and errors and reports in memory. BoxLang+ or a trial adds the disk store, a longer request history and AI calls from the server. See [Licensing](licensing.md#free-and-boxlang).
 :::
 
 ::: expandable "Does the console call out to the internet?"
@@ -60,7 +60,7 @@ Only Explain with AI and Ask Lens do. `bx-ai` is a soft dependency: Lens loads w
 :::
 
 ::: expandable "Why are my errors and reports gone after a restart?"
-Without BoxLang+ or a trial they are kept in memory only. With one of them they are saved to disk. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today).
+Without BoxLang+ or a trial they are kept in memory only. With one of them they are saved to disk. See [Licensing](licensing.md#free-and-boxlang).
 :::
 
 ::: expandable "What is in the diagnostic bundle?"

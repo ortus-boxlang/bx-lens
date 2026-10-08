@@ -50,7 +50,7 @@ The `demoLens` module in `home/modules/demoLens` shows how another module adds a
 
 ```bash
 python3 mock-ai.py &                         # a stand-in for a local Ollama server on localhost:11434
-WITH_AI=1 SKIP_BUILD=1 ./start.sh            # installs bx-ai (BX_AI_VERSION, default 3.0.0) and sets ai.enabled
+WITH_AI=1 SKIP_BUILD=1 ./start.sh            # bx-ai is inside the module; this sets ai.enabled
 ```
 
 Then open the console, go to Ask Lens, or open an error and press Explain with AI. The mock answers with the start of the prompt it received.

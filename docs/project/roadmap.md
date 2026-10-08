@@ -31,7 +31,7 @@ See [Core gaps](../reference/events.md#core-gaps).
 
 - The `lensDumpHeap` BIF. Heap dumps are in the console System page and are off by default. Thread dumps are in the console Threads page.
 - The `bx:lens` component.
-- A final feature split between free and BoxLang+. Today only the disk store and the long request history need Plus or a trial, and this may change, see [Licensing](../licensing.md#what-plus-or-a-trial-adds-today).
+- A final feature split between free and BoxLang+. Today the disk store, the long request history and AI calls from the server need Plus or a trial, and this may change, see [Licensing](../licensing.md#free-and-boxlang).
 
 ## Relation to BX Insights
 

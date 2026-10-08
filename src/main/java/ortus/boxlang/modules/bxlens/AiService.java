@@ -1,7 +1,7 @@
 /**
  * [BoxLang]
  *
- * Copyright [2023] [Ortus Solutions, Corp]
+ * Copyright [2026] [Ortus Solutions, Corp]
  */
 package ortus.boxlang.modules.bxlens;
 
@@ -52,10 +52,10 @@ public final class AiService {
 	}
 
 	/**
-	 * Can the server call a model? It needs <code>ai.enabled</code> and bx-ai.
+	 * Can the server call a model? It needs <code>ai.enabled</code>, bx-ai and a BoxLang+ license or trial.
 	 */
 	public boolean canCall() {
-		return service.getConfig().getBool( "ai.enabled", false ) && installed();
+		return service.getConfig().getBool( "ai.enabled", false ) && installed() && service.getLicensing().has( "ai" );
 	}
 
 	public Map<String, Object> info() {
@@ -64,6 +64,7 @@ public final class AiService {
 		m.put( "installed", installed() );
 		m.put( "enabled", c.getBool( "ai.enabled", false ) );
 		m.put( "canCall", canCall() );
+		m.put( "licensed", service.getLicensing().has( "ai" ) );
 		m.put( "provider", c.getString( "ai.provider", "" ).isBlank() ? "(bx-ai default)" : c.getString( "ai.provider", "" ) );
 		m.put( "model", c.getString( "ai.model", "" ) );
 		m.put( "links", c.getBool( "ai.links", true ) );
@@ -77,7 +78,8 @@ public final class AiService {
 	 */
 	public String chat( String prompt ) {
 		if ( !canCall() ) {
-			throw new IllegalStateException( installed() ? "AI is off. Set ai.enabled to true in boxlang.json." : "The bx-ai module is not installed." );
+			throw new IllegalStateException( !service.getLicensing().has( "ai" ) ? "AI calls are a BoxLang+ feature. A license or trial is needed."
+			    : installed() ? "AI is off. Set ai.enabled to true in boxlang.json." : "The bx-ai module is not installed." );
 		}
 		long now = System.currentTimeMillis();
 		synchronized ( this ) {

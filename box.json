@@ -23,13 +23,10 @@
 	"private": false,
 	"license": [
 		{
-			"type": "Commercial",
+			"type": "BoxLang+ Proprietary (free tier with limits)",
 			"URL": "https://boxlang.io/plans"
 		}
 	],
-	"dependencies": {
-		"bx-ai": "*"
-	},
 	"devDependencies": {
 		"commandbox-boxlang": "*",
 		"commandbox-docbox": "*",

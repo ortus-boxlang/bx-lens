@@ -164,11 +164,27 @@ spotless {
  * - Copies the build/libs/bx-lens-*.jar to build/modules/bx-lens/libs/
  * - Copies the src/main/bx/** to build/modules/bx-lens/ folder.
  */
+def bxAiVersion = '3.4.0'
+/**
+ * BoxLang AI (bx-ai) ships inside this module as a nested module (module inception: the modules folder of a module).
+ * It is downloaded once into build/cache.
+ */
+task downloadBxAi( type: Download ) {
+	src "https://downloads.ortussolutions.com/ortussolutions/boxlang-modules/bx-ai/${bxAiVersion}/bx-ai-${bxAiVersion}.zip"
+	dest file( "build/cache/bx-ai-${bxAiVersion}.zip" )
+	overwrite false
+	onlyIfModified false
+}
+
 task createModuleStructure(type: Copy) {
+	dependsOn downloadBxAi
 	mustRunAfter shadowJar, jar
     from( 'build/libs' ) {
 		include "${project.name}-${version}.jar"
         into 'libs'
+    }
+    from( zipTree( file( "build/cache/bx-ai-${bxAiVersion}.zip" ) ) ) {
+        into 'modules/bxai'
     }
     from( 'src/main/bx/assets' ) {
         include '**/*.js', '**/*.css', '**/*.svg', '**/*.html', '**/*.txt'
@@ -186,6 +202,7 @@ task createModuleStructure(type: Copy) {
     }
     from( '.' ) {
         include 'box.json'
+		include 'LICENSE'
 		include 'readme.md'
 		include 'changelog.md'
 		// Token Replacements Go Here

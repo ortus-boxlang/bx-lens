@@ -7,24 +7,31 @@ icon: lucide:badge-check
 
 # Licensing
 
-BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans).
+## The license
 
-## What Plus or a trial adds today
+BX Lens ships under a BoxLang+ proprietary license, in the `LICENSE` file of the module. It is freeware with limits: the free features can be used without a subscription, including in production, but not redistributed or modified. The BoxLang+ features and the removal of the free limits need a BoxLang+ subscription or an active trial. The same terms apply to every Ortus BoxLang+ module, such as bx-redis. The exact text is the `LICENSE` file, not this page.
 
-This is the current state and it may change. When it does, this page changes with it.
+## Free and BoxLang+
 
-Lens checks the license in one place (`Licensing.has()`). Today two features need BoxLang+ or an active trial. Everything else is open in every license state, including the whole console, the AI help and the bar.
+This is the current split. When it changes, this page changes with it. Lens checks the license in one place (`Licensing.has()`).
 
-| | Free | BoxLang+ or trial |
+| Feature | Free | BoxLang+ or trial |
 |---|---|---|
-| Requests kept in memory | 25 at most, even if `history.maxRequests` is higher | `history.maxRequests`, as configured (default 50) |
-| Errors and Reports | In memory only. Totals start at zero after a restart. The minute series covers the last 60 minutes. | Saved to disk by the disk store. Totals since first install survive restarts and upgrades. The minute series covers `store.retentionHours`. |
+| The bar, every tab, the bar designer | yes | yes |
+| Console: Overview, Requests, In flight, Queries, Errors, Reports | yes, in memory | yes, saved to disk (see below) |
+| Console: Executors, Tasks (with run, pause, resume, reload), Datasources, Caches, Logs, Environment, Modules, System, Threads | yes | yes |
+| Live settings, read-only mode, viewer role, audit log | yes | yes |
+| Heap dump, GC, thread dump, diagnostic bundle, log download | yes | yes |
+| Copy a prompt and open ChatGPT or Claude | yes | yes |
+| Requests kept in memory | 25 at most, even if `history.maxRequests` is higher | `history.maxRequests` as configured (default 50) |
+| Disk store: errors and reports survive restarts, totals since first install | no | yes |
+| AI from the server: Explain with AI and Ask Lens through bx-ai | no | yes |
 
-The disk store (`store.enabled`, on by default) writes `errors.json` and `reports.json` to `store.dir` (default `lens-data` in the BoxLang home). It keeps data for `store.retentionHours` (72), limits the errors file to `store.maxMB` (50) and writes every `store.flushSeconds` (30). Each file is replaced atomically. See [Errors and Reports](console/errors-and-reports.md#the-disk-store).
+The disk store (`store.enabled`, on by default) writes `errors.json` and `reports.json` to `store.dir` (default `lens-data` in the BoxLang home). It keeps data for `store.retentionHours` (72), limits the errors file to `store.maxMB` (50) and writes every `store.flushSeconds` (30). Each file is replaced atomically. See [Errors and Reports](console/errors-and-reports.md#the-disk-store). Without the license the store settings have no effect, and the Errors and Reports pages say that the data is kept in memory only. The bar layout file and the settings overrides file are small files for your own choices, and they work on Free.
 
-Without the license the store settings have no effect, and the Errors and Reports pages say that the data is kept in memory only. If a trial ends or a license expires, the disk store stops writing and the request history returns to 25 at the next license check (the answer is cached for 5 minutes). The saved files stay on disk. Lens reads them at the next start if the license is valid then.
+If a trial ends or a license expires, the disk store stops writing, the request history returns to 25 and the AI calls stop at the next license check (the answer is cached for 5 minutes). The saved files stay on disk. Lens reads them at the next start if the license is valid then. Settings you configured do not have to change.
 
-The split is not final. The pages of the console and the settings do not depend on it, so nothing you configure now has to change when it does.
+BoxLang AI (bx-ai) ships inside the module, in its `modules` folder, so there is nothing else to install. It is Apache 2.0 licensed. Using it from Lens still needs `ai.enabled` and, for the server calls, BoxLang+.
 
 ## License states
 

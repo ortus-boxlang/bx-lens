@@ -1,7 +1,7 @@
 /**
  * [BoxLang]
  *
- * Copyright [2023] [Ortus Solutions, Corp]
+ * Copyright [2026] [Ortus Solutions, Corp]
  */
 package ortus.boxlang.modules.bxlens.bifs;
 

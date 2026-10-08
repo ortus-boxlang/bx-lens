@@ -1,7 +1,7 @@
 /**
  * [BoxLang]
  *
- * Copyright [2023] [Ortus Solutions, Corp]
+ * Copyright [2026] [Ortus Solutions, Corp]
  */
 package ortus.boxlang.modules.bxlens;
 
@@ -77,10 +77,10 @@ public final class Licensing {
 
 	/**
 	 * Is a feature available? Plus and a trial get everything. Free keeps the live console and a short request history in memory, but not
-	 * the disk store (saved errors, reports and trends) or the long request history. Other features are open to everyone for now.
+	 * the disk store (saved errors, reports and trends), the long request history or the AI calls. Other features are open to everyone for now.
 	 */
 	public boolean has( String feature ) {
-		if ( "diskStore".equals( feature ) || "fullHistory".equals( feature ) ) {
+		if ( "diskStore".equals( feature ) || "fullHistory".equals( feature ) || "ai".equals( feature ) ) {
 			String state = String.valueOf( status().get( "state" ) );
 			return "plus".equals( state ) || "trial".equals( state );
 		}

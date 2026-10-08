@@ -13,7 +13,7 @@ History lists recent requests, newest first. The current request is marked.
 
 ## How it works
 
-- Lens keeps finished requests in an in-memory ring buffer. The default size is 50 (`history.maxRequests`). Without BoxLang+ or a trial the buffer is capped at 25, see [Licensing](../licensing.md#what-plus-or-a-trial-adds-today).
+- Lens keeps finished requests in an in-memory ring buffer. The default size is 50 (`history.maxRequests`). Without BoxLang+ or a trial the buffer is capped at 25, see [Licensing](../licensing.md#free-and-boxlang).
 - When the buffer is full, Lens recycles the oldest request.
 - History resets on a restart or a module reload. Lens never writes it to disk.
 - Each row shows a type pill, status, time, SQL count and issue count.

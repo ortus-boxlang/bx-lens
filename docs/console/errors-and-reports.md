@@ -7,7 +7,7 @@ icon: lucide:bug
 
 # Errors and Reports
 
-Both pages work across all requests that Lens tracks. With the console on, that is every request. Without BoxLang+ or a trial they are kept in memory only and a restart clears them. With one of those, Lens saves them to disk. See [Licensing](../licensing.md#what-plus-or-a-trial-adds-today).
+Both pages work across all requests that Lens tracks. With the console on, that is every request. Without BoxLang+ or a trial they are kept in memory only and a restart clears them. With one of those, Lens saves them to disk. See [Licensing](../licensing.md#free-and-boxlang).
 
 ## Errors
 

@@ -62,7 +62,7 @@ Gradle plugin and Maven Central rate limits in sandboxes: point Gradle at a mirr
 
 ## Conventions
 
-- Follow `.editorconfig` (tabs) and the Ortus formatter in `.ortus-java-style.xml`. Use the `this.` prefix for instance fields. New Java files carry the standard header.
+- Follow `.editorconfig` (tabs) and the Ortus formatter in `.ortus-java-style.xml`. Use the `this.` prefix for instance fields. New Java files carry the BoxLang+ header (the same four line header as bx-redis: `[BoxLang]` and `Copyright [2026] [Ortus Solutions, Corp]`), never an Apache header. The `LICENSE` file is the BoxLang+ proprietary license (freeware with limits); do not change its text without the owners.
 - No em dashes in docs, comments or UI copy.
 - New features need tests: JUnit for Java, Playwright for anything a user can see. Add a harness page when a feature needs a scenario.
 - Keep `box.json`, `settings.gradle` and `gradle.properties` aligned when names or versions change. `boxlangVersion` in `gradle.properties` is the BoxLang version the module compiles against.
@@ -70,3 +70,8 @@ Gradle plugin and Maven Central rate limits in sandboxes: point Gradle at a mirr
 ## Skills
 
 Relevant BoxLang development skills live under `.agents/skills` (restore with `npx skills experimental_install`). Use them for module development, BIFs, interceptors, logging and runtime architecture.
+
+## Bundled modules and gating
+
+- BoxLang AI (bx-ai 3.4.0) is nested in `modules/bxai` inside the built module. `build.gradle` downloads it (`downloadBxAi`) into `build/cache`. Do not add it to `box.json` dependencies.
+- Features gated by `Licensing.has()`: `diskStore`, `fullHistory` (25 requests free) and `ai` (server side calls). Everything else is open. Add a feature to that list and to `docs/licensing.md` together.

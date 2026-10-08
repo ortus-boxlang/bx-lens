@@ -77,7 +77,7 @@ Lens lists regular files in the BoxLang logs directory and one level of folders 
 
 ## Errors, Reports or totals are gone after a restart
 
-Without BoxLang+ or a trial, Errors and Reports are in memory only. With one of them, they are saved to `store.dir` (default `lens-data` in the BoxLang home). Check `store.enabled`, that the license state in the console header is Plus or Trial, that the folder is writable, and that the folder is on a volume that survives a restart. Query statistics are never saved. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today).
+Without BoxLang+ or a trial, Errors and Reports are in memory only. With one of them, they are saved to `store.dir` (default `lens-data` in the BoxLang home). Check `store.enabled`, that the license state in the console header is Plus or Trial, that the folder is writable, and that the folder is on a volume that survives a restart. Query statistics are never saved. See [Licensing](licensing.md#free-and-boxlang).
 
 ## Only 25 requests are in the history
 

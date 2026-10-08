@@ -1,7 +1,7 @@
 /**
  * [BoxLang]
  *
- * Copyright [2023] [Ortus Solutions, Corp]
+ * Copyright [2026] [Ortus Solutions, Corp]
  */
 package ortus.boxlang.modules.bxlens;
 
@@ -93,7 +93,7 @@ public final class SettingsRegistry {
 		add( "store.dir", "string", "Console", "Disk store folder", false, "" );
 		add( "store.retentionHours", "int", "Console", "Keep saved data (hours)", false, 72 );
 		add( "store.maxMB", "int", "Console", "Disk store size limit (MB)", false, 50 );
-		add( "ai.enabled", "bool", "Console", "AI: let the server call a model", false, false );
+		add( "ai.enabled", "bool", "Console", "AI: let the server call a model (Plus)", false, false );
 		add( "ai.provider", "string", "Console", "AI provider", false, "" );
 		add( "ai.model", "string", "Console", "AI model", false, "" );
 		add( "ai.apiKey", "secret", "Console", "AI API key", false, "" );

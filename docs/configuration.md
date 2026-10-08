@@ -186,7 +186,7 @@ See [Security](security.md#behind-a-proxy).
 |---|---|---|---|
 | `trackNonHtml` | boolean | `true` | Record JSON, SSE, file and redirect requests too. They show no bar. |
 | `header` | string | `"X-BxLens-Id"` | Response header that carries the stored request id. |
-| `maxRequests` | number | `50` | Size of the in-memory ring buffer. The oldest request is recycled when full. Without BoxLang+ or a trial the buffer is capped at 25. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today). |
+| `maxRequests` | number | `50` | Size of the in-memory ring buffer. The oldest request is recycled when full. Without BoxLang+ or a trial the buffer is capped at 25. See [Licensing](licensing.md#free-and-boxlang). |
 
 ## `ui`
 
@@ -218,7 +218,7 @@ See [Security](security.md#behind-a-proxy).
 
 ## `store`
 
-The disk store keeps errors and reports across restarts. It needs BoxLang+ or a trial. Without one, Errors and Reports stay in memory and `store` has no effect. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today).
+The disk store keeps errors and reports across restarts. It needs BoxLang+ or a trial. Without one, Errors and Reports stay in memory and `store` has no effect. See [Licensing](licensing.md#free-and-boxlang).
 
 | Key | Type | Default | Description |
 |---|---|---|---|

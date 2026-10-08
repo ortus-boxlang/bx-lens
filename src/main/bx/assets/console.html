@@ -431,7 +431,8 @@
       <section x-show="tab === 'ask'">
         <h1 class="h1">Ask Lens <small>ask about this server in plain words</small></h1>
         <div class="card" style="max-width:820px">
-          <p class="sub" x-show="aiInfo && !aiInfo.canCall">The server is not set to call a model (<span class="mono">ai.enabled</span> and the <span class="mono">bx-ai</span> module). You can still copy the prompt with a redacted summary of this server and paste it into a chat of your choice.</p>
+          <p class="sub" x-show="aiInfo && !aiInfo.licensed">Asking a model from the server is a BoxLang+ feature (a license or a trial). Copy prompt and the chat links work without it.</p>
+          <p class="sub" x-show="aiInfo && aiInfo.licensed && !aiInfo.canCall">The server is not set to call a model (<span class="mono">ai.enabled</span> and the <span class="mono">bx-ai</span> module). You can still copy the prompt with a redacted summary of this server and paste it into a chat of your choice.</p>
           <textarea x-model="askQ" rows="3" maxlength="1000" placeholder="Why was the server slow in the last few minutes?" style="width:100%;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px"></textarea>
           <div class="tools" style="margin-top:8px"><button class="btn primary" x-show="aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy || !askQ.trim()" @click="ask()"><svg class="ic"><use href="#ph-sparkle"/></svg>Ask</button>
             <button class="btn" :disabled="!askQ.trim()" @click="copyPrompt('ask', askQ, '')"><svg class="ic"><use href="#ph-copy"/></svg>Copy prompt</button>
