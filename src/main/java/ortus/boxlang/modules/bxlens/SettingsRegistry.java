@@ -53,7 +53,7 @@ public final class SettingsRegistry {
 		add( "inject", "bool", "Bar", "Inject the bar into HTML pages", true, true );
 		add( "history.trackNonHtml", "bool", "Collection", "Track JSON and SSE requests", true, true );
 		for ( String id : collectorIds ) {
-			add( "collectors." + id + ".enabled", "bool", "Collectors", id, true, !List.of( "functions", "logs" ).contains( id ) );
+			add( "collectors." + id + ".enabled", "bool", "Collectors", id, true, !List.of( "functions", "logs", "bifs" ).contains( id ) );
 		}
 		add( "collectors.queries.includeParams", "bool", "Collectors", "queries: keep parameter values", true, true );
 		add( "collectors.queries.captureCaller", "bool", "Collectors", "queries: find the calling line", true, true );

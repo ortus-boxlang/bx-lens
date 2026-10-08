@@ -49,5 +49,7 @@ unzip -q -o "$CACHE/bx-derby.zip" -d "$RUN/home/modules/derby"
 
 echo "+ harness on http://localhost:$PORT (BoxLang $VERSION)"
 export BOXLANG_HOME="$RUN/home"
+# Lets /~bxlens/ reach BoxLang on MiniServer: the default pass predicate plus the console path (see docs/guides/production.md)
+export BOXLANG_PASS_PREDICATE='regex( '"'"'^(/.+?\.cfml|/.+?\.cf[cms]|.+?\.bx[ms]{0,1})(/.*)?$'"'"' ) or regex( '"'"'^/~bxlens/?$'"'"' )'
 exec java -cp "$CACHE/boxlang-$VERSION.jar:$CACHE/miniserver-$VERSION.jar:$CACHE/web-support-$VERSION.jar" \
 	ortus.boxlang.web.MiniServer --webroot "$HERE/app" --host 127.0.0.1 --port "$PORT"

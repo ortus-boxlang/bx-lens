@@ -180,6 +180,8 @@ class {
 				jvm          : { enabled : true },
 				cache        : { enabled : true },
 				modules      : { enabled : true },
+				// Time per built-in function, from postBIFInvocation. Every BIF call allocates an event while this is on, so it is off by default
+				bifs         : { enabled : false },
 				// Console pages. Turn one off and its page disappears
 				executors    : { enabled : true },
 				tasks        : { enabled : true },
@@ -204,7 +206,8 @@ class {
 			"onLensRequestFinish"
 		];
 
-		interceptors = [];
+		// Lets /~bxlens/ open the console, see models/IndexRewrite.bx
+		interceptors = [ { class : "#moduleRecord.invocationPath#.models.IndexRewrite", properties : {} } ];
 	}
 
 	/**

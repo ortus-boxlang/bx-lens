@@ -36,6 +36,9 @@
 					"logs": {
 						"enabled": true
 					},
+					"bifs": {
+						"enabled": true
+					},
 					"scopes": {
 						"enabled": true,
 						"url": true,

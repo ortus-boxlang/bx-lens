@@ -18,6 +18,7 @@ import ortus.boxlang.modules.bxlens.ext.LensRegistry;
 import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
 import ortus.boxlang.modules.bxlens.interceptors.ILensCollector;
 import ortus.boxlang.modules.bxlens.interceptors.TaskOutcomes;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.BifCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.CacheCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.ExceptionCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.FunctionCollector;
@@ -690,7 +691,7 @@ public final class LensService {
 	private List<ILensCollector> builtIns() {
 		return List.of( new LifecycleCollector(), new TemplateCollector(), new FunctionCollector(), new QueryCollector(), new HttpCollector(),
 		    new ExceptionCollector(), new LogCollector(), new TransactionCollector(), new ScopesCollector(), new JvmCollector(), new CacheCollector(),
-		    new ModulesCollector() );
+		    new ModulesCollector(), new BifCollector() );
 	}
 
 	private List<String> collectorIds() {

@@ -127,11 +127,14 @@
 					{ id: "timers", label: "Timers", badge: c.timers || null, sev: "" },
 					{ id: "cache", label: "Cache", badge: d.cache ? d.cache.length : null, sev: "" },
 					{ id: "modules", label: "Modules", badge: d.modules ? d.modules.length : null, sev: "" },
+					{ id: "bifs", label: "BIFs", badge: d.bifs ? d.bifs.length : null, sev: "" },
 					{ id: "request", label: "Request", badge: null, sev: "" },
 					{ id: "scopes", label: "Scopes", badge: null, sev: "" },
 					{ id: "jvm", label: "Runtime", badge: null, sev: "" },
 					{ id: "history", label: "History", badge: this.history.length || null, sev: "" }
 				];
+				// The BIFs tab only exists when the bifs collector measured something
+				if ( !d.bifs ) { list = list.filter( function ( t ) { return t.id !== "bifs"; } ); }
 				this.customPanels.forEach( function ( p ) {
 					var b = p.badge && p.badge.count >= 0 ? p.badge.count : null;
 					list.push( { id: p.id, label: p.label, badge: b, sev: p.badge && p.badge.severity !== "none" ? p.badge.severity : "" } );

@@ -105,7 +105,7 @@ public final class Snapshot {
 		m.put( "logs", new ArrayList<>( req.logs ) );
 		m.put( "issues", new ArrayList<>( req.issues ) );
 
-		for ( String key : List.of( "scopes", "jvm", "cache", "modules", "cost", "slowSample", "responseHeaders" ) ) {
+		for ( String key : List.of( "scopes", "jvm", "cache", "modules", "bifs", "cost", "slowSample", "responseHeaders" ) ) {
 			Object v = req.data.get( key );
 			if ( v != null ) {
 				m.put( key, v );

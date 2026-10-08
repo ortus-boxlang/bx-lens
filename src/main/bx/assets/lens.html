@@ -212,6 +212,18 @@
 		</table></div>
 	</div></template>
 
+	<!-- BIFs -->
+	<template x-if="tab === 'bifs'"><div>
+		<h3 x-text="'Built-in functions · ' + (d.bifs ? d.bifs.length : 0) + ' called, slowest first'"></h3>
+		<div class="empty" x-show="!d.bifs || !d.bifs.length">No built-in function calls were measured.</div>
+		<div class="scroll" x-show="d.bifs && d.bifs.length"><table>
+			<thead><tr><th>Function</th><th class="num">Calls</th><th class="num">Total ms</th><th class="num">Avg ms</th><th class="num">Max ms</th><th class="num">Errors</th></tr></thead>
+			<tbody><template x-for="b in (d.bifs || [])" :key="b.name"><tr>
+				<td class="mono" x-text="b.name"></td><td class="num" x-text="b.calls"></td><td class="num" x-text="b.totalMs"></td><td class="num" x-text="b.avgMs"></td><td class="num" x-text="b.maxMs"></td><td class="num" x-text="b.errors || ''"></td>
+			</tr></template></tbody>
+		</table></div>
+	</div></template>
+
 	<!-- Request -->
 	<template x-if="tab === 'request'"><div>
 		<h3>Request</h3>

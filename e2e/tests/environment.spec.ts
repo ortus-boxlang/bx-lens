@@ -20,7 +20,7 @@ test.describe( 'environment', () => {
 		const text = await page.content();
 		expect( text ).not.toContain( 'lens-demo' );
 		await page.click( 'button:has-text("Modules")' );
-		await expect( page.locator( 'td.mono', { hasText: 'bxLens' } ).first() ).toBeVisible();
+		await expect( page.locator( '.main section:visible td.mono', { hasText: 'bxLens' } ).first() ).toBeVisible();
 		await page.click( 'button:has-text("Environment variables")' );
 		await page.fill( 'input[placeholder="Filter by name"]', 'PATH' );
 		await expect( page.locator( 'td.mono', { hasText: /^PATH$/ } ).first() ).toBeVisible();

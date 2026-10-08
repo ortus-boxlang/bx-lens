@@ -755,7 +755,7 @@ public final class ConsoleRouter {
 
 	private static final String[][] BAR_TABS = {
 	    { "issues", "Issues" }, { "timeline", "Timeline" }, { "queries", "Queries" }, { "templates", "Templates" }, { "http", "HTTP" },
-	    { "exceptions", "Exceptions" }, { "messages", "Messages" }, { "timers", "Timers" }, { "cache", "Cache" }, { "modules", "Modules" },
+	    { "exceptions", "Exceptions" }, { "messages", "Messages" }, { "timers", "Timers" }, { "cache", "Cache" }, { "modules", "Modules" }, { "bifs", "BIFs" },
 	    { "request", "Request" }, { "scopes", "Scopes" }, { "jvm", "Runtime" }, { "history", "History" }
 	};
 
