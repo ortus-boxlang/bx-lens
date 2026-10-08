@@ -66,6 +66,8 @@ Please make sure you use JDK21+.
 
 ## Coding Styles & Formatting
 
+New Java files carry the four line BoxLang+ header, the same one bx-redis uses: `[BoxLang]` and `Copyright [2026] [Ortus Solutions, Corp]`. Do not add an Apache header. Do not change the text of the `LICENSE` file.
+
 We are big on coding styles and have included two codings styles for you to follow:
 
 -   [cfformat](../.cfformat.json) - For BoxLang/CFML code

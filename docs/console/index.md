@@ -50,7 +50,7 @@ The console lives at:
 /~bxlens/index.bxm
 ```
 
-This is a public mapping named `~bxlens`, the same pattern as `/~bxai` in bx-ai. A bare `/~bxlens/` is not served by MiniServer (it answers 404), so always use the `index.bxm` URL. Every other route is under it, for example `/~bxlens/index.bxm/stream`.
+This is a public mapping named `~bxlens`, the same pattern as `/~bxai` in bx-ai. `/~bxlens/index.bxm` always works. `/~bxlens/` with a trailing slash is rewritten to it, but on MiniServer that also needs a pass predicate, see [The console URL](../guides/production.md#the-console-url). Every other route is under it, for example `/~bxlens/index.bxm/stream`.
 
 ## Sign in
 
@@ -90,6 +90,7 @@ When someone reaches the console over plain HTTP from a non-loopback address, ev
 | [Caches](caches.md) | Cache statistics, a capped key list, and evict, reap and clear. |
 | [Logs](logs.md) | Every log file, with search, a level filter and a live tail. |
 | [Environment](environment.md) | Configuration, modules, JVM arguments, variables, and the diagnostic bundle. |
+| [Modules](modules.md) | Every loaded module, nested ones too, with version, state, path and what it provides. |
 | [System](system-and-threads.md) | CPU, memory, garbage collection, Run GC, heap dump, classes, disks and runtime details. |
 | [Threads](system-and-threads.md#threads) | Thread viewer, thread dump and deadlock detail. |
 | [Bar designer](bar-designer.md) | Choose and order the tabs of the bar. |

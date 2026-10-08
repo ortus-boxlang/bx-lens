@@ -18,14 +18,13 @@ icon: lucide:map
 | Tier 3 extension: custom UI panels | Planned. Will stay off behind `ui.allowCustomPanels`. |
 | Compare two requests in History | Planned. |
 | Load the full detail of an earlier request from History | Not available in v1. History shows summaries only. |
-| BIF call collector | Needs core to announce `postBIFInvocation`. |
 | Components panel | Needs core to announce `onComponentInvocation`. |
 | Cache hit and miss events | Needs core. Lens uses statistic differences today. |
 | SOAP events | Needs core. |
 | Bar on core error pages | Needs the web context to announce `onRequestFlushBuffer`. |
 | Panels from other modules (ORM, Redis, mail, AI, JDBC pools, Quick, qb, ColdBox, cbwire) | Ideas. |
 
-See [Core gaps](../reference/events.md#core-gaps).
+The BIF call collector is shipped, see the [BIFs panel](../panels/bifs.md). See [Core gaps](../reference/events.md#core-gaps).
 
 ## Not implemented
 

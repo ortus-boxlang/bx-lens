@@ -7,7 +7,7 @@ icon: lucide:code
 
 # BIF Reference
 
-These functions work whenever the module is loaded. When Lens is not collecting for the request, or the caller is not allowed, they do nothing.
+These functions work whenever the module is loaded. When Lens is not collecting for the request, or the caller is not allowed, the first group does nothing. The [data functions](#data-functions) at the end work in every request, tracked or not.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -22,6 +22,11 @@ These functions work whenever the module is loaded. When Lens is not collecting 
 | [`lensRender`](#lensrender) | `()` | string |
 | [`lensDump`](#lensdump) | `( value, label="" )` | nothing |
 | [`lensPanel`](#lenspanel) | `( id, label, renderer )` | a panel builder |
+| [`lensReport`](#lensreport) | `()` | struct |
+| [`lensErrors`](#lenserrors) | `( limit=20 )` | array of structs |
+| [`lensQueries`](#lensqueries) | `( limit=20, sort="slowest" )` | array of structs |
+| [`lensInflight`](#lensinflight) | `()` | array of structs |
+| [`lensLicense`](#lenslicense) | `()` | struct |
 
 `lensConsole()` also exists. It serves the [console](../console/index.md) and is called only by the module's own `index.bxm`. Do not call it from your code.
 
@@ -131,6 +136,97 @@ lensPanel( "jobs", "Jobs", "table" )
 ```
 
 Builder methods: `columns`, `rows`, `kv`, `tree`, `spans`, `messages`, `json`, `text`, `label`, `icon`, `order`, `badge( count, severity )` and `issue( severity, title, detail, file, line )`.
+
+## Data functions
+
+These five functions return the numbers the [console](../console/index.md) shows, as plain BoxLang structs and arrays. Use them to build a health endpoint, a smoke test or your own page. They work whether or not Lens tracks the current request, and they do not check `bar.access` or `console.access`. They describe every request on the server, so do not hand their output to untrusted users.
+
+The harness page `harness/app/api/lens.json.bxm` calls all five and returns them as JSON. Read it for a working example.
+
+Times are in milliseconds. Dates are milliseconds since the epoch.
+
+### lensReport
+
+`lensReport()` returns the data of the console [Reports](../console/errors-and-reports.md#reports) page.
+
+| Key | Content |
+|---|---|
+| `startedAt`, `uptimeMs` | When this run started, and how long ago. |
+| `persisted` | True when the disk store is on, so `lifetime` exists. |
+| `session` | Totals since this start: `requests`, `errors`, `slow`, `queries`, `queryMs`, `httpCalls`, `exceptions`, `avgMs`, `maxMs`, `p50`, `p95`, `p99`, and `status` with the keys `1xx` to `5xx`. |
+| `lifetime` | Only when `persisted` is true. Totals since first install: `since`, `runs`, `requests`, `errors`, `slow`, `queries`, `exceptions`. |
+| `series` | One entry per minute: `t`, `requests`, `errors`, `avgMs`. |
+| `seriesMinutes` | How many minutes the series keeps. |
+| `slowestUrls`, `busiestUrls`, `failingUrls` | Up to 10 entries each: `url`, `count`, `errors`, `avgMs`, `maxMs`. |
+
+```javascript
+report = lensReport();
+writeOutput( "p95: #report.session.p95# ms over #report.session.requests# requests" );
+```
+
+### lensErrors
+
+`lensErrors( limit=20 )` returns the error groups of the console [Errors](../console/errors-and-reports.md#errors) page, newest first, at most `limit` (at least 1). Samples are not included. Each group is a struct:
+
+| Key | Content |
+|---|---|
+| `id`, `type`, `message` | The group id, the error type and the message. |
+| `count` | How many times it happened. |
+| `firstSeen`, `lastSeen` | When. |
+| `lastStatus` | The HTTP status of the last request. |
+| `handled` | False for an uncaught error or an error status. |
+| `file`, `line` | Where it was thrown, when known. |
+| `urlCount`, `urls` | How many URLs hit it, and a struct of URL to count. |
+
+```javascript
+for ( group in lensErrors( 5 ) ) {
+	writeOutput( "#group.count# x #group.type#: #group.message#<br>" );
+}
+```
+
+### lensQueries
+
+`lensQueries( limit=20, sort="slowest" )` returns the per statement statistics of the console [Queries](../console/in-flight-and-queries.md#queries) page, largest first, at most `limit` (at least 1).
+
+| `sort` | Orders by |
+|---|---|
+| `slowest` | `maxMs`. Also used for any other value. |
+| `total` | `totalMs` |
+| `count` | `count` |
+| `failures` | `failures` |
+
+Each row has `sql`, `datasource`, `count`, `failures`, `slow`, `avgMs`, `maxMs`, `minMs`, `totalMs`, `rows`, `firstSeen`, `lastSeen`, `file`, `line`, `lastError`, `slowestRequest` and `lastRequest`. The SQL has placeholders, never parameter values.
+
+```javascript
+top = lensQueries( 3, "total" );
+writeOutput( top[ 1 ].sql & " took " & top[ 1 ].totalMs & " ms in total" );
+```
+
+### lensInflight
+
+`lensInflight()` returns the requests Lens tracks that are running now, longest first. Each entry has `id`, `method`, `uri`, `queryString`, `app`, `remoteAddr`, `startedAt`, `elapsedMs`, `thread`, `threadState` and `queries` (the number run so far). It is an empty array when nothing is running.
+
+```javascript
+stuck = lensInflight().filter( ( r ) => r.elapsedMs > 5000 );
+```
+
+### lensLicense
+
+`lensLicense()` returns the license state, the same one the console header shows. See [Licensing](../licensing.md#license-states).
+
+| Key | Content |
+|---|---|
+| `state` | `plus`, `trial`, `expired` or `none`. `none` is the Free state. |
+| `label` | The text the console shows, for example `BoxLang+ active` or `Free`. |
+| `daysLeft` | The days left of a trial. `null` in every other state. |
+| `note` | A message from the license check, often empty. |
+| `plansUrl` | The BoxLang+ plans page. |
+
+```javascript
+if ( lensLicense().state == "expired" ) {
+	lensMessage( "The BoxLang+ license has expired", "warn" );
+}
+```
 
 ## Not available
 

@@ -14,4 +14,4 @@ The Modules panel lists every loaded module. Each row shows the name, version, a
 !!! note
     BIFs that a module registers through the Java service loader may show as none for that module.
 
-It is on by default. Turn it off with `collectors.modules.enabled`.
+The console has a fuller [Modules page](../console/modules.md). The panel is on by default. Turn it off with `collectors.modules.enabled`.

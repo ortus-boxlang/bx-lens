@@ -47,7 +47,7 @@ Lens is **off by default**. The bar and the console are switched on separately i
 }
 ```
 
-Make the password with `boxlang generatesecret "your password"`. The console is at `/~bxlens/index.bxm` (a bare `/~bxlens/` is not served). Keep the bar off on live servers and read [Running Lens in production](docs/guides/production.md) before you expose the console. See [Security](docs/security.md).
+Make the password with `boxlang generatesecret "your password"`. The console is at `/~bxlens/index.bxm` (`/~bxlens/` with a trailing slash needs a MiniServer pass predicate, see [production](docs/guides/production.md#the-console-url)). Keep the bar off on live servers and read [Running Lens in production](docs/guides/production.md) before you expose the console. See [Security](docs/security.md).
 
 Upgrading? `enabled` is now `bar.enabled` and `access.allowedIPs` is now `bar.access`. See [Configuration](docs/configuration.md#moving-from-older-settings).
 
@@ -64,13 +64,14 @@ Upgrading? `enabled` is now `bar.enabled` and `access.allowedIPs` is now `bar.ac
 | **Messages and Timers** | What your code sends with `lensMessage()`, `lensDump()`, `lensMeasure()` |
 | **Cache** | Every BoxCache cache with hit rate, objects, evictions and what this request did to it |
 | **Modules** | Loaded modules with version, author, what they provide and activation time |
+| **BIFs** | Opt-in (`collectors.bifs.enabled`). Calls, total, average and slowest time per built-in function, and errors. It costs time on every BIF call, so use it to hunt, then turn it off. Needs a BoxLang build with `postBIFInvocation` timing |
 | **Request, Scopes, Runtime** | Request and response headers, redacted scope snapshots, memory, GC, threads, versions, and the CPU time and allocation of the request |
 | **History** | The last 50 requests, including JSON and SSE, recycled in memory |
 | Your panels | Applications and other modules add panels with `lensPanel()` or the `onLensCollect` interception point |
 
 The Issues tab also names where a slow request was stuck (a stack sample after `thresholds.slowRequestMs`) and lists security Notes for missing headers and cookie flags.
 
-The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, Caches, Logs, Environment, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
+The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, Caches, Logs, Modules, Environment, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
 
 ## What the console adds
 
@@ -87,9 +88,9 @@ The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, 
 | **In flight and Queries** | Running requests with a live stack, and runs, average, maximum, total, failures and slow runs per SQL statement. |
 | **Errors and Reports** | Errors grouped by cause with redacted samples, and totals, p50, p95 and p99, status classes, URLs and a minute series. |
 | **System** | Run GC, a heap dump (off by default, admin only) and a deadlock banner. |
-| **AI help** | Optional. Copy a redacted prompt, open ChatGPT or Claude, or let the server call a model through `bx-ai`. A local provider such as Ollama keeps the data inside your network. |
+| **AI help** | Optional. Copy a redacted prompt, open ChatGPT or Claude, or, with BoxLang+ or a trial, let the server call a model through `bx-ai` (it ships inside the module). A local provider such as Ollama keeps the data inside your network. |
 
-BoxLang+ or a trial adds a disk store for errors and reports (totals since first install survive restarts) and a request history longer than 25. Everything else is open. This split is the current state and may change. See [Licensing](docs/licensing.md).
+Free keeps the bar, the whole console, the last 25 requests, and errors and reports in memory only. BoxLang+ or a trial adds a disk store for errors and reports (totals since first install survive restarts), a request history longer than 25 and AI calls from the server. This split is the current state and may change. See [Licensing](docs/licensing.md).
 
 A collapsed health strip turns amber or red when something is wrong and opens on Issues when an exception was caught. Resize it, detach it as a floating window, switch themes, and use the keyboard: <kbd>Ctrl</kbd>+<kbd>`</kbd> toggles, <kbd>1</kbd> to <kbd>9</kbd> switch tabs, <kbd>/</kbd> searches.
 
@@ -112,6 +113,14 @@ try {
 }
 
 lensPanel( "orm", "ORM" ).columns( [ "Entity", "ms" ] ).rows( rows ).badge( rows.len(), "none" );
+```
+
+## Read the console data from code
+
+Five functions return plain structs and arrays and work in any request: `lensReport()`, `lensErrors( limit )`, `lensQueries( limit, sort )`, `lensInflight()` and `lensLicense()`. See the [BIF reference](docs/guides/bifs.md#data-functions).
+
+```javascript
+writeOutput( jsonSerialize( { report : lensReport(), slowQueries : lensQueries( 5, "total" ) } ) );
 ```
 
 ## Documentation
@@ -163,7 +172,7 @@ Lens works on one server. BX Insights is the separate observability product for 
 
 ## License
 
-BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans) and [Licensing](docs/licensing.md). Today BoxLang+ or a trial adds the disk store and a request history longer than 25. This may change. Phosphor Icons are MIT licensed, see `src/main/bx/assets/ICONS-LICENSE.txt`.
+BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans) and [Licensing](docs/licensing.md). Today BoxLang+ or a trial adds the disk store, a request history longer than 25 and AI calls from the server. This may change. Phosphor Icons are MIT licensed, see `src/main/bx/assets/ICONS-LICENSE.txt`.
 
 ## Ortus Sponsors
 

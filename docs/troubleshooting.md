@@ -21,7 +21,7 @@ Check these in order.
 
 ## The console shows a 404
 
-- Use `/~bxlens/index.bxm`. A bare `/~bxlens/` is not served.
+- Use `/~bxlens/index.bxm`, which always works. `/~bxlens/` with a trailing slash needs the MiniServer pass predicate, see [The console URL](guides/production.md#the-console-url).
 - A caller outside `console.access`, `access.allowedHosts` or `access.requireHeader` gets a plain 404 on purpose.
 - `console.enabled` must be `true`.
 
@@ -98,8 +98,8 @@ Lens counts a failure when a query started and never finished, or when a databas
 ## AI help does not answer
 
 - "AI is off": set `ai.enabled` to `true`.
-- "The bx-ai module is not installed": install `bx-ai`. Copy prompt and the chat links work without it.
-- Lens was checked with `bx-ai` 3.0.0. Version 2.0.0 fails to start on the current BoxLang snapshot.
+- "The bx-ai module is not installed": `bx-ai` 3.4.0 ships inside Lens, in its `modules/bxai` folder. This message means that folder was removed or did not load. Reinstall the module. Copy prompt and the chat links work without it.
+- The server calls need BoxLang+ or a trial. On Free, Explain with AI and Ask are not available, see [Licensing](licensing.md#free-and-boxlang).
 - "Too many AI requests": the limit is 10 per minute. "An AI request is already running": wait for it.
 - "The model did not answer in time": the call waits 90 seconds. Check that the provider, and for Ollama the server and the model, are reachable.
 - "The AI call failed" has the reason from the provider. The log has more.

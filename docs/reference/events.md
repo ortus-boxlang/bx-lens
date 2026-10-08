@@ -33,7 +33,9 @@ Core announces these globally and per application.
 | `preTemplateInvoke`, `postTemplateInvoke` | `context, template, templatePath` | Template tree. No `executionTime`, so Lens times it. |
 | `preFunctionInvoke`, `postFunctionInvoke` | `context, arguments, function, name` (+ `result` on post) | Functions panel (opt in, hot path). |
 | `onFunctionException` | same + `exception` | Exceptions. |
-| `onBIFInvocation` | `context, arguments, bif, name` (+ `result` on the second call) | Not used in v1. See the core gaps below. |
+| `onBIFInvocation` | `context, arguments, bif, name` | Announced before a BIF runs. Lens does not use it. |
+| `postBIFInvocation` | `name`, `elapsedNanos` (the keys Lens reads) | Time per built-in function. Used by the opt-in `bifs` collector. Core announces it only when a listener exists. |
+| `onBIFException` | `name`, `elapsedNanos` (the keys Lens reads) | Counts failed BIF calls in the `bifs` collector. |
 | `onPreSourceInvoke`, `onPostSourceInvoke` | script or source execution | Eval and script timing. |
 | `afterBoxClassCreation`, `afterBoxClassInit`, `afterDynamicObjectCreation`, `onCreateObjectRequest` | object created | Objects (opt in). |
 | `onComponentInstance`, `onBIFInstance` | descriptor | Startup only. |
@@ -81,14 +83,13 @@ Core keeps run counts for a task but not the error of its last run, so the Tasks
 
 ## Core gaps
 
-Lens needs these core changes. Until they land, the matching features are limited.
+Lens needs these core changes. Until they land, the matching features are limited. `postBIFInvocation` used to be on this list. It now exists in core with `elapsedNanos` and `onBIFException` (core pull request 657), and Lens uses it for the [BIFs panel](../panels/bifs.md). You need a BoxLang snapshot or release that has the change.
 
-1. `postBIFInvocation` is never announced. `BIF.java` announces `onBIFInvocation` twice, so Lens does not collect BIF calls.
-2. `onComponentInvocation` is declared but never announced.
-3. There are no cache hit or miss events. Lens computes per-request cache numbers from the difference of cache statistics instead.
-4. There are no SOAP events.
-5. The web context does not announce `onRequestFlushBuffer`, so Lens cannot inject a bar into core's error pages.
-6. Template events lack execution time. This is optional and cheap to add. Lens times templates itself.
+1. `onComponentInvocation` is declared but never announced.
+2. There are no cache hit or miss events. Lens computes per-request cache numbers from the difference of cache statistics instead.
+3. There are no SOAP events.
+4. The web context does not announce `onRequestFlushBuffer`, so Lens cannot inject a bar into core's error pages.
+5. Template events lack execution time. This is optional and cheap to add. Lens times templates itself.
 
 ## Lens interception points
 

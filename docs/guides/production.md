@@ -67,6 +67,22 @@ When the console is on, Lens collects every request on the server, not only thos
 13. **Size the history.** `history.maxRequests` is the memory you spend. Each request holds its full snapshot in memory. Without BoxLang+ or a trial the history is capped at 25.
 14. **Watch the audit log.** `bxlens-audit.log` in the logs directory records logins, failed logins, denied attempts and every change. Read it on the Logs page or ship it with your other logs.
 
+## The console URL
+
+`/~bxlens/index.bxm` always works. Lens also rewrites `/~bxlens` and `/~bxlens/` (with the trailing slash) to it, in `onWebExecutorRequest`. Nothing else in the public folder becomes reachable that way.
+
+On MiniServer the request must also pass the pass predicate, or MiniServer serves it as a static path and never hands it to BoxLang. Add the console path to the default predicate. Set the environment variable `BOXLANG_PASS_PREDICATE` to this exact value:
+
+```text
+regex( '^(/.+?\.cfml|/.+?\.cf[cms]|.+?\.bx[ms]{0,1})(/.*)?$' ) or regex( '^/~bxlens/?$' )
+```
+
+or set the same string as `passPredicate` in `miniserver.json` (in JSON, write each backslash twice). The first `regex` is the default MiniServer predicate and the second one lets the console path through. The harness does this in `harness/start.sh`.
+
+MiniServer welcome files do not apply to module mappings, and the list of welcome files is not configurable in core. That is why Lens does the rewrite itself.
+
+On CommandBox or a servlet container this was not tested. The trailing slash form works only if the path reaches the BoxLang servlet, which depends on the server's own mappings. Use `/~bxlens/index.bxm` there.
+
 ## Check it
 
 - Request `/~bxlens/index.bxm` from a machine that is not allowed. You get a plain 404.

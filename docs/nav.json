@@ -20,6 +20,7 @@
 			"console/caches.md",
 			"console/logs.md",
 			"console/environment.md",
+			"console/modules.md",
 			"console/in-flight-and-queries.md",
 			"console/errors-and-reports.md",
 			"console/ask-lens-and-ai.md",
@@ -42,6 +43,7 @@
 			"panels/jvm.md",
 			"panels/cache.md",
 			"panels/modules.md",
+			"panels/bifs.md",
 			"panels/history.md",
 			"panels/issues.md"
 		]

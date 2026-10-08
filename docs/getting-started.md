@@ -95,7 +95,7 @@ See the [BIF reference](guides/bifs.md) for all functions.
 
 ## Open the console
 
-With the console on, open `http://localhost:8085/~bxlens/index.bxm` (use your own host and port) and sign in. A bare `/~bxlens/` is not served, so always include `index.bxm`. The bar also has an Open console button.
+With the console on, open `http://localhost:8085/~bxlens/index.bxm` (use your own host and port) and sign in. `/~bxlens/index.bxm` always works. The short form `/~bxlens/` also works when the request reaches BoxLang. On MiniServer that needs a pass predicate, see [The console URL](guides/production.md#the-console-url). The bar also has an Open console button.
 
 ![The console login page](assets/screenshots/console-login.png)
 

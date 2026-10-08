@@ -20,7 +20,7 @@ BX Lens is a BoxLang module with two surfaces: a request level debug bar (a smal
   - `util/Cost`: CPU time and allocation of the request thread. `model/SecurityChecks`: header and cookie Notes (severity `info`).
   - `model/`: `LensRequest` (per request, attached to the request context), `Span`, `IssueEngine`, `Snapshot` (the JSON contract with the UI).
   - `interceptors/collectors/`: one class per panel. They never throw into a request.
-  - `bifs/`: the `lens*` BIFs. They do nothing when the request is not tracked. `lensConsole()` runs the console and is called only from `src/main/bx/public/index.bxm`.
+  - `bifs/`: the `lens*` BIFs. The tracking BIFs do nothing when the request is not tracked. `lensReport`, `lensErrors`, `lensQueries`, `lensInflight` and `lensLicense` return plain structs and arrays in any request (`BoxData` converts the maps). `lensConsole()` runs the console and is called only from `src/main/bx/public/index.bxm`.
   - `ext/`: the data only extension API (`LensPanelBuilder`, `LensRegistry`, `CollectHandle`).
   - `store/RequestStore`: bounded in-memory ring buffer.
   - `web/WebExchange`: the only class that touches web-support types (compile only dependency).
@@ -45,7 +45,7 @@ BX Lens is a BoxLang module with two surfaces: a request level debug bar (a smal
 - Collectors are shared across threads. Keep per request state in `LensRequest`, never in collector fields.
 - Anything sent to the page goes through `Sanitizer` (redaction, depth and size caps) and `Json` (script safe). The UI renders only with `x-text`, never `x-html`.
 - Core skips `onRequestEnd` for uncaught errors and aborts, so those requests are finished from `onError` and `onAbort` and get no bar. Do not fight this; document it.
-- Core gaps (no `postBIFInvocation`, no `onComponentInvocation`, no cache read events, no SOAP events) are listed in `docs/reference/events.md`. Do not build collectors on events that never fire.
+- Core gaps (no `onComponentInvocation`, no cache read events, no SOAP events) are listed in `docs/reference/events.md`. Do not build collectors on events that never fire.
 - The first run of a template includes compilation, so slow template warnings on first hit are expected. Tests warm pages up in `e2e/global-setup.ts`.
 
 ## Build and test

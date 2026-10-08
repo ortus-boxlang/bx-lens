@@ -97,7 +97,7 @@ cd e2e
 npx playwright test screens.spec.ts
 ```
 
-Keep the file names stable, because the docs reference them. The console pages use `console-login`, `console-login-error`, `console-overview`, `console-requests`, `console-executors`, `console-tasks`, `console-task-run`, `console-system`, `console-threads`, `console-designer`, `console-settings`, `console-settings-edit`, `console-system-heap`, `console-datasources`, `console-caches`, `console-logs`, `console-environment`, `console-queries`, `console-errors`, `console-reports`, `console-inflight`, `console-ask`, `bar-menu` and `license-trial`. The screenshots for the newest console pages are referenced in the docs before the files exist and are generated later.
+Keep the file names stable, because the docs reference them. The console pages use `console-login`, `console-login-error`, `console-overview`, `console-requests`, `console-executors`, `console-tasks`, `console-task-run`, `console-system`, `console-threads`, `console-designer`, `console-settings`, `console-settings-edit`, `console-system-heap`, `console-datasources`, `console-caches`, `console-logs`, `console-environment`, `console-queries`, `console-errors`, `console-reports`, `console-inflight`, `console-ask`, `console-modules`, `bar-bifs`, `bar-menu` and `license-trial`. The screenshots for the newest console pages are referenced in the docs before the files exist and are generated later.
 
 ## Continuous integration
 
@@ -125,3 +125,4 @@ Do not commit `site/` or other build output.
 - Keep collectors free of shared state. Use the per-request slot.
 - Collectors must never throw into a request.
 - Update the [Changelog](changelog.md).
+- New Java files carry the four line BoxLang+ header (`[BoxLang]` and `Copyright [2026] [Ortus Solutions, Corp]`), never an Apache header.

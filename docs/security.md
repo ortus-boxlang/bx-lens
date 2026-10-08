@@ -157,7 +157,7 @@ Download over HTTPS only, keep the file in a safe place, and delete it when you 
 
 ## AI data flow
 
-AI help is optional and has three levels. Lens never calls a model unless an admin sets `ai.enabled` and the `bx-ai` module is installed.
+AI help is optional and has three levels. Lens never calls a model unless an admin sets `ai.enabled`, the server has BoxLang+ or a trial, and the `bx-ai` module that ships inside Lens is present.
 
 | Level | What leaves the server |
 |---|---|

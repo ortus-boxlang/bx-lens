@@ -21,6 +21,7 @@ Each panel comes from one or more collectors. Collectors never throw into your r
 | [Timers](messages-and-timers.md#timers) | yes | Output from `lensStart`, `lensStop`, `lensMeasure` and `lensAddMeasure`. |
 | [Cache](cache.md) | yes | Every BoxCache cache and what the request did to it. |
 | [Modules](modules.md) | yes | Loaded modules. |
+| [BIFs](bifs.md) | no | Time spent in built-in functions. Costs time on every BIF call. |
 | [Request](request-and-scopes.md#request) | yes | Request details. |
 | [Scopes](request-and-scopes.md#scopes) | yes | Scope contents. |
 | [Runtime](jvm.md) | yes | JVM, memory and request statistics. |
@@ -28,7 +29,7 @@ Each panel comes from one or more collectors. Collectors never throw into your r
 
 The console has its own pages. See [Console](../console/index.md).
 
-Opt-in collectors: `functions` and `logs`. Custom panels from modules and app code appear after the built-in tabs. Enable or tune collectors under `collectors` in [Configuration](../configuration.md#collectors).
+Opt-in collectors: `functions`, `logs` and `bifs`. Custom panels from modules and app code appear after the built-in tabs. Enable or tune collectors under `collectors` in [Configuration](../configuration.md#collectors).
 
 Press `1` to `9` to switch to a tab by position. Hide tabs with `tabs.hide`, or reorder them in the [Bar designer](../console/bar-designer.md).
 

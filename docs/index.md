@@ -29,7 +29,7 @@ Every setting, its default and what it does.
 What each tab shows and how Lens flags problems.
 :::
 ::: card title="BIF Reference" icon="lucide:code" href="guides/bifs.md"
-`lensMessage`, `lensMeasure`, `lensPanel` and the rest.
+`lensMessage`, `lensMeasure`, `lensPanel`, and data functions such as `lensReport` and `lensErrors`.
 :::
 ::: card title="Extending Lens" icon="lucide:puzzle" href="guides/extending.md"
 Add your own panels from a module or from app code.
@@ -50,10 +50,10 @@ License states and what BoxLang+ adds today.
 - Cost per request: CPU time and bytes allocated by the request thread, and a sample of where a slow request was stuck.
 - Security notes for missing headers and cookie flags.
 - A History tab with the last 50 requests (25 without BoxLang+ or a trial), including JSON and SSE. Lens keeps them in memory only.
-- A password-protected console with an admin and a view-only role. Pages: Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks (with Run now), Datasources, Caches, Logs, Environment, System (with Run GC and heap dump), Threads, a Bar designer and editable Settings.
-- Optional AI help to explain an error, a query or a deadlock, with a prompt you copy or a call through `bx-ai`. Off by default.
+- A password-protected console with an admin and a view-only role. Pages: Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks (with Run now), Datasources, Caches, Logs, Modules, Environment, System (with Run GC and heap dump), Threads, a Bar designer and editable Settings.
+- Optional AI help to explain an error, a query or a deadlock, with a prompt you copy or, with BoxLang+ or a trial, a call through `bx-ai`, which ships inside Lens. Off by default.
 - Light and dark themes, resizing, a floating detached window and keyboard shortcuts.
-- Cache and Modules panels, and a small API to add your own panels without writing JavaScript.
+- Cache and Modules panels, an opt-in BIFs panel for time per built-in function, five BIFs that return the console data (`lensReport`, `lensErrors`, `lensQueries`, `lensInflight`, `lensLicense`), and a small API to add your own panels without writing JavaScript.
 
 ## What it is not
 

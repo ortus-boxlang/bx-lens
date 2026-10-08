@@ -234,7 +234,7 @@ Optional help from a language model. Off by default. See [Ask Lens and AI help](
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | boolean | `false` | Let the server send a redacted prompt to a model through the `bx-ai` module. It needs `bx-ai` installed. |
+| `enabled` | boolean | `false` | Let the server send a redacted prompt to a model through the `bx-ai` module. The module ships inside Lens, and the server calls also need BoxLang+ or a trial. See [Licensing](licensing.md#free-and-boxlang). |
 | `provider` | string | `""` | The bx-ai provider, for example `ollama`. Empty uses the bx-ai default. |
 | `model` | string | `""` | The model name. Empty uses the provider default. |
 | `apiKey` | string | `""` | The API key. Accepts a `bxsecret:` value. Leave it empty to use the key from the bx-ai settings. |
@@ -297,7 +297,8 @@ Each collector powers one or more panels and has an `enabled` flag. Most also ha
 | | `cookie`, `session`, `request`, `application`, `variables` | `false` | Include these scopes. Opt in. |
 | `jvm` | `enabled` | `true` | Runtime panel. |
 | `cache` | `enabled` | `true` | Cache panel. |
-| `modules` | `enabled` | `true` | Modules panel. |
+| `modules` | `enabled` | `true` | Bar Modules panel and console [Modules](console/modules.md) page. |
+| `bifs` | `enabled` | `false` | Time per built-in function, from `postBIFInvocation`. Off by default and skipped at `light`, because every BIF call allocates an event while it is on. Needs a BoxLang build with core pull request 657. Lens's own `lens*` functions are left out, a request keeps up to 300 names, and the [panel](panels/bifs.md) shows the top 60 by total time. |
 | `executors` | `enabled` | `true` | Console [Executors](console/executors.md) page. |
 | `tasks` | `enabled` | `true` | Console [Tasks](console/tasks.md) page. |
 | `datasources` | `enabled` | `true` | Console [Datasources](console/datasources.md) page. |

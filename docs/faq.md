@@ -16,7 +16,7 @@ The bar is a strip on your HTML pages that shows one request. The console is a s
 :::
 
 ::: expandable "Why does /~bxlens/ give a 404?"
-A bare `/~bxlens/` is not served by MiniServer. Use `/~bxlens/index.bxm`. A caller that is not allowed by `console.access` also gets a plain 404 on purpose.
+`/~bxlens/index.bxm` always works. `/~bxlens/` with a trailing slash works only if the request reaches BoxLang. On MiniServer that needs a pass predicate, see [The console URL](guides/production.md#the-console-url). A caller that is not allowed by `console.access` also gets a plain 404 on purpose.
 :::
 
 ::: expandable "How do I make the console password?"
@@ -56,7 +56,7 @@ Copy prompt and the Ask ChatGPT and Ask Claude buttons send nothing from the ser
 :::
 
 ::: expandable "Does the AI help need bx-ai?"
-Only Explain with AI and Ask Lens do. `bx-ai` is a soft dependency: Lens loads without it. Lens was checked with `bx-ai` 3.0.0.
+Only Explain with AI and Ask Lens use it, and only with BoxLang+ or a trial. `bx-ai` 3.4.0 ships inside Lens, so there is nothing to install. If you remove it, Lens still loads.
 :::
 
 ::: expandable "Why are my errors and reports gone after a restart?"
