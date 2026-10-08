@@ -225,7 +225,7 @@ test.describe( '@screens documentation screenshots', () => {
 		await page.waitForTimeout( 800 );
 		await consoleShot( page, 'console-logs' );
 		await page.click( '.nav:has-text("Environment")' );
-		await page.click( 'button:has-text("Modules")' );
+		await page.click( '.main section:visible button:has-text("Modules")' );
 		await consoleShot( page, 'console-environment' );
 	} );
 
