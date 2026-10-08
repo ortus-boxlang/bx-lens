@@ -124,6 +124,7 @@
 #bxlens .issue { display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: start; padding: 8px 0; border-bottom: 1px solid var(--line); }
 #bxlens .issue .sev { font: 10.5px var(--mono); text-transform: uppercase; padding-top: 2px; }
 #bxlens .sev.crit { color: var(--crit); }
+#bxlens .sev.info { background: var(--surface2); color: var(--muted); }
 #bxlens .sev.warn { color: var(--warn); }
 #bxlens .empty { color: var(--muted); padding: 18px 0; }
 #bxlens .bar-meter { height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden; min-width: 70px; }

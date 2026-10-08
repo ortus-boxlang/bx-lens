@@ -176,7 +176,9 @@ public final class IssueEngine {
 				if ( "crit".equals( i.get( "severity" ) ) ) {
 					return "crit";
 				}
-				warn = true;
+				if ( !"info".equals( i.get( "severity" ) ) ) {
+					warn = true;
+				}
 			}
 		}
 		return warn ? "warn" : "none";

@@ -95,6 +95,32 @@ public final class WebExchange {
 		return out;
 	}
 
+	/**
+	 * Response headers with multiple values joined by comma.
+	 */
+	public Map<String, Object> responseHeaders() {
+		Map<String, Object>		out	= new LinkedHashMap<>();
+		Map<String, String[]>	map	= exchange.getResponseHeaderMap();
+		if ( map != null ) {
+			map.forEach( ( k, v ) -> out.put( k, v == null ? "" : String.join( ", ", v ) ) );
+		}
+		return out;
+	}
+
+	/**
+	 * Cookies the response sets.
+	 */
+	public java.util.List<ortus.boxlang.modules.bxlens.model.SecurityChecks.Cookie> responseCookies() {
+		java.util.List<ortus.boxlang.modules.bxlens.model.SecurityChecks.Cookie>	out	= new java.util.ArrayList<>();
+		BoxCookie[]																	cs	= exchange.getResponseCookies();
+		if ( cs != null ) {
+			for ( BoxCookie c : cs ) {
+				out.add( new ortus.boxlang.modules.bxlens.model.SecurityChecks.Cookie( c.getName(), c.isHttpOnly(), c.isSecure(), c.isSameSite() ) );
+			}
+		}
+		return out;
+	}
+
 	public int status() {
 		return exchange.getResponseStatus();
 	}

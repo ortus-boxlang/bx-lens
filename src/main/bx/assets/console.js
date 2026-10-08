@@ -178,6 +178,17 @@
 						return { key: s.id, type: s.type, label: s.label.indexOf("/") > -1 ? s.label.split("/").pop() : s.label, left: (s.start / total) * 100, width: Math.max(0.6, (s.dur / total) * 100), top: i * 16 };
 					});
 				},
+				copyJson: async function () { try { await navigator.clipboard.writeText(JSON.stringify(this.detail, null, 2)); this.toast("Request JSON copied"); } catch (e) { this.toast("Could not copy"); } },
+				downloadJson: function () {
+					var a = document.createElement("a");
+					a.href = URL.createObjectURL(new Blob([JSON.stringify(this.detail, null, 2)], { type: "application/json" }));
+					a.download = "lens-request-" + this.detail.request.id + ".json"; document.body.appendChild(a); a.click(); a.remove();
+				},
+				copyCurl: async function () {
+					var r = this.detail.request, h = this.detail.headers || {}, parts = ["curl -X " + r.method + " '" + r.url + (r.query ? "?" + r.query : "") + "'"];
+					Object.keys(h).filter(function (k) { return ["host", "content-length", "connection"].indexOf(k.toLowerCase()) < 0 && h[k] !== "[redacted]"; }).forEach(function (k) { parts.push("-H '" + k + ": " + String(h[k]).replace(/'/g, "'\\''") + "'"); });
+					try { await navigator.clipboard.writeText(parts.join(" \\\n  ")); this.toast("cURL copied. Redacted headers are left out."); } catch (e) { this.toast("Could not copy"); }
+				},
 				wfHeight: function () { return Math.min(40, this.bars().length) * 16 + 8; },
 				spark: function () { return this.overview ? this.line(this.overview.series, Math.max(1, Math.max.apply(null, this.overview.series)), 240, 46) : ""; },
 

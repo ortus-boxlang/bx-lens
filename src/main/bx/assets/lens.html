@@ -12,9 +12,11 @@
 		<button class="chip" @click="open('request')" title="Request URL"><b x-text="r.uri"></b></button>
 		<button class="chip" @click="open('timeline')" title="Request time">time <b x-text="fmt(r.durationMs)"></b></button>
 		<button class="chip" x-show="d.jvm" @click="open('jvm')" title="Heap used">mem <b x-text="d.jvm ? d.jvm.heapUsedMb + ' MB' : ''"></b></button>
+		<button class="chip" x-show="d.cost && d.cost.cpuMs !== null" @click="open('jvm')" title="CPU time of the request thread">cpu <b x-text="d.cost ? fmt(d.cost.cpuMs) : ''"></b></button>
+		<button class="chip" x-show="d.cost && d.cost.allocBytes !== null" @click="open('jvm')" title="Memory allocated by the request thread">alloc <b x-text="d.cost ? bytesLabel(d.cost.allocBytes) : ''"></b></button>
 		<button class="chip" @click="open('queries')" title="Queries">sql <b x-text="d.counts.queries"></b></button>
 		<button class="chip" @click="open('templates')" title="Templates">tpl <b x-text="d.counts.templates"></b></button>
-		<button class="chip issues" :class="sev === 'crit' ? 'crit' : ''" x-show="d.issues.length" @click="open('issues')" title="Open Issues"><svg class="ic"><use href="#bxlens-ph-warning"/></svg> <span x-text="d.issues.length + (d.issues.length === 1 ? ' issue' : ' issues')"></span></button>
+		<button class="chip issues" :class="sev === 'crit' ? 'crit' : ''" x-show="d.counts.issues" @click="open('issues')" title="Open Issues"><svg class="ic"><use href="#bxlens-ph-warning"/></svg> <span x-text="d.counts.issues + (d.counts.issues === 1 ? ' issue' : ' issues')"></span></button>
 		<span class="grow"></span>
 		<a class="ibtn" x-show="ui.consoleUrl" :href="ui.consoleUrl" target="_blank" rel="noopener noreferrer" title="Open the console"><svg class="ic"><use href="#bxlens-ph-arrow-square-out"/></svg></a>
 		<span class="more"><button class="ibtn" @click="toggleMenu($event)" title="More" aria-haspopup="menu" :aria-expanded="menu"><svg class="ic"><use href="#bxlens-ph-dots-three"/></svg></button>
@@ -47,7 +49,7 @@
 		<div class="empty" x-show="!d.issues.length">Nothing suspicious in this request.</div>
 		<template x-for="(i, n) in sortedIssues" :key="n">
 			<div class="issue">
-				<span class="sev" :class="i.severity" x-text="i.severity === 'crit' ? 'Error' : 'Warn'"></span>
+				<span class="sev" :class="i.severity" x-text="i.severity === 'crit' ? 'Error' : (i.severity === 'info' ? 'Note' : 'Warn')"></span>
 				<div><b x-text="i.title"></b>
 					<div class="mono muted" x-text="i.detail"></div>
 					<div class="mono" x-show="i.file"><a :href="editorUrl(i.file, i.line)" x-text="shortPath(i.file) + ':' + i.line"></a></div></div>
@@ -221,6 +223,8 @@
 			</dl>
 			<dl class="kv"><template x-for="(v, k) in d.headers" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd :class="v === '[redacted]' ? 'redact' : ''" x-text="v"></dd></div></template></dl>
 		</div>
+		<h3 style="margin-top:12px" x-show="d.responseHeaders && Object.keys(d.responseHeaders).length">Response headers</h3>
+		<dl class="kv" x-show="d.responseHeaders"><template x-for="(v, k) in d.responseHeaders" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd :class="v === '[redacted]' ? 'redact' : ''" x-text="v"></dd></div></template></dl>
 		<div class="actions" style="margin-top:10px">
 			<button class="abtn" @click="copy(JSON.stringify(d, null, 2), 'Request JSON')">Copy request JSON</button>
 			<button class="abtn" @click="copy('curl -X ' + r.method + ' \'' + r.url + (r.query ? '?' + r.query : '') + '\'', 'cURL')">Copy as cURL</button>
@@ -240,6 +244,7 @@
 		<h3>Runtime</h3>
 		<div class="grid2" x-show="d.jvm">
 			<dl class="kv"><dt>BoxLang</dt><dd x-text="d.jvm.boxlangVersion"></dd><dt>Java</dt><dd x-text="d.jvm.javaVersion + ' (' + d.jvm.javaVendor + ')'"></dd><dt>OS</dt><dd x-text="d.jvm.os"></dd><dt>CPU cores</dt><dd x-text="d.jvm.cores"></dd><dt>Uptime</dt><dd x-text="uptime(d.jvm.uptimeMs)"></dd></dl>
+			<dl class="kv" x-show="d.cost"><dt>CPU time</dt><dd x-text="d.cost && d.cost.cpuMs !== null ? fmt(d.cost.cpuMs) + ' on the request thread' : 'not measurable'"></dd><dt>Allocated</dt><dd x-text="d.cost && d.cost.allocBytes !== null ? bytesLabel(d.cost.allocBytes) : 'not measurable'"></dd></dl>
 			<dl class="kv"><dt>Heap</dt><dd x-text="d.jvm.heapUsedMb + ' MB of ' + d.jvm.heapMaxMb + ' MB'"></dd><dt>Heap change</dt><dd x-text="(d.jvm.heapDeltaMb >= 0 ? '+' : '') + d.jvm.heapDeltaMb + ' MB during request'"></dd><dt>Non heap</dt><dd x-text="d.jvm.nonHeapUsedMb + ' MB'"></dd><dt>GC</dt><dd x-text="d.jvm.gcCount + ' collections, ' + d.jvm.gcTimeMs + ' ms during request'"></dd><dt>Threads</dt><dd x-text="d.jvm.threads"></dd></dl>
 			<dl class="kv"><dt>Requests tracked</dt><dd x-text="d.jvm.requests.totalRequests"></dd><dt>Average time</dt><dd x-text="d.jvm.requests.avgRequestTimeMs + ' ms'"></dd><dt>Slowest</dt><dd x-text="d.jvm.requests.slowestRequestMs + ' ms'"></dd><dt>Active sessions</dt><dd x-text="d.jvm.requests.activeSessions"></dd></dl>
 		</div>

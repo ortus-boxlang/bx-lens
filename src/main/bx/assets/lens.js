@@ -94,7 +94,8 @@
 				return id === null ? null : ( this.d.spans.filter( function ( s ) { return s.id === id; } )[ 0 ] || null );
 			},
 			get sortedIssues() {
-				return this.d.issues.slice().sort( function ( a, b ) { return ( a.severity === "crit" ? 0 : 1 ) - ( b.severity === "crit" ? 0 : 1 ); } );
+				var rank = { crit: 0, warn: 1, info: 2 };
+				return this.d.issues.slice().sort( function ( a, b ) { return ( rank[ a.severity ] === undefined ? 1 : rank[ a.severity ] ) - ( rank[ b.severity ] === undefined ? 1 : rank[ b.severity ] ); } );
 			},
 			get treeSpans() {
 				return this.d.spans.filter( function ( s ) { return s.type === "template" || s.type === "func"; } );
@@ -156,6 +157,12 @@
 				var dark = this.$root.getAttribute( "data-theme" ) === "dark";
 				this.theme = dark ? "light" : "dark";
 				this.applyTheme(); this.persist();
+			},
+			bytesLabel: function ( n ) {
+				if ( n === null || n === undefined ) { return "n/a"; }
+				var u = [ "B", "KB", "MB", "GB" ], i = 0;
+				while ( n >= 1024 && i < 3 ) { n /= 1024; i++; }
+				return ( i ? n.toFixed( n >= 100 ? 0 : 1 ) : n ) + " " + u[ i ];
 			},
 			toggleMenu: function ( e ) {
 				var r = e.currentTarget.getBoundingClientRect();

@@ -77,28 +77,30 @@ public final class LensService {
 	/**
 	 * Placeholder written by lensRender() and replaced with the bar when the request ends.
 	 */
-	public static final String			MARKER			= "<!--bxlens:here-->";
+	public static final String										MARKER			= "<!--bxlens:here-->";
 
-	private static volatile LensService	instance;
+	private static volatile LensService								instance;
 
-	private volatile BoxRuntime			runtime;
-	private volatile LensConfig			config			= LensConfig.defaults();
-	private volatile AccessGuard		barGuard		= new AccessGuard( config, "bar.access", false );
-	private volatile AccessGuard		consoleGuard	= new AccessGuard( config, "console.access", true );
-	private volatile ConsoleAuth		auth			= new ConsoleAuth( config );
-	private volatile TaskOutcomes		outcomes		= new TaskOutcomes();
-	private volatile Licensing			licensing		= new Licensing( "" );
-	private volatile LayoutStore		layout			= new LayoutStore( null );
-	private final ConsoleData			consoleData		= new ConsoleData( this );
-	private final AtomicInteger			streams			= new AtomicInteger();
-	private volatile RequestStore		store			= new RequestStore( 50 );
-	private volatile BarRenderer		renderer;
-	private volatile String				version			= "0.0.0";
-	private volatile String				moduleDir		= "";
-	private final GlobalStats			stats			= new GlobalStats();
-	private final LensRegistry			registry		= new LensRegistry();
-	private final List<ILensCollector>	collectors		= Collections.synchronizedList( new ArrayList<>() );
-	private volatile BoxLangLogger		logger;
+	private volatile BoxRuntime										runtime;
+	private volatile LensConfig										config			= LensConfig.defaults();
+	private volatile AccessGuard									barGuard		= new AccessGuard( config, "bar.access", false );
+	private volatile AccessGuard									consoleGuard	= new AccessGuard( config, "console.access", true );
+	private volatile ConsoleAuth									auth			= new ConsoleAuth( config );
+	private volatile TaskOutcomes									outcomes		= new TaskOutcomes();
+	private volatile Licensing										licensing		= new Licensing( "" );
+	private volatile LayoutStore									layout			= new LayoutStore( null );
+	private final ConsoleData										consoleData		= new ConsoleData( this );
+	private final AtomicInteger										streams			= new AtomicInteger();
+	private final Map<String, LensRequest>							active			= new java.util.concurrent.ConcurrentHashMap<>();
+	private volatile java.util.concurrent.ScheduledExecutorService	watchdog;
+	private volatile RequestStore									store			= new RequestStore( 50 );
+	private volatile BarRenderer									renderer;
+	private volatile String											version			= "0.0.0";
+	private volatile String											moduleDir		= "";
+	private final GlobalStats										stats			= new GlobalStats();
+	private final LensRegistry										registry		= new LensRegistry();
+	private final List<ILensCollector>								collectors		= Collections.synchronizedList( new ArrayList<>() );
+	private volatile BoxLangLogger									logger;
 
 	private LensService() {
 	}
@@ -172,6 +174,7 @@ public final class LensService {
 				register( c );
 			}
 		}
+		startWatchdog();
 		announceRegister();
 		getLogger().info( "bx-lens {} active: bar={}, console={}, collect={}, collectors={}", this.version, this.config.barEnabled, this.config.consoleEnabled,
 		    this.config.collectLevel, collectorIds() );
@@ -181,6 +184,11 @@ public final class LensService {
 	 * Unregister all collectors and clear history.
 	 */
 	public synchronized void shutdown() {
+		if ( watchdog != null ) {
+			watchdog.shutdownNow();
+			watchdog = null;
+		}
+		active.clear();
 		try {
 			if ( runtime != null ) {
 				runtime.getInterceptorService().unregister( outcomes );
@@ -271,6 +279,9 @@ public final class LensService {
 		String ua = ex.requestHeader( "User-Agent" );
 		req.userAgent	= ua == null ? "" : ua;
 		req.template	= uri;
+		req.thread		= Thread.currentThread();
+		req.data.put( "_costStart", ortus.boxlang.modules.bxlens.util.Cost.begin() );
+		active.put( req.id, req );
 		rc.putAttachment( Keys.requestAttach, req );
 		try {
 			if ( showBar ) {
@@ -301,6 +312,14 @@ public final class LensService {
 			return;
 		}
 		req.endNanos = System.nanoTime();
+		active.remove( req.id );
+		Object costStart = req.data.remove( "_costStart" );
+		if ( costStart instanceof ortus.boxlang.modules.bxlens.util.Cost.Start cs ) {
+			Map<String, Object> cost = ortus.boxlang.modules.bxlens.util.Cost.since( cs );
+			if ( cost != null ) {
+				req.data.put( "cost", cost );
+			}
+		}
 		req.closeAll();
 		WebExchange ex = WebExchange.of( rc );
 		if ( ex != null ) {
@@ -332,6 +351,18 @@ public final class LensService {
 		}
 		announce( Keys.onLensCollect, Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
 		IssueEngine.analyze( req, config );
+		if ( ex != null ) {
+			try {
+				ortus.boxlang.modules.bxlens.model.SecurityChecks.analyze( req, config, ex.responseHeaders(), ex.responseCookies(), ex.secure() );
+				Map<String, Object>							rh		= new LinkedHashMap<>();
+				ortus.boxlang.modules.bxlens.util.Sanitizer	clean	= new ortus.boxlang.modules.bxlens.util.Sanitizer( config );
+				ex.responseHeaders().forEach( ( k, v ) -> rh.put( k, clean.cleanKeyed( k, v ) ) );
+				req.data.put( "responseHeaders", rh );
+			} catch ( Throwable t ) {
+				getLogger().debug( "Security checks failed: {}", t.toString() );
+			}
+		}
+		applySlowSample( req );
 		stats.recordRequest( Math.round( req.durationNs() / 1_000_000.0 ) );
 
 		Map<String, Object>	snapshot	= Snapshot.build( req, config, ex );
@@ -358,6 +389,79 @@ public final class LensService {
 			}
 		}
 		announce( Keys.onLensRequestFinish, Struct.of( "context", rc, "requestId", req.id ) );
+	}
+
+	/**
+	 * Once a request runs longer than the slow request limit, take one stack sample of its thread, so the issue can say where it was stuck.
+	 */
+	private void startWatchdog() {
+		if ( !config.active || config.slowRequestMs <= 0 || !config.getBool( "checks.slowSample", true ) ) {
+			return;
+		}
+		watchdog = java.util.concurrent.Executors.newSingleThreadScheduledExecutor( r -> {
+			Thread t = new Thread( r, "bxlens-watchdog" );
+			t.setDaemon( true );
+			return t;
+		} );
+		watchdog.scheduleWithFixedDelay( () -> {
+			try {
+				long now = System.nanoTime();
+				for ( LensRequest r : active.values() ) {
+					if ( !r.data.containsKey( "slowSample" ) && ( now - r.startNanos ) / 1_000_000L >= config.slowRequestMs && r.thread != null
+					    && r.thread.isAlive() ) {
+						List<Map<String, Object>> frames = new ArrayList<>();
+						for ( StackTraceElement e : r.thread.getStackTrace() ) {
+							if ( frames.size() >= 40 ) {
+								break;
+							}
+							Map<String, Object> f = new LinkedHashMap<>();
+							f.put( "text", e.toString() );
+							String file = e.getFileName() == null ? "" : e.getFileName().toLowerCase();
+							f.put( "bx", file.endsWith( ".bx" ) || file.endsWith( ".bxm" ) || file.endsWith( ".bxs" ) || file.endsWith( ".cfc" )
+							    || file.endsWith( ".cfm" ) );
+							frames.add( f );
+						}
+						Map<String, Object> sample = new LinkedHashMap<>();
+						sample.put( "atMs", Math.round( ( now - r.startNanos ) / 1_000_000.0 ) );
+						sample.put( "frames", frames );
+						r.data.put( "slowSample", sample );
+					}
+				}
+			} catch ( Throwable t ) {
+				// The watchdog must never stop
+			}
+		}, 200, 200, java.util.concurrent.TimeUnit.MILLISECONDS );
+	}
+
+	@SuppressWarnings( "unchecked" )
+	private void applySlowSample( LensRequest req ) {
+		Object s = req.data.get( "slowSample" );
+		if ( ! ( s instanceof Map<?, ?> sample ) ) {
+			return;
+		}
+		Object frames = sample.get( "frames" );
+		if ( ! ( frames instanceof List<?> list ) ) {
+			return;
+		}
+		for ( Object o : list ) {
+			if ( o instanceof Map<?, ?> f && Boolean.TRUE.equals( f.get( "bx" ) ) ) {
+				String					text	= String.valueOf( f.get( "text" ) );
+				java.util.regex.Matcher	m		= java.util.regex.Pattern.compile( "\\(([^()]*\\.(?:bxm|bxs|bx|cfc|cfm)):(\\d+)\\)" ).matcher( text );
+				if ( m.find() ) {
+					synchronized ( req.issues ) {
+						for ( Map<String, Object> issue : req.issues ) {
+							if ( "Slow request".equals( issue.get( "title" ) ) ) {
+								issue.put( "detail", issue.get( "detail" ) + ". At " + sample.get( "atMs" ) + " ms it was in "
+								    + m.group( 1 ).replaceAll( ".*/", "" ) + ":" + m.group( 2 ) );
+								issue.put( "file", m.group( 1 ) );
+								issue.put( "line", Integer.parseInt( m.group( 2 ) ) );
+							}
+						}
+					}
+				}
+				return;
+			}
+		}
 	}
 
 	/**

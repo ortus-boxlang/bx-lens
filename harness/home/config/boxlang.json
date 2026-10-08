@@ -39,7 +39,8 @@
 					}
 				},
 				"dev": {
-					"reloadAssets": true
+					"reloadAssets": true,
+					"license": "@LENS_LICENSE@"
 				}
 			}
 		}

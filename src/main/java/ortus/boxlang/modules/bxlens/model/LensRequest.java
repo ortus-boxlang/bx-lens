@@ -60,6 +60,8 @@ public final class LensRequest {
 	public volatile int								status			= 200;
 	public volatile boolean							html			= false;
 	public volatile RequestBoxContext				requestContext;
+	/** The thread that handles the request, sampled by the slow request watchdog. */
+	public volatile Thread							thread;
 
 	public final List<Span>							spans			= Collections.synchronizedList( new ArrayList<>() );
 	public final List<Map<String, Object>>			queries			= Collections.synchronizedList( new ArrayList<>() );
@@ -221,7 +223,22 @@ public final class LensRequest {
 	}
 
 	/**
-	 * Add an issue. Severity is "crit" or "warn".
+	 * Issues that count: everything except notes ("info"), which are listed on the Issues tab but do not color the strip.
+	 */
+	public int countIssues() {
+		int n = 0;
+		synchronized ( issues ) {
+			for ( Map<String, Object> i : issues ) {
+				if ( !"info".equals( i.get( "severity" ) ) ) {
+					n++;
+				}
+			}
+		}
+		return n;
+	}
+
+	/**
+	 * Add an issue. Severity is "crit", "warn" or "info" (a note that does not color the strip).
 	 */
 	public void addIssue( String severity, String title, String detail, String file, int line, String tab, int spanId ) {
 		Map<String, Object> m = new LinkedHashMap<>();

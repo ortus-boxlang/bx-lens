@@ -117,7 +117,7 @@ public final class Snapshot {
 		m.put( "logs", new ArrayList<>( req.logs ) );
 		m.put( "issues", new ArrayList<>( req.issues ) );
 
-		for ( String key : List.of( "scopes", "jvm", "cache", "modules" ) ) {
+		for ( String key : List.of( "scopes", "jvm", "cache", "modules", "cost", "slowSample", "responseHeaders" ) ) {
 			Object v = req.data.get( key );
 			if ( v != null ) {
 				m.put( key, v );
@@ -142,7 +142,7 @@ public final class Snapshot {
 		counts.put( "messages", req.messages.size() );
 		counts.put( "timers", req.timers.size() );
 		counts.put( "logs", req.logs.size() );
-		counts.put( "issues", req.issues.size() );
+		counts.put( "issues", req.countIssues() );
 		m.put( "counts", counts );
 		return m;
 	}
@@ -158,7 +158,7 @@ public final class Snapshot {
 		s.put( "status", req.status );
 		s.put( "type", classify( req.contentType ) );
 		s.put( "ms", Span.ms( req.durationNs() ) );
-		s.put( "issues", req.issues.size() );
+		s.put( "issues", req.countIssues() );
 		s.put( "severity", IssueEngine.severity( req ) );
 		s.put( "queries", req.queries.size() );
 		s.put( "at", req.startMillis );
