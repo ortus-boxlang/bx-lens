@@ -134,6 +134,25 @@
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
 				},
+				cachel: null, csel: "", ckeys: null, cfilter: "", cvalue: null, cconfirm: false, cmsg: "",
+				loadCaches: async function () { this.cachel = await (await this.api("caches")).json(); if (!this.csel && this.cachel.caches.length) { this.pickCache(this.cachel.caches[0].name); } },
+				pickCache: function (n) { this.csel = n; this.cvalue = null; this.cmsg = ""; this.loadKeys(); },
+				loadKeys: async function () {
+					if (!this.csel) { return; }
+					var r = await this.api("caches/" + encodeURIComponent(this.csel) + "/keys?filter=" + encodeURIComponent(this.cfilter));
+					if (r.ok) { this.ckeys = await r.json(); }
+				},
+				viewValue: async function (k) {
+					var r = await this.api("cachevalue/" + encodeURIComponent(this.csel) + "?key=" + encodeURIComponent(k));
+					this.cvalue = await r.json();
+				},
+				cacheAct: async function (action, key) {
+					var r = await this.api("caches/" + encodeURIComponent(this.csel) + "/" + action, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ key: key || "" }).toString() });
+					var j = await r.json();
+					this.cmsg = j.ok === false ? (j.message || j.error || "Failed") : (action === "evict" ? (j.evicted ? "Evicted" : "Key not found") : "Done, " + (j.removed || 0) + " object(s) removed");
+					this.cvalue = null;
+					await this.loadKeys(); await this.loadCaches();
+				},
 				dsl: null, dsRes: {}, dsBusy: "",
 				dsClass: function (d) { return d.state === "ok" || d.state === "idle" ? (d.state === "ok" ? "on" : "hid") : "off"; },
 				testDs: async function (d) {
@@ -168,6 +187,7 @@
 					var self = this;
 					clearInterval(this.threadTimer);
 					if (this.tab === "system") { this.loadHd(); }
+					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
 					if (this.tab === "threads") {
 						this.loadThreads();

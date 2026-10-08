@@ -258,6 +258,13 @@ public final class ConsoleRouter {
 			String id = decode( route.substring( "datasources/".length(), route.length() - "/test".length() ) );
 			service.getAudit().log( "datasource.test", s.role, ex.remoteAddr(), "datasource=" + id );
 			json( context, ex, 200, service.getDatasources().test( id ) );
+		} else if ( route.startsWith( "caches" ) && panelOn( "caches" ) ) {
+			caches( context, ex, method, route, s );
+		} else if ( route.startsWith( "cachevalue/" ) && method.equals( "GET" ) && panelOn( "caches" ) ) {
+			String name = decode( route.substring( "cachevalue/".length() ) );
+			service.getAudit().log( "cache.value", s.role, ex.remoteAddr(), "cache=" + name + " key=" + ex.urlParam( "key" ) );
+			Map<String, Object> v = service.getCaches().value( name, ex.urlParam( "key" ) );
+			json( context, ex, v == null ? 404 : 200, v == null ? Map.of( "error", "Unknown cache" ) : v );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
 			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
@@ -289,7 +296,7 @@ public final class ConsoleRouter {
 		}
 	}
 
-	private static final List<String> ADMIN_ONLY = List.of( "threads/dump", "heapdump", "logs/download", "bundle" );
+	private static final List<String> ADMIN_ONLY = List.of( "threads/dump", "heapdump", "logs/download", "bundle", "cachevalue" );
 
 	private static boolean isAdmin( ConsoleAuth.Session s ) {
 		return s != null && "admin".equals( s.role );
@@ -338,6 +345,7 @@ public final class ConsoleRouter {
 		    { "executors", "Executors", "lightning", "Runtime" },
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
 		    { "datasources", "Datasources", "database", "Runtime" },
+		    { "caches", "Caches", "package", "Runtime" },
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },
 		    { "designer", "Bar designer", "layout", "Config" },
@@ -367,6 +375,33 @@ public final class ConsoleRouter {
 	 * Heap dump: <code>GET heapdump</code> info, <code>POST heapdump</code> start (needs <code>confirm=true</code>), <code>GET heapdump/download</code>,
 	 * <code>POST heapdump/discard</code>. Needs <code>console.allowHeapDump</code>. Read-only mode does not block it.
 	 */
+	/**
+	 * <code>GET caches</code>, <code>GET caches/{name}/keys?filter=</code>, <code>POST caches/{name}/{clear|evict|reap}</code>.
+	 */
+	private void caches( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
+		if ( route.equals( "caches" ) && method.equals( "GET" ) ) {
+			json( context, ex, 200, service.getCaches().list() );
+			return;
+		}
+		String[] parts = route.split( "/" );
+		if ( parts.length == 3 && parts[ 0 ].equals( "caches" ) ) {
+			String name = decode( parts[ 1 ] );
+			if ( parts[ 2 ].equals( "keys" ) && method.equals( "GET" ) ) {
+				Map<String, Object> k = service.getCaches().keys( name, ex.urlParam( "filter" ) );
+				json( context, ex, k == null ? 404 : 200, k == null ? Map.of( "error", "Unknown cache" ) : k );
+				return;
+			}
+			if ( method.equals( "POST" ) ) {
+				String key = ex.formParam( "key" );
+				service.getAudit().log( "cache." + parts[ 2 ], s.role, ex.remoteAddr(), "cache=" + name + ( key == null ? "" : " key=" + key ) );
+				Map<String, Object> r = service.getCaches().action( name, parts[ 2 ], key );
+				json( context, ex, r == null ? 404 : 200, r == null ? Map.of( "error", "Unknown cache" ) : r );
+				return;
+			}
+		}
+		json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+	}
+
 	private void heapDump( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
 		boolean		allowed	= service.getConfig().getBool( "console.allowHeapDump", false );
 		HeapDumper	hd		= service.getHeapDumper();

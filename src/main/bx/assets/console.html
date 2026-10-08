@@ -229,6 +229,38 @@
         </template>
       </section>
 
+      <!-- Caches -->
+      <section x-show="tab === 'caches'">
+        <h1 class="h1">Caches <small>BoxCache statistics and a capped look inside</small></h1>
+        <template x-if="cachel">
+          <div class="split">
+            <div>
+              <template x-for="c in cachel.caches" :key="c.name">
+                <div class="card" style="margin-bottom:10px;cursor:pointer" :class="csel === c.name ? 'sel' : ''" @click="pickCache(c.name)"><h3><span class="mono" x-text="c.name"></span><span><span class="chipx" :class="c.enabled ? 'on' : 'off'" x-text="c.enabled ? c.provider : 'disabled'"></span></span></h3>
+                  <div x-show="!c.error"><div class="rowbar" style="margin:4px 0 3px"><span class="mono">hit rate</span><span class="mute mono" x-text="c.hitRate + '% (' + c.hits + ' hits, ' + c.misses + ' misses)'"></span></div>
+                    <div class="bar"><div :style="'width:' + c.hitRate + '%'"></div></div>
+                    <dl class="kv" style="margin-top:8px"><dt>Objects</dt><dd x-text="c.objects"></dd><dt>Evictions</dt><dd x-text="c.evictions"></dd><dt>Expired</dt><dd x-text="c.expired"></dd><dt>Reaps</dt><dd x-text="c.reaps"></dd></dl></div>
+                  <p class="sub" x-show="c.error" x-text="c.error"></p>
+                </div>
+              </template>
+            </div>
+            <div class="card" x-show="csel"><h3><span class="mono" x-text="csel"></span><span x-text="ckeys ? (ckeys.truncated ? 'first ' + ckeys.limit + ' matches' : ckeys.keys.length + ' keys') : ''"></span></h3>
+              <div class="tools"><input type="text" placeholder="Filter keys" x-model="cfilter" @input.debounce.300ms="loadKeys()" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px">
+                <button class="btn" :disabled="!state || state.readOnly" @click="cacheAct('reap')">Reap expired</button>
+                <button class="btn crit" :disabled="!state || state.readOnly" @click="cconfirm = true">Clear all</button></div>
+              <div class="confirm" x-show="cconfirm"><span>Remove every object from this cache?</span><button class="btn mini primary" @click="cacheAct('clear'); cconfirm = false">Clear</button><button class="btn mini" @click="cconfirm = false">Cancel</button></div>
+              <div class="scroll" style="max-height:340px;margin-top:8px"><table><thead><tr><th>Key</th><th class="num">Hits</th><th class="num">Timeout</th><th></th></tr></thead><tbody>
+                <template x-for="k in (ckeys ? ckeys.keys : [])" :key="k.key"><tr><td class="mono" style="word-break:break-all" x-text="k.key"></td><td class="num" x-text="k.hits === undefined ? '' : k.hits"></td><td class="num" x-text="k.timeout === undefined ? '' : k.timeout"></td>
+                  <td class="num"><button class="btn mini" :disabled="!state || state.role === 'viewer'" @click="viewValue(k.key)">View</button> <button class="btn mini" :disabled="!state || state.readOnly" @click="cacheAct('evict', k.key)">Evict</button></td></tr></template></tbody></table></div>
+              <p class="sub" x-show="ckeys && ckeys.keys.length === 0">No keys match.</p>
+              <div x-show="cvalue" style="margin-top:10px"><h3 style="margin-bottom:4px"><span class="mono" x-text="cvalue ? cvalue.key : ''"></span><span x-text="cvalue && cvalue.found ? cvalue.type + (cvalue.truncated ? ', cut to 2 KB' : '') : ''"></span></h3>
+                <pre class="code" style="max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all" x-text="cvalue ? (cvalue.found ? cvalue.value : 'Not found or expired') : ''"></pre></div>
+              <p class="sub" x-show="cmsg" x-text="cmsg"></p>
+            </div>
+          </div>
+        </template>
+      </section>
+
       <!-- System -->
       <section x-show="tab === 'system'">
         <h1 class="h1">System <small>JVM and host numbers, live</small></h1>
