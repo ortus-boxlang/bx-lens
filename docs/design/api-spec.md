@@ -1,10 +1,10 @@
 # BX Lens: API and Shape Spec (DRAFT for approval)
 
-Request-level debug bar for BoxLang web apps (MiniServer, servlet, CommandBox). In-memory only. HTML responses only. Open source. Observability across requests is out of scope (that is BX Insights).
+Request-level debug bar for BoxLang web apps (MiniServer, servlet, CommandBox). In-memory only. HTML responses only. Observability across requests is out of scope (that is BX Insights). BX Lens is a product of Ortus Solutions, see [Licensing](../licensing.md).
 
 ## Status (v1 as implemented)
 
-This page is the original design draft. Where it disagrees with the shipped module, the user docs win: see [Configuration](../configuration.md), [BIF Reference](../guides/bifs.md), [Extending Lens](../guides/extending.md) and [Core Event Inventory](../reference/events.md).
+This page is the original design draft and is kept for history. Where it disagrees with the shipped module, the user docs win. The settings below (`enabled`, `access.allowedIPs`, `access.allowPrivateNetworks`) are replaced by `bar.*` and `console.*`, and the console, the bar designer, request cost and licensing came later: see [Console](../console/index.md), [Configuration](../configuration.md), [BIF Reference](../guides/bifs.md), [Extending Lens](../guides/extending.md) and [Core Event Inventory](../reference/events.md).
 
 **Implemented in v1**
 

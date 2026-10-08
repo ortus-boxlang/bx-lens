@@ -66,9 +66,14 @@ Core announces these globally and per application.
 
 ## Global events
 
-These are not per request. They feed a rolling global activity view in the Lens service: scheduled tasks, executors and watchers.
+These are not per request. Lens uses two of them, and only when the console is on, to remember how the last run of each scheduled task ended:
 
-`onSchedulerStartup`, `onSchedulerShutdown`, `onSchedulerRestart`, `schedulerBeforeAnyTask`, `schedulerAfterAnyTask`, `schedulerOnAnyTaskSuccess`, `schedulerOnAnyTaskError`, `onSchedulerRegistration`, `onSchedulerRemoval`, `onAllSchedulersStarted`, `onWatcher*`, module events (`preModuleLoad`, `postModuleLoad` and others), `onRuntimeStart`, `onRuntimeShutdown`, `onConfigurationLoad`.
+| Event | Use |
+|---|---|
+| `schedulerOnAnyTaskSuccess` | Remember a successful run. |
+| `schedulerOnAnyTaskError` | Remember the error message and stack of a failed run. |
+
+Core keeps run counts for a task but not the error of its last run, so the Tasks page keeps it in memory since Lens started. Everything else on the console Executors, Tasks, System and Threads pages is read on demand from core's async and scheduler services and the JDK management beans, not from events.
 
 ## Not in core
 

@@ -6,7 +6,19 @@
 			"getting-started.md",
 			"configuration.md",
 			"ui.md",
-			"security.md"
+			"security.md",
+			"licensing.md"
+		]
+	},
+	{
+		"title": "Console",
+		"children": [
+			"console/index.md",
+			"console/executors.md",
+			"console/tasks.md",
+			"console/system-and-threads.md",
+			"console/bar-designer.md",
+			"console/settings.md"
 		]
 	},
 	{
@@ -31,7 +43,8 @@
 		"title": "Guides",
 		"children": [
 			"guides/bifs.md",
-			"guides/extending.md"
+			"guides/extending.md",
+			"guides/production.md"
 		]
 	},
 	{

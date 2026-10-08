@@ -16,7 +16,7 @@
 
 <p>&nbsp;</p>
 
-A request level debug bar for BoxLang web applications. Install the module, turn it on, and every HTML page gets a bar at the bottom with the request timeline, queries, templates, exceptions, HTTP calls, cache, modules, scopes and more. Everything is collected by Java code in memory. Nothing is written to disk.
+A debug bar and a console for BoxLang web applications. The **bar** gives every HTML page a strip at the bottom with the request timeline, queries, templates, exceptions, HTTP calls, cache, modules, scopes, cost and more. The **console** is a password-protected page for one server with live requests, executor health, scheduled tasks (with Run now), JVM numbers, threads and a bar designer. Everything is collected by Java code in memory. Nothing is written to disk except the bar layout you save.
 
 ![BX Lens on an N+1 page](docs/assets/screenshots/overview.png)
 
@@ -32,21 +32,24 @@ install-bx-module bx-lens
 box install bx-lens
 ```
 
-Lens is **off by default** and only serves callers on loopback and private networks. Turn it on in `boxlang.json`:
+Lens is **off by default**. The bar and the console are switched on separately in `boxlang.json`, and each has its own access rule that defaults to loopback only:
 
 ```json
 {
 	"modules": {
 		"bxLens": {
 			"settings": {
-				"enabled": true
+				"bar": { "enabled": true },
+				"console": { "enabled": true, "password": "bxsecret:..." }
 			}
 		}
 	}
 }
 ```
 
-Never enable it on a public site. See [Security](docs/security.md).
+Make the password with `boxlang generatesecret "your password"`. The console is at `/~bxlens/index.bxm` (a bare `/~bxlens/` is not served). Keep the bar off on live servers and read [Running Lens in production](docs/guides/production.md) before you expose the console. See [Security](docs/security.md).
+
+Upgrading? `enabled` is now `bar.enabled` and `access.allowedIPs` is now `bar.access`. See [Configuration](docs/configuration.md#moving-from-older-settings).
 
 ## What you get
 
@@ -61,9 +64,13 @@ Never enable it on a public site. See [Security](docs/security.md).
 | **Messages and Timers** | What your code sends with `lensMessage()`, `lensDump()`, `lensMeasure()` |
 | **Cache** | Every BoxCache cache with hit rate, objects, evictions and what this request did to it |
 | **Modules** | Loaded modules with version, author, what they provide and activation time |
-| **Request, Scopes, Runtime** | Headers, redacted scope snapshots, memory, GC, threads and versions |
+| **Request, Scopes, Runtime** | Request and response headers, redacted scope snapshots, memory, GC, threads, versions, and the CPU time and allocation of the request |
 | **History** | The last 50 requests, including JSON and SSE, recycled in memory |
 | Your panels | Applications and other modules add panels with `lensPanel()` or the `onLensCollect` interception point |
+
+The Issues tab also names where a slow request was stuck (a stack sample after `thresholds.slowRequestMs`) and lists security Notes for missing headers and cookie flags.
+
+The console pages are Overview, Requests, Executors, Tasks, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
 
 A collapsed health strip turns amber or red when something is wrong and opens on Issues when an exception was caught. Resize it, detach it as a floating window, switch themes, and use the keyboard: <kbd>Ctrl</kbd>+<kbd>`</kbd> toggles, <kbd>1</kbd> to <kbd>9</kbd> switch tabs, <kbd>/</kbd> searches.
 
@@ -103,7 +110,10 @@ bxSites serve
 ```bash
 ./harness/start.sh          # builds the module and starts MiniServer on http://localhost:8085
 DEV=1 SKIP_BUILD=1 ./harness/start.sh   # serve the UI files from src/main/bx/assets, edit and refresh
+LENS_LICENSE=trial ./harness/start.sh   # show a license state (trial, plus, expired, none)
 ```
+
+The console is at `http://localhost:8085/~bxlens/index.bxm` and the demo password is `lens-demo`. `/load.bxm` saturates a small executor and `/stall.bxm` shows the slow request sample. `harness/home/config/tasks.json` defines the demo scheduled tasks.
 
 ## Development
 
@@ -123,13 +133,18 @@ Set `LENS_CHROMIUM` to use a Chromium you already have. CI runs the Java tests o
 
 How it fits together:
 
-- `src/main/java/.../LensService` owns the settings, the collectors, the in-memory history and the injector.
+- `src/main/java/.../LensService` owns the settings, the collectors, the in-memory history, the injector and the slow request watchdog.
+- `ConsoleRouter`, `ConsoleAuth` and `ConsoleData` are the console: routes and security headers, login and sessions, and the data for executors, tasks, system and threads. `AccessGuard` checks callers for the bar and the console. `Licensing` detects BoxLang+. `LayoutStore` keeps the bar layout.
 - `interceptors/collectors/*` are the Java collectors, one per panel. They run as BoxLang interceptors.
 - `model/` holds the per request data, the issue engine and the snapshot that the UI reads.
-- `src/main/bx/assets/` is the UI: Alpine.js, one CSS file and one template. The data travels as JSON inside the page.
+- `src/main/bx/assets/` is the UI for the bar (`lens.*`) and the console (`console.*`): Alpine.js, vendored Phosphor icons, CSS and templates. The bar's data travels as JSON inside the page.
 - `src/main/bx/ModuleConfig.bx` declares every setting with its default.
 
-Lens is request level and open source. BX Insights is the separate, licensed observability product.
+Lens works on one server. BX Insights is the separate observability product for clusters, history over time and alerting.
+
+## License
+
+BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans) and [Licensing](docs/licensing.md). Which features need BoxLang+ is not decided yet, so every feature works in every license state today. Phosphor Icons are MIT licensed, see `src/main/bx/assets/ICONS-LICENSE.txt`.
 
 ## Ortus Sponsors
 

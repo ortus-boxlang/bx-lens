@@ -26,9 +26,11 @@ Each panel comes from one or more collectors. Collectors never throw into your r
 | [Runtime](jvm.md) | yes | JVM, memory and request statistics. |
 | [History](history.md) | yes | The last 50 requests. |
 
+The console has its own pages. See [Console](../console/index.md).
+
 Opt-in collectors: `functions` and `logs`. Custom panels from modules and app code appear after the built-in tabs. Enable or tune collectors under `collectors` in [Configuration](../configuration.md#collectors).
 
-Press `1` to `9` to switch to a tab by position.
+Press `1` to `9` to switch to a tab by position. Hide tabs with `tabs.hide`, or reorder them in the [Bar designer](../console/bar-designer.md).
 
 ## Add your own
 

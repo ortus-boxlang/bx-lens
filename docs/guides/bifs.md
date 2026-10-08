@@ -7,7 +7,7 @@ icon: lucide:code
 
 # BIF Reference
 
-These functions work whenever the module is loaded. When Lens is disabled for the request, or the caller is not allowed, they do nothing.
+These functions work whenever the module is loaded. When Lens is not collecting for the request, or the caller is not allowed, they do nothing.
 
 | Function | Signature | Returns |
 |---|---|---|
@@ -22,6 +22,8 @@ These functions work whenever the module is loaded. When Lens is disabled for th
 | [`lensRender`](#lensrender) | `()` | string |
 | [`lensDump`](#lensdump) | `( value, label="" )` | nothing |
 | [`lensPanel`](#lenspanel) | `( id, label, renderer )` | a panel builder |
+
+`lensConsole()` also exists. It serves the [console](../console/index.md) and is called only by the module's own `index.bxm`. Do not call it from your code.
 
 ## lensMessage
 

@@ -11,7 +11,7 @@ BASE_VERSION="$(grep '^boxlangVersion=' "$ROOT/gradle.properties" | cut -d= -f2)
 VERSION="${BOXLANG_VERSION:-${BASE_VERSION}-snapshot}"
 PORT="${PORT:-8085}"
 CACHE="$HERE/.cache"
-RUN="$HERE/.run"
+RUN="${RUN_DIR:-$HERE/.run}"
 DL="https://downloads.ortussolutions.com/ortussolutions"
 
 mkdir -p "$CACHE" "$RUN"

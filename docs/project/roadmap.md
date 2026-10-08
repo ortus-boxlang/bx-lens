@@ -27,19 +27,19 @@ icon: lucide:map
 
 See [Core gaps](../reference/events.md#core-gaps).
 
-## Not implemented in v1
+## Not implemented
 
-- `lensDumpHeap`, `lensThreadDump`, heap and thread dumps.
+- `lensDumpHeap` and heap dumps. Thread dumps are in the console Threads page.
 - The `bx:lens` component.
-- A `/~bxlens/` asset endpoint. Lens inlines its assets.
+- A feature split between free and BoxLang+. It is not decided, see [Licensing](../licensing.md).
 
 ## Relation to BX Insights
 
-Lens is request-level and open source. It shows what one request did, right on the page, while you develop.
+Lens works on one server. The bar shows what one request did, right on the page. The console shows live requests, executors, tasks, JVM numbers and threads for that server.
 
-BX Insights is the separate, licensed observability product. It looks across requests and over time.
+BX Insights is the separate observability product. It is the answer for clusters, history over time and alerting.
 
-Lens will not add persistence. It keeps everything in memory and clears it on restart.
+Lens will not add persistence or cross-node views. It keeps requests in memory and clears them on restart. The only file it writes is the saved bar layout.
 
 ## Design spec
 

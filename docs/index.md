@@ -7,7 +7,7 @@ icon: lucide:scan-search
 
 # BX Lens
 
-BX Lens is an open source debug bar for BoxLang web apps. Turn it on and every HTML page gets a docked panel that shows what the request did: templates, queries, HTTP calls, exceptions, timers, scopes and more. It runs in MiniServer, servlet containers and CommandBox.
+BX Lens shows what your BoxLang web app is doing. It has two surfaces. The **bar** is a docked panel on every HTML page that shows what the request did: templates, queries, HTTP calls, exceptions, timers, scopes and more. The **console** is a standalone page for one server with live requests, executor health, scheduled tasks, JVM numbers and threads. Both are off by default. Lens runs in MiniServer, servlet containers and CommandBox.
 
 ![The BX Lens bar docked at the bottom of a page, showing the Timeline waterfall](assets/screenshots/overview.png)
 
@@ -18,6 +18,9 @@ The bar starts as a collapsed health strip:
 ::: cards
 ::: card title="Getting Started" icon="lucide:rocket" href="getting-started.md"
 Install the module and enable it in `boxlang.json`.
+:::
+::: card title="Console" icon="lucide:layout-dashboard" href="console/index.md"
+Live requests, executors, tasks and threads for one server.
 :::
 ::: card title="Configuration" icon="lucide:sliders-horizontal" href="configuration.md"
 Every setting, its default and what it does.
@@ -32,7 +35,10 @@ What each tab shows and how Lens flags problems.
 Add your own panels from a module or from app code.
 :::
 ::: card title="Security" icon="lucide:shield" href="security.md"
-Off by default, localhost only, redacted output.
+Off by default, loopback only, redacted output.
+:::
+::: card title="Licensing" icon="lucide:badge-check" href="licensing.md"
+License states and BoxLang+.
 :::
 :::
 
@@ -41,17 +47,20 @@ Off by default, localhost only, redacted output.
 - A collapsed health strip: status, time, memory, query and template counts.
 - A unified waterfall of templates, functions, queries and HTTP calls on one time axis.
 - An Issues tab that ranks slow queries, N+1 patterns, slow templates, caught exceptions and 4xx/5xx responses.
+- Cost per request: CPU time and bytes allocated by the request thread, and a sample of where a slow request was stuck.
+- Security notes for missing headers and cookie flags.
 - A History tab with the last 50 requests, including JSON and SSE. Lens keeps them in memory only.
+- A password-protected console with Overview, Requests, Executors, Tasks (with Run now), System, Threads, a Bar designer and Settings.
 - Light and dark themes, resizing, a floating detached window and keyboard shortcuts.
 - Cache and Modules panels, and a small API to add your own panels without writing JavaScript.
 
 ## What it is not
 
-Lens is request-level and open source. It stores nothing on disk and keeps no data across restarts. BX Insights is the separate, licensed observability product for data across requests and over time. See [Roadmap](project/roadmap.md#relation-to-bx-insights).
+Lens works on one server. It keeps recent requests in memory and keeps no history across restarts (the only file it writes is the saved bar layout). BX Insights is the separate observability product for clusters, history over time and alerting. See [Roadmap](project/roadmap.md#relation-to-bx-insights).
 
-!!! warning "Development tool"
-    Lens ships disabled. Never enable it in production. See [Security](security.md).
+!!! warning "Off by default"
+    The bar is a development tool. The console can run on a live server, but only with a password, an access list and HTTPS. See [Security](security.md) and [Running Lens in production](guides/production.md).
 
-## Source and status
+## License and status
 
-BX Lens lives at [github.com/ortus-boxlang/bx-lens](https://github.com/ortus-boxlang/bx-lens). The original [design spec](design/api-spec.md) has a status section that says what v1 implements. Lens needs BoxLang 1.19 or newer and Java 21.
+BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans) and [Licensing](licensing.md). The original [design spec](design/api-spec.md) has a status section. Lens needs BoxLang 1.19 or newer and Java 21.

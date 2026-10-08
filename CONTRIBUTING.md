@@ -16,7 +16,7 @@ Before submitting your contribution, please make sure to take a moment and read 
 
 ## Code Of Conduct
 
-This project is open source, and as such, the maintainers give their free time to build and maintain the source code held within. They make the code freely available in the hope that it will be of use to other developers and/or businesses. Please be considerate towards maintainers when raising issues or presenting pull requests. **We all follow the Golden Rule: Do to others as you want them to do to you.**
+BX Lens is a product of Ortus Solutions, developed in a private repository. The maintainers give their time to build and maintain it. Please be considerate towards maintainers when raising issues or presenting pull requests. **We all follow the Golden Rule: Do to others as you want them to do to you.**
 
 -   As contributors and maintainers of this project, we pledge to respect all people who contribute through reporting issues, posting feature requests, updating documentation, submitting pull requests or patches, and other activities.
 -   Participants will be tolerant of opposing views.
@@ -30,7 +30,7 @@ This project is open source, and as such, the maintainers give their free time t
 BoxLang tracks its issues in Jira and each module track it's own issues in its repo.
 
 -   BoxLang JIra : https://ortussolutions.atlassian.net/browse/BL/issues
--   Module Issues: https://github.com/ortus-boxlang/bx-lens/issues
+-   Module Issues: in the private repository `ortus-solutions-private/bx-lens`, or through Ortus support
 
 If you file a bug report, your issue should contain a title, a clear description of the issue, a way to replicate the issue, and any support files that we might need to replicate your issue. The goal of a bug report is to make it easy for yourself - and others - to replicate the bug and develop a fix for it. All issues that do not contain a way to replicate will not be addressed.
 
@@ -84,7 +84,7 @@ You can also see the Ortus Coding Standards you must follow here: https://github
 
 ## Financial Contributions
 
-You can support ColdBox and all of our Open Source initiatives at Ortus Solutions by becoming a patreon. You can also get lots of goodies and services depending on the level of contributions.
+You can support the BoxLang and ColdBox open source work at Ortus Solutions by becoming a patreon. You can also get lots of goodies and services depending on the level of contributions.
 
 -   [Become a backer or sponsor on Patreon](https://www.patreon.com/ortussolutions)
 -   [One-time donations via PayPal](https://www.paypal.com/paypalme/ortussolutions)
@@ -93,8 +93,4 @@ You can support ColdBox and all of our Open Source initiatives at Ortus Solution
 
 Thank you to all the people who have already contributed to BoxLang! We: heart: : heart: : heart: love you!
 
-<a href = "https://github.com/ortus-boxlang/bx-lens/graphs/contributors">
-  <img src = "https://contrib.rocks/image?repo=ortus-boxlang/bx-lens"/>
-</a>
-
-Made with [contributors-img](https://contrib.rocks)
+See the contributors graph in the repository.

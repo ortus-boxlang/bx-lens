@@ -60,3 +60,25 @@ Open `/extend.bxm`. Show the Harness and Phases panels built from app code, and 
 Drag the top edge to resize, press the detach button to float the panel, then dock it again. Toggle the theme. Reload the page and show that the state persists.
 
 ![The detached floating window](../assets/screenshots/popout.png)
+
+## 11. The console
+
+Open `http://localhost:8085/~bxlens/index.bxm` and sign in with `lens-demo`. Start on Overview, then open Requests and pick the N+1 request you made earlier. Click Open console in the bar and the More menu to show the link from a page to its request.
+
+![The console Requests page](../assets/screenshots/console-requests.png)
+
+## 12. Executors and tasks
+
+Open `/load.bxm`, then the Executors page. The `demo-pool` goes degraded and then critical as eight tasks queue on two threads. Open Tasks, pick `sync-prices`, press Run now and show the error. Pause and resume `cleanup-sessions`.
+
+![A task run in the console](../assets/screenshots/console-task-run.png)
+
+## 13. A slow request
+
+Open `/stall.bxm`, then Issues. The Slow request issue names the line where the request was after 3 seconds. Point at the `cpu` and `alloc` chips in the strip.
+
+## 14. Design the bar
+
+Open the Bar designer, hide a tab, move another, save, and reload a page. Press Reset to default.
+
+![The Bar designer](../assets/screenshots/console-designer.png)

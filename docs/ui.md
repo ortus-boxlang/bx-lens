@@ -7,6 +7,8 @@ icon: lucide:keyboard
 
 # Keyboard and UI
 
+This page covers the bar. The console has its own pages, see [Console](console/index.md).
+
 ## Health strip
 
 The bar starts as a collapsed strip with status, request time, memory, query count and template count.
@@ -14,6 +16,8 @@ The bar starts as a collapsed strip with status, request time, memory, query cou
 ![The collapsed health strip](assets/screenshots/strip-collapsed.png)
 
 The strip border and an issues chip turn amber or red when the request is slow, has an N+1, catches an exception, or returns a 4xx or 5xx status. Click a chip to open the matching tab.
+
+The strip also shows two cost chips, `cpu` (CPU time of the request thread) and `alloc` (bytes it allocated). Click one to open the Runtime panel. They are hidden when the JVM cannot measure them.
 
 When an exception was caught, Lens opens the panel on Issues for you. Turn this off with `ui.autoOpenOnException`.
 
@@ -27,6 +31,19 @@ When an exception was caught, Lens opens the panel on Issues for you. Turn this 
 | `1` to `9` | Switch to the tab in that position. |
 | `/` | Focus the Timeline search. |
 
+## Console button and More menu
+
+When the console is on and you may use it, the strip has an **Open console** button. The **More** menu next to it has:
+
+- Open this request in the console
+- Copy request as JSON
+- Copy request id
+- Detach as a floating window (or dock it again)
+
+![The More menu](assets/screenshots/bar-menu.png)
+
+The tabs the bar shows, and their order, can be designed in the console. See [Bar designer](console/bar-designer.md).
+
 ## Layout
 
 - The panel docks at the bottom of the page.
@@ -35,7 +52,7 @@ When an exception was caught, Lens opens the panel on Issues for you. Turn this 
 
 ![The panel detached as a floating window](assets/screenshots/popout.png)
 
-Lens saves the open tab, height, collapsed state, theme and detached state in the browser's `localStorage`.
+Lens saves the open tab, height, collapsed state, theme and detached state in the browser's `localStorage`. The tab list comes from the layout saved in the console.
 
 ## Themes
 

@@ -27,21 +27,42 @@ icon: lucide:rocket
 
 ## Enable
 
-Lens ships disabled. Turn it on in `boxlang.json`, under `modules.bxLens.settings`:
+Lens ships with everything off. It has two surfaces, and you turn each one on by itself in `boxlang.json`, under `modules.bxLens.settings`.
 
-```json title="boxlang.json"
-{
-	"modules": {
-		"bxLens": {
-			"settings": {
-				"enabled": true
-			}
-		}
-	}
-}
-```
+=== "The bar"
+    ```json title="boxlang.json"
+    {
+    	"modules": {
+    		"bxLens": {
+    			"settings": {
+    				"bar": { "enabled": true }
+    			}
+    		}
+    	}
+    }
+    ```
 
-Restart the runtime. Every other setting has a default, so this is all you need. See [Configuration](configuration.md) for the rest.
+    The bar shows on HTML pages for callers on the same machine (`bar.access` defaults to `"local"`).
+
+=== "The console"
+    ```json title="boxlang.json"
+    {
+    	"modules": {
+    		"bxLens": {
+    			"settings": {
+    				"console": {
+    					"enabled": true,
+    					"password": "bxsecret:..."
+    				}
+    			}
+    		}
+    	}
+    }
+    ```
+
+    The console lives at `/~bxlens/index.bxm` and needs a password. See [Console](console/index.md) and how to make a `bxsecret:` value.
+
+Restart the runtime. Every other setting has a default, so this is all you need. See [Configuration](configuration.md) for the rest. For a server that real users reach, read [Running Lens in production](guides/production.md) first.
 
 ## See the bar
 
@@ -72,9 +93,15 @@ users = lensMeasure( "load users", () => {
 
 See the [BIF reference](guides/bifs.md) for all functions.
 
+## Open the console
+
+With the console on, open `http://localhost:8085/~bxlens/index.bxm` (use your own host and port) and sign in. A bare `/~bxlens/` is not served, so always include `index.bxm`. The bar also has an Open console button.
+
+![The console login page](assets/screenshots/console-login.png)
+
 ## Try the demo app
 
-The repository has a harness app that produces every kind of data Lens can show. See [Development](project/contributing.md#the-harness) and the [demo script](project/demo-script.md).
+The repository has a harness app that produces every kind of data Lens can show, with the bar and the console both on. See [Development](project/contributing.md#the-harness) and the [demo script](project/demo-script.md).
 
 ## Runtime notes
 
@@ -95,12 +122,12 @@ Lens uses the same request events as MiniServer. Only MiniServer is covered by t
 
 ## How the bar is delivered
 
-Lens inlines its CSS, JavaScript and data into the HTML response. That adds about 110 KB to each HTML response and needs no extra network request. There is no separate asset endpoint.
+The bar inlines its CSS, JavaScript and data into the HTML response. That adds about 110 KB to each HTML response and needs no extra network request. The console is a separate page at `/~bxlens/index.bxm` that serves its own files and makes no request to any other site.
 
 ## Requirements and limits
 
 - Lens injects into HTML responses (`text/html` by default), before the last `</body>`. Other responses are recorded but show no bar. See [History](panels/history.md).
-- Callers must pass the [access rules](security.md). By default only loopback and private network addresses see the bar.
+- Callers must pass the [access rules](security.md). By default only loopback addresses see the bar (`bar.access` is `"local"`).
 - When a request ends in an uncaught exception or abort, core renders its own error page and Lens cannot inject into it. The request is still recorded in History. See [Exceptions](panels/exceptions.md).
 
 ## Next steps
@@ -108,3 +135,5 @@ Lens inlines its CSS, JavaScript and data into the HTML response. That adds abou
 - [Tour the panels](panels/index.md)
 - [Learn the keyboard shortcuts](ui.md)
 - [Read the security notes](security.md)
+- [Set up the console](console/index.md)
+- [Check the license terms](licensing.md)
