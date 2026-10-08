@@ -58,7 +58,8 @@ test.describe( 'the bar', () => {
 	test( 'the panel can be detached and docked again', async ( { lens, page } ) => {
 		await lens.visit( '/orders.bxm' );
 		await lens.open( 'Timeline' );
-		await page.locator( '#bxlens .ibtn[title^="Detach"]' ).click();
+		await page.locator( '#bxlens .more .ibtn' ).click();
+		await page.locator( '#bxlens .menu button', { hasText: 'Detach as a floating window' } ).click();
 		await expect( page.locator( '#bxlens .lens' ) ).toHaveClass( /detached/ );
 		await expect( page.locator( '#bxlens .popbar' ) ).toBeVisible();
 		await expect( lens.panel ).toBeVisible();

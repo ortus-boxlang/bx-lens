@@ -44,14 +44,17 @@
 				executors: [], execCounts: {}, esel: null, hist: {},
 				tasks: null, ksel: null, kf: "all", kq: "", confirm: "", runResult: null, running: "",
 				system: null, sys: { cpu: [], heap: [], thr: [] },
+				bar: null, design: [], dirty: false, dragFrom: null, dragOver: null,
 				threads: null, tsel: null, tf: "ALL", tq: "", tpool: "", threadTimer: null,
 				icon: icon,
 
 				init: async function () {
 					var self = this;
 					await this.load();
-					var h = location.hash.replace("#", "");
+					var h = location.hash.replace("#", ""), deep = h.split("/");
+					h = deep[0];
 					if (this.state.tabs.some(function (t) { return t.id === h; })) { this.tab = h; }
+					if (h === "requests" && deep[1]) { this.pick(decodeURIComponent(deep[1])); }
 					window.addEventListener("hashchange", function () { var t = location.hash.replace("#", ""); if (t) { self.tab = t; self.onTab(); } });
 					setInterval(function () { self.now = Date.now(); }, 1000);
 					this.timer = setInterval(function () { if (self.live && !self.streamOk && !document.hidden) { self.refresh(); } }, 3000);
@@ -109,6 +112,7 @@
 				onTab: function () {
 					var self = this;
 					clearInterval(this.threadTimer);
+					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
 					if (this.tab === "threads") {
 						this.loadThreads();
 						this.threadTimer = setInterval(function () { if (self.live && self.tab === "threads" && !document.hidden) { self.loadThreads(); } }, 5000);
@@ -251,6 +255,25 @@
 				},
 				defRows: function (t) { var d = t.definition || {}; return Object.keys(d).map(function (k) { return { k: k, v: String(d[k]) }; }); },
 
+				// ---- bar designer ----
+				loadBar: async function () {
+					this.bar = await (await this.api("bar")).json();
+					var layout = this.bar.layout, pos = {}, vis = {};
+					layout.forEach(function (l, i) { pos[l.id] = i; vis[l.id] = l.visible; });
+					this.design = this.bar.catalog.map(function (t, i) { return { id: t.id, label: t.label, custom: t.custom, hidden: t.hidden, visible: vis[t.id] === undefined ? true : vis[t.id], k: pos[t.id] === undefined ? 1000 + i : pos[t.id] }; })
+						.sort(function (a, b) { return a.k - b.k; });
+					this.dirty = false;
+				},
+				move: function (i, d) { var j = i + d; if (j < 0 || j >= this.design.length) { return; } var t = this.design.splice(i, 1)[0]; this.design.splice(j, 0, t); this.dirty = true; },
+				dropOn: function (i) { if (this.dragFrom === null || this.dragFrom === i) { this.dragOver = null; return; } var t = this.design.splice(this.dragFrom, 1)[0]; this.design.splice(i, 0, t); this.dragFrom = null; this.dragOver = null; this.dirty = true; },
+				previewTabs: function () { return this.design.filter(function (t) { return t.visible && !t.hidden; }); },
+				saveDesign: async function () {
+					var body = new URLSearchParams({ layout: JSON.stringify(this.design.map(function (t) { return { id: t.id, visible: t.visible }; })) }).toString();
+					var r = await this.api("bar/layout", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body });
+					if (r.ok) { this.toast("Layout saved. Reload a page to see it."); await this.loadBar(); } else { this.toast("Could not save the layout"); }
+				},
+				resetDesign: async function () { var r = await this.api("bar/reset", { method: "POST" }); if (r.ok) { this.toast("Back to the default layout"); await this.loadBar(); } },
+
 				// ---- system ----
 				setSystem: function (s) {
 					this.system = s;
@@ -293,7 +316,11 @@
 				dumpUrl: function () { return base() + "/api/threads/dump"; },
 
 				licenseClass: function () { return this.state ? this.state.license.state : "none"; },
-				showBanner: function () { return this.state && (this.state.license.state === "trial"); }
+				showBanner: function () { return this.state && (this.state.license.state === "trial" || this.state.license.state === "expired"); },
+				bannerText: function () {
+					if (!this.state) { return ""; }
+					return this.state.license.state === "expired" ? "The BoxLang+ license is not valid. Plus features may stop working." : "You are on a trial. Plus features stop working when it ends and need a license.";
+				}
 			};
 		});
 	});

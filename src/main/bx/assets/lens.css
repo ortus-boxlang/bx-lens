@@ -137,3 +137,10 @@
 #bxlens .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: 90px; background: var(--fg); color: var(--bg); padding: 5px 12px; border-radius: 4px; font: 12px var(--sans); z-index: 2147483002; }
 @media (max-width: 560px) { #bxlens .kv { grid-template-columns: 1fr; } #bxlens .issue { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: no-preference) { #bxlens .tab, #bxlens .abtn { transition: background .12s, border-color .12s; } }
+
+#bxlens .ic { width: 1.15em; height: 1.15em; vertical-align: -0.2em; flex: none; }
+#bxlens a.ibtn { text-decoration: none; display: inline-flex; align-items: center; }
+#bxlens .more { position: relative; display: inline-block; }
+#bxlens .menu { position: fixed; min-width: 250px; z-index: 5; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,.35); padding: 4px; display: flex; flex-direction: column; }
+#bxlens .menu a, #bxlens .menu button { text-align: left; padding: 7px 10px; border-radius: 4px; color: var(--fg); text-decoration: none; font: 12px var(--sans); background: none; border: 0; cursor: pointer; }
+#bxlens .menu a:hover, #bxlens .menu button:hover { background: var(--surface2); }

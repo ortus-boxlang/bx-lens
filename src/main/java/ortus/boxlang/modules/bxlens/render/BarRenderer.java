@@ -34,6 +34,7 @@ public final class BarRenderer {
 	private String			html;
 	private String			js;
 	private String			alpine;
+	private String			icons;
 
 	/**
 	 * @param assetsDir folder holding lens.css, lens.html, lens.js and alpine.min.js
@@ -50,6 +51,7 @@ public final class BarRenderer {
 		this.html	= read( assetsDir, "lens.html" );
 		this.js		= read( assetsDir, "lens.js" );
 		this.alpine	= read( assetsDir, "alpine.min.js" );
+		this.icons	= read( assetsDir, "bar-icons.svg" );
 	}
 
 	/**
@@ -65,7 +67,7 @@ public final class BarRenderer {
 		StringBuilder sb = new StringBuilder( css.length() + html.length() + js.length() + alpine.length() + payloadJson.length() + 512 );
 		sb.append( "\n<!-- BX Lens -->\n" );
 		sb.append( "<style id=\"bxlens-css\">" ).append( css ).append( "</style>\n" );
-		sb.append( "<div id=\"bxlens\" x-data=\"bxLens()\" x-cloak>" ).append( html ).append( "</div>\n" );
+		sb.append( "<div id=\"bxlens\" x-data=\"bxLens()\" x-cloak>" ).append( icons ).append( html ).append( "</div>\n" );
 		sb.append( "<script type=\"application/json\" id=\"bxlens-data\">" ).append( payloadJson ).append( "</script>\n" );
 		sb.append( "<script id=\"bxlens-js\">" ).append( safeScript( js ) ).append( "</script>\n" );
 		// Load Alpine only when the host page does not ship its own. lens.js registers with either.

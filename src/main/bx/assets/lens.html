@@ -14,11 +14,18 @@
 		<button class="chip" x-show="d.jvm" @click="open('jvm')" title="Heap used">mem <b x-text="d.jvm ? d.jvm.heapUsedMb + ' MB' : ''"></b></button>
 		<button class="chip" @click="open('queries')" title="Queries">sql <b x-text="d.counts.queries"></b></button>
 		<button class="chip" @click="open('templates')" title="Templates">tpl <b x-text="d.counts.templates"></b></button>
-		<button class="chip issues" :class="sev === 'crit' ? 'crit' : ''" x-show="d.issues.length" @click="open('issues')" title="Open Issues">&#9888; <span x-text="d.issues.length + (d.issues.length === 1 ? ' issue' : ' issues')"></span></button>
+		<button class="chip issues" :class="sev === 'crit' ? 'crit' : ''" x-show="d.issues.length" @click="open('issues')" title="Open Issues"><svg class="ic"><use href="#bxlens-ph-warning"/></svg> <span x-text="d.issues.length + (d.issues.length === 1 ? ' issue' : ' issues')"></span></button>
 		<span class="grow"></span>
-		<button class="ibtn" x-show="ui.allowDetach && !collapsed" @click="toggleDetach()" :title="detached ? 'Dock to the bottom' : 'Detach as a floating window'" x-text="detached ? '&#9716;' : '&#10697;'"></button>
-		<button class="ibtn" @click="toggleTheme()" title="Toggle theme">&#9680;</button>
-		<button class="ibtn" @click="toggle()" :title="'Collapse / expand (' + hotkeyLabel + ')'" x-text="collapsed ? '&#9652;' : '&#9662;'"></button>
+		<a class="ibtn" x-show="ui.consoleUrl" :href="ui.consoleUrl" target="_blank" rel="noopener noreferrer" title="Open the console"><svg class="ic"><use href="#bxlens-ph-arrow-square-out"/></svg></a>
+		<span class="more"><button class="ibtn" @click="toggleMenu($event)" title="More" aria-haspopup="menu" :aria-expanded="menu"><svg class="ic"><use href="#bxlens-ph-dots-three"/></svg></button>
+			<span class="menu" x-show="menu" :style="menuStyle" @click.outside="menu = false" role="menu">
+				<a role="menuitem" x-show="ui.consoleUrl" :href="ui.consoleUrl + '#requests/' + r.id" target="_blank" rel="noopener noreferrer" @click="menu = false">Open this request in the console</a>
+				<button role="menuitem" @click="copy(JSON.stringify(d, null, 2), 'Request JSON'); menu = false">Copy request as JSON</button>
+				<button role="menuitem" @click="copy(r.id, 'Request id'); menu = false">Copy request id</button>
+				<button role="menuitem" x-show="ui.allowDetach && !collapsed" @click="toggleDetach(); menu = false" x-text="detached ? 'Dock to the bottom' : 'Detach as a floating window'"></button>
+			</span></span>
+		<button class="ibtn" @click="toggleTheme()" title="Toggle theme"><svg class="ic"><use href="#bxlens-ph-circle-half"/></svg></button>
+		<button class="ibtn" @click="toggle()" :title="'Collapse / expand (' + hotkeyLabel + ')'"><svg class="ic"><use :href="collapsed ? '#bxlens-ph-caret-up' : '#bxlens-ph-caret-down'"/></svg></button>
 	</div>
 	<div class="bar tabs" role="tablist" x-show="!collapsed">
 		<template x-for="(t, i) in tabs" :key="t.id">

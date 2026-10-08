@@ -18,7 +18,7 @@
     <button class="live" :class="live ? '' : 'off'" @click="live = !live" :aria-pressed="live" title="Refresh every 3 seconds"><i></i><span x-text="live ? 'live 3s' : 'paused'"></span></button>
     <button class="btn" @click="logout()"><svg class="ic"><use href="#ph-sign-out"/></svg>Log out</button>
   </header>
-  <div class="banner" x-show="showBanner()">You are on a trial. Plus features stop working when it ends and need a license.</div>
+  <div class="banner" x-show="showBanner()"><span x-text="bannerText()"></span> <a class="link" :href="state ? state.license.plansUrl : '#'" target="_blank" rel="noopener noreferrer">Get a license</a></div>
   <div class="app">
     <nav class="side" aria-label="Console">
       <template x-for="g in groups()" :key="g.name">
@@ -251,6 +251,42 @@
                     <div class="legend"><span><i class="dot" style="background:var(--green)"></i>BoxLang template or function</span><span><i class="dot"></i>Java</span></div>
                   </div>
                 </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+
+      <!-- Bar designer -->
+      <section x-show="tab === 'designer'">
+        <h1 class="h1">Bar designer <small>choose the tabs the bar shows and their order</small></h1>
+        <template x-if="bar">
+          <div>
+            <div class="msg warn" style="margin:0 0 10px" x-show="!bar.enabled">The bar is off in the settings (<span class="mono">bar.enabled</span>). The layout is saved and applies when you turn it on.</div>
+            <div class="split">
+              <div class="card">
+                <h3>Tabs <span>drag to reorder, or use the arrows</span></h3>
+                <ul class="dlist" role="list">
+                  <template x-for="(t, i) in design" :key="t.id">
+                    <li class="drow" :class="[t.visible ? '' : 'off', dragOver === i ? 'over' : '']" draggable="true" @dragstart="dragFrom = i; $event.dataTransfer.effectAllowed = 'move'" @dragover.prevent="dragOver = i" @dragleave="dragOver = null" @drop.prevent="dropOn(i)" @dragend="dragFrom = null; dragOver = null">
+                      <svg class="ic grip"><use href="#ph-dots-six-vertical"/></svg>
+                      <button class="eye" @click="t.visible = !t.visible; dirty = true" :aria-pressed="t.visible" :aria-label="(t.visible ? 'Hide ' : 'Show ') + t.label" :disabled="t.hidden"><svg class="ic"><use :href="t.visible && !t.hidden ? '#ph-eye' : '#ph-eye-slash'"/></svg></button>
+                      <span class="dname" x-text="t.label"></span>
+                      <span class="chipx hid" x-show="t.custom">module panel</span><span class="chipx off" x-show="t.hidden">hidden in settings</span>
+                      <span class="spacer"></span>
+                      <button class="btn mini" @click="move(i, -1)" :disabled="i === 0" :aria-label="'Move ' + t.label + ' up'"><svg class="ic"><use href="#ph-caret-up"/></svg></button>
+                      <button class="btn mini" @click="move(i, 1)" :disabled="i === design.length - 1" :aria-label="'Move ' + t.label + ' down'"><svg class="ic"><use href="#ph-caret-down"/></svg></button>
+                    </li>
+                  </template>
+                </ul>
+                <div class="tools" style="margin-top:12px"><button class="btn primary" :disabled="!dirty" @click="saveDesign()"><svg class="ic"><use href="#ph-check-circle"/></svg>Save layout</button><button class="btn" @click="resetDesign()">Reset to default</button><span class="sub" x-show="dirty">Unsaved changes</span></div>
+              </div>
+              <div class="card">
+                <h3>Preview <span>how the bar will look</span></h3>
+                <div class="prev"><div class="pstrip"><span class="plogo"></span><b>Lens</b><span class="pchip ok">GET 200</span><span class="pchip">/orders.bxm</span><span class="pchip">time 41 ms</span><span class="pchip">sql 7</span></div>
+                  <div class="ptabs"><template x-for="(t, i) in previewTabs()" :key="t.id"><span class="ptab" :class="i === 0 ? 'on' : ''"><span x-text="t.label"></span><span class="pk" x-show="i < 9" x-text="i + 1"></span></span></template></div></div>
+                <p class="sub" style="margin-top:10px">The number keys switch tabs in this order. A tab with no data still shows. Developers see changes on the next page load.</p>
               </div>
             </div>
           </div>

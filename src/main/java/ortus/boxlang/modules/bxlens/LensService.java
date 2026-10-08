@@ -87,6 +87,8 @@ public final class LensService {
 	private volatile AccessGuard		consoleGuard	= new AccessGuard( config, "console.access", true );
 	private volatile ConsoleAuth		auth			= new ConsoleAuth( config );
 	private volatile TaskOutcomes		outcomes		= new TaskOutcomes();
+	private volatile Licensing			licensing		= new Licensing( "" );
+	private volatile LayoutStore		layout			= new LayoutStore( null );
 	private final ConsoleData			consoleData		= new ConsoleData( this );
 	private final AtomicInteger			streams			= new AtomicInteger();
 	private volatile RequestStore		store			= new RequestStore( 50 );
@@ -135,6 +137,14 @@ public final class LensService {
 		this.consoleGuard	= new AccessGuard( this.config, "console.access", true );
 		this.auth			= new ConsoleAuth( this.config );
 		this.outcomes		= new TaskOutcomes();
+		this.licensing		= new Licensing( this.config.getString( "dev.license", "" ) );
+		Path layoutFile = null;
+		try {
+			layoutFile = runtime.getRuntimeHome().resolve( "config" ).resolve( "bxlens-layout.json" );
+		} catch ( Throwable t ) {
+			// No home: the layout lives in memory only
+		}
+		this.layout = new LayoutStore( layoutFile );
 		if ( this.config.consoleEnabled ) {
 			runtime.getInterceptorService().register( this.outcomes );
 		}
@@ -334,7 +344,9 @@ public final class LensService {
 				StringBuffer	buffer		= rc.getBuffer();
 				int				markerAt	= buffer.indexOf( MARKER );
 				if ( ( config.inject || markerAt >= 0 ) && req.injected.compareAndSet( false, true ) ) {
-					String block = renderer.render( pagePayload( json ) );
+					boolean	consoleOk	= config.consoleEnabled && ex != null
+					    && consoleGuard.isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( consoleGuard.requiredHeader() ) );
+					String	block		= renderer.render( pagePayload( json, consoleOk ? "/~bxlens/index.bxm" : "" ) );
 					if ( markerAt >= 0 ) {
 						buffer.replace( markerAt, markerAt + MARKER.length(), block );
 					} else {
@@ -366,7 +378,7 @@ public final class LensService {
 	/**
 	 * Build the JSON for the page: the request snapshot, recent history and UI settings.
 	 */
-	String pagePayload( String requestJson ) {
+	String pagePayload( String requestJson, String consoleUrl ) {
 		Map<String, Object> ui = new LinkedHashMap<>();
 		ui.put( "version", version );
 		ui.put( "theme", config.getString( "ui.theme", "auto" ) );
@@ -380,6 +392,9 @@ public final class LensService {
 		ui.put( "remoteBase", config.getString( "editor.remoteBase", "" ) );
 		ui.put( "localBase", config.getString( "editor.localBase", "" ) );
 		ui.put( "maxRequests", config.maxRequests );
+		ui.put( "layout", layout.get() );
+		ui.put( "hiddenTabs", config.hiddenTabs );
+		ui.put( "consoleUrl", consoleUrl );
 		ui.put( "slowQueryMs", config.slowQueryMs );
 		ui.put( "slowRequestMs", config.slowRequestMs );
 		Map<String, Object> page = new LinkedHashMap<>();
@@ -455,6 +470,14 @@ public final class LensService {
 
 	public ConsoleAuth getAuth() {
 		return auth;
+	}
+
+	public LayoutStore getLayout() {
+		return layout;
+	}
+
+	public Licensing getLicensing() {
+		return licensing;
 	}
 
 	public TaskOutcomes getOutcomes() {

@@ -18,7 +18,7 @@
 			// ---- data
 			d: null, r: null, ui: {}, history: [], declared: [],
 			// ---- ui state
-			tab: "timeline", collapsed: true, detached: false, height: 360, theme: "auto",
+			tab: "timeline", collapsed: true, detached: false, menu: false, menuStyle: "", height: 360, theme: "auto",
 			v0: 0, v1: 0, total: 0, sel: null, q: "", filters: {}, toastText: "", base: "",
 			_y0: null, _h0: 0, _toastTimer: null,
 
@@ -52,7 +52,7 @@
 					this.collapsed = false;
 					this.tab = this.d.issues.length ? "issues" : "exceptions";
 				}
-				if ( !this.tabIds().includes( this.tab ) ) { this.tab = "timeline"; }
+				if ( !this.tabIds().includes( this.tab ) ) { this.tab = this.tabIds()[ 0 ] || "timeline"; }
 				this.applyTheme();
 				var self = this;
 				document.addEventListener( "keydown", function ( e ) { self.onKey( e ); } );
@@ -135,6 +135,15 @@
 					var b = p.badge && p.badge.count >= 0 ? p.badge.count : null;
 					list.push( { id: p.id, label: p.label, badge: b, sev: p.badge && p.badge.severity !== "none" ? p.badge.severity : "" } );
 				} );
+				// Tabs hidden in the settings never show. The layout saved in the console's bar designer orders and hides the rest
+				var hidden = this.ui.hiddenTabs || [], layout = this.ui.layout || [];
+				list = list.filter( function ( t ) { return hidden.indexOf( t.id ) < 0; } );
+				if ( layout.length ) {
+					var pos = {}, vis = {};
+					layout.forEach( function ( l, i ) { pos[ l.id ] = i; vis[ l.id ] = l.visible !== false; } );
+					list = list.filter( function ( t ) { return vis[ t.id ] !== false; } );
+					list = list.map( function ( t, i ) { return { t: t, k: pos[ t.id ] === undefined ? 1000 + i : pos[ t.id ] }; } ).sort( function ( a, b ) { return a.k - b.k; } ).map( function ( x ) { return x.t; } );
+				}
 				return list;
 			},
 			tabIds: function () { return this.tabs.map( function ( t ) { return t.id; } ); },
@@ -148,6 +157,11 @@
 				this.theme = dark ? "light" : "dark";
 				this.applyTheme(); this.persist();
 			},
+			toggleMenu: function ( e ) {
+				var r = e.currentTarget.getBoundingClientRect();
+				this.menuStyle = "right:" + Math.max( 4, window.innerWidth - r.right ) + "px;bottom:" + ( window.innerHeight - r.top + 4 ) + "px;";
+				this.menu = !this.menu;
+			},
 			applyTheme: function () {
 				var t = this.theme;
 				if ( t === "auto" ) { t = window.matchMedia && window.matchMedia( "(prefers-color-scheme: dark)" ).matches ? "dark" : "light"; }
@@ -156,7 +170,7 @@
 			goIssue: function ( i ) {
 				if ( i.span ) { this.sel = i.span; }
 				this.tab = i.tab === "timeline" || i.span ? "timeline" : i.tab;
-				if ( !this.tabIds().includes( this.tab ) ) { this.tab = "issues"; }
+				if ( !this.tabIds().includes( this.tab ) ) { this.tab = this.tabIds()[ 0 ] || "timeline"; }
 				this.persist();
 			},
 			zoom: function ( how ) {

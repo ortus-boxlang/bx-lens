@@ -217,6 +217,17 @@ public final class ConsoleRouter {
 			    + ".txt";
 			ex.setResponseHeader( "Content-Disposition", "attachment; filename=\"" + name + "\"" );
 			send( context, ex, 200, "text/plain; charset=UTF-8", service.getData().threadDump(), true );
+		} else if ( route.equals( "bar" ) && method.equals( "GET" ) && panelOn( "designer" ) ) {
+			json( context, ex, 200, bar() );
+		} else if ( route.equals( "bar/layout" ) && method.equals( "POST" ) && panelOn( "designer" ) ) {
+			saveLayout( context, ex );
+		} else if ( route.equals( "bar/reset" ) && method.equals( "POST" ) && panelOn( "designer" ) ) {
+			try {
+				service.getLayout().reset();
+				json( context, ex, 200, bar() );
+			} catch ( java.io.IOException e ) {
+				json( context, ex, 500, Map.of( "error", "Could not save the layout: " + e.getMessage() ) );
+			}
 		} else if ( route.startsWith( "tasks/" ) && method.equals( "POST" ) && panelOn( "tasks" ) ) {
 			taskAction( context, ex, route.substring( "tasks/".length() ) );
 		} else {
@@ -255,6 +266,7 @@ public final class ConsoleRouter {
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },
+		    { "designer", "Bar designer", "layout", "Config" },
 		    { "settings", "Settings", "gear", "Config" }
 		};
 		for ( String[] t : catalog ) {
@@ -273,15 +285,8 @@ public final class ConsoleRouter {
 		return out;
 	}
 
-	/**
-	 * License status. Detection through bx-plus comes with the licensing step, until then everything is available.
-	 */
 	private Map<String, Object> license() {
-		Map<String, Object> m = new LinkedHashMap<>();
-		m.put( "state", "none" );
-		m.put( "label", "Free" );
-		m.put( "note", "License detection is not wired up yet" );
-		return m;
+		return service.getLicensing().status();
 	}
 
 	private Map<String, Object> settings() {
@@ -391,6 +396,64 @@ public final class ConsoleRouter {
 	// ---------------------------------------------------------------------------------------------
 	// Helpers
 	// ---------------------------------------------------------------------------------------------
+
+	private static final String[][] BAR_TABS = {
+	    { "issues", "Issues" }, { "timeline", "Timeline" }, { "queries", "Queries" }, { "templates", "Templates" }, { "http", "HTTP" },
+	    { "exceptions", "Exceptions" }, { "messages", "Messages" }, { "timers", "Timers" }, { "cache", "Cache" }, { "modules", "Modules" },
+	    { "request", "Request" }, { "scopes", "Scopes" }, { "jvm", "Runtime" }, { "history", "History" }
+	};
+
+	/**
+	 * Every tab the bar can show: the built-in ones and the panels modules and applications declared.
+	 */
+	private List<Map<String, Object>> barCatalog() {
+		List<Map<String, Object>> out = new ArrayList<>();
+		for ( String[] t : BAR_TABS ) {
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put( "id", t[ 0 ] );
+			m.put( "label", t[ 1 ] );
+			m.put( "custom", false );
+			m.put( "hidden", service.getConfig().hiddenTabs.contains( t[ 0 ] ) );
+			out.add( m );
+		}
+		for ( Map<String, Object> p : service.getRegistry().list() ) {
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put( "id", p.get( "id" ) );
+			m.put( "label", p.get( "label" ) );
+			m.put( "custom", true );
+			m.put( "hidden", service.getConfig().hiddenTabs.contains( String.valueOf( p.get( "id" ) ) ) );
+			out.add( m );
+		}
+		return out;
+	}
+
+	private Map<String, Object> bar() {
+		LensConfig			cfg	= service.getConfig();
+		Map<String, Object>	m	= new LinkedHashMap<>();
+		m.put( "enabled", cfg.barEnabled );
+		m.put( "catalog", barCatalog() );
+		m.put( "layout", service.getLayout().get() );
+		return m;
+	}
+
+	private void saveLayout( IBoxContext context, WebExchange ex ) {
+		try {
+			Object parsed = JSONUtil.fromJSON( ex.formParam( "layout" ) );
+			if ( ! ( parsed instanceof java.util.Collection<?> c ) ) {
+				json( context, ex, 400, Map.of( "error", "Expected a list of tabs" ) );
+				return;
+			}
+			Set<String> valid = new java.util.HashSet<>();
+			for ( Map<String, Object> t : barCatalog() ) {
+				valid.add( String.valueOf( t.get( "id" ) ) );
+			}
+			service.getLayout().save( c, valid );
+			service.getLogger().info( "bx-lens console: bar layout saved by {}", ex.remoteAddr() );
+			json( context, ex, 200, bar() );
+		} catch ( Throwable t ) {
+			json( context, ex, 400, Map.of( "error", "Could not save the layout" ) );
+		}
+	}
 
 	private boolean panelOn( String id ) {
 		LensConfig cfg = service.getConfig();

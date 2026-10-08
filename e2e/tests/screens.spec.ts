@@ -113,7 +113,8 @@ test.describe( '@screens documentation screenshots', () => {
 
 	test( 'detached window', async ( { lens, page } ) => {
 		await show( lens, '/n-plus-one.bxm', 'Timeline' );
-		await page.locator( '#bxlens .ibtn[title^="Detach"]' ).click();
+		await page.locator( '#bxlens .more .ibtn' ).click();
+		await page.locator( '#bxlens .menu button', { hasText: 'Detach as a floating window' } ).click();
 		await shoot( page, 'popout', true );
 	} );
 
