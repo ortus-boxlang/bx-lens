@@ -200,6 +200,10 @@
 				},
 				resetQueries: async function () { this.qs = await (await this.api("queries/reset", { method: "POST" })).json(); this.qpick = null; },
 				openRequest: function (id) { this.go("requests"); this.pick(id); },
+				modl: null, modsel: "", modq: "",
+				loadModules: async function () { this.modl = await (await this.api("modules")).json(); if (!this.modsel && this.modl.modules.length) { this.modsel = this.modl.modules[0].name; } },
+				modRows: function () { var q = this.modq.toLowerCase(); return this.modl.modules.filter(function (m) { return !q || m.name.toLowerCase().indexOf(q) >= 0; }); },
+				modcur: function () { var s = this.modsel; return this.modl ? (this.modl.modules.find(function (m) { return m.name === s; }) || null) : null; },
 				envd: null, envView: "config", envq: "", base: base(),
 				loadEnv: async function () { this.envd = await (await this.api("environment")).json(); },
 				envRows: function () {
@@ -294,6 +298,7 @@
 					}
 					if (this.tab === "queries") { this.loadQueries(); }
 					if (this.tab === "environment" && !this.envd) { this.loadEnv(); }
+					if (this.tab === "modules") { this.loadModules(); }
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
@@ -402,8 +407,8 @@
 						{ label: "Task completion rate", v: e.taskCompletionRate === undefined ? 100 : (e.taskCompletionRate || 100), d: c[0], c: c[1], inv: true }
 					].map(function (m) { m.cls = self.meterClass(m.v, m.d, m.c, m.inv); m.key = m.label; return m; });
 				},
-				qcap: function (e) { return e.queueCapacity > 1e6 || e.queueCapacity < 0 ? "unbounded" : e.queueCapacity; },
-				qmax: function (e) { return e.queueCapacity > 1e6 || e.queueCapacity <= 0 ? 10 : Math.max(10, e.queueCapacity); },
+				qcap: function (e) { return e.queueCapacity === null || e.queueCapacity === undefined || e.queueCapacity > 1e6 || e.queueCapacity < 0 ? "unbounded" : e.queueCapacity; },
+				qmax: function (e) { return !e.queueCapacity || e.queueCapacity > 1e6 || e.queueCapacity <= 0 ? 10 : Math.max(10, e.queueCapacity); },
 				execIssues: function () { return this.executors.filter(function (e) { return e.healthStatus === "critical" || e.healthStatus === "degraded"; }); },
 
 				// ---- tasks ----

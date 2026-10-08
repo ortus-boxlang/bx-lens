@@ -268,6 +268,8 @@ public final class ConsoleRouter {
 			json( context, ex, v == null ? 404 : 200, v == null ? Map.of( "error", "Unknown cache" ) : v );
 		} else if ( route.startsWith( "logfiles" ) && method.equals( "GET" ) && panelOn( "logfiles" ) ) {
 			logFiles( context, ex, route, s );
+		} else if ( route.equals( "modules" ) && method.equals( "GET" ) && panelOn( "modules" ) ) {
+			json( context, ex, 200, service.getEnvironment().modules() );
 		} else if ( route.equals( "environment" ) && method.equals( "GET" ) && panelOn( "environment" ) ) {
 			json( context, ex, 200, service.getEnvironment().environment() );
 		} else if ( route.equals( "bundle" ) && method.equals( "GET" ) ) {
@@ -400,6 +402,7 @@ public final class ConsoleRouter {
 		    { "datasources", "Datasources", "database", "Runtime" },
 		    { "caches", "Caches", "package", "Runtime" },
 		    { "logfiles", "Logs", "file-text", "Runtime" },
+		    { "modules", "Modules", "plug", "Runtime" },
 		    { "environment", "Environment", "sliders-horizontal", "Runtime" },
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },

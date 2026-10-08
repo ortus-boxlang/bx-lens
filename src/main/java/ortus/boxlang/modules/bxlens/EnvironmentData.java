@@ -88,6 +88,56 @@ public final class EnvironmentData {
 		return m;
 	}
 
+	/**
+	 * Every loaded module with what it provides, for the Modules page. Nested modules (inside another module's modules folder) show their parent.
+	 */
+	public Map<String, Object> modules() {
+		List<Map<String, Object>> out = new ArrayList<>();
+		try {
+			for ( Map.Entry<Key, ModuleRecord> e : BoxRuntime.getInstance().getModuleService().getRegistry().entrySet() ) {
+				ModuleRecord		r	= e.getValue();
+				Map<String, Object>	m	= new LinkedHashMap<>();
+				m.put( "name", e.getKey().getName() );
+				m.put( "version", r.version );
+				m.put( "author", r.author );
+				m.put( "description", r.description );
+				m.put( "webURL", r.webURL );
+				m.put( "enabled", r.enabled );
+				m.put( "activated", r.activated );
+				m.put( "activationMs", r.activationTime );
+				m.put( "activatedOn", r.activatedOn == null ? "" : r.activatedOn.toString() );
+				m.put( "bifs", names( r.bifs ) );
+				m.put( "components", names( r.components ) );
+				m.put( "memberMethods", names( r.memberMethods ) );
+				m.put( "interceptors", names( r.interceptors ) );
+				m.put( "interceptionPoints", names( r.customInterceptionPoints ) );
+				m.put( "dependencies", names( r.dependencies ) );
+				m.put( "nested", names( r.nestedModules ) );
+				m.put( "parent", r.parentModule == null ? "" : r.parentModule.getName() );
+				m.put( "path", r.physicalPath == null ? "" : r.physicalPath.toString() );
+				m.put( "publicMapping", r.publicMapping == null ? "" : String.valueOf( r.publicMapping.name() ) );
+				m.put( "self", ortus.boxlang.modules.bxlens.util.Keys.moduleName.equals( e.getKey() ) );
+				out.add( m );
+			}
+		} catch ( Throwable t ) {
+			// Keep what we have
+		}
+		out.sort( Comparator.comparing( x -> String.valueOf( x.get( "name" ) ).toLowerCase() ) );
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put( "modules", out );
+		return m;
+	}
+
+	private static List<String> names( Collection<?> c ) {
+		List<String> out = new ArrayList<>();
+		if ( c != null ) {
+			for ( Object o : c ) {
+				out.add( String.valueOf( o instanceof Key k ? k.getName() : o ) );
+			}
+		}
+		return out;
+	}
+
 	private List<Map<String, Object>> pairs( Map<String, String> source ) {
 		List<Map<String, Object>> out = new ArrayList<>();
 		for ( Map.Entry<String, String> e : source.entrySet() ) {

@@ -282,6 +282,25 @@
         </template>
       </section>
 
+      <!-- Modules -->
+      <section x-show="tab === 'modules'">
+        <h1 class="h1">Modules <small>everything loaded into this runtime, including modules nested inside other modules</small></h1>
+        <template x-if="modl">
+          <div class="split narrow">
+            <div class="card"><h3>Loaded <span x-text="modl.modules.length"></span></h3>
+              <div class="tools"><input type="text" placeholder="Filter modules" x-model="modq" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px"></div>
+              <div class="scroll" style="max-height:560px;margin-top:8px"><table><thead><tr><th>Module</th><th>Version</th><th>State</th></tr></thead><tbody>
+                <template x-for="m in modRows()" :key="m.name"><tr class="row" :class="modsel === m.name ? 'sel' : ''" @click="modsel = m.name"><td><span class="mono" x-text="m.name"></span><span class="chipx hid" style="margin-left:6px" x-show="m.parent" x-text="'in ' + m.parent"></span></td><td x-text="m.version"></td><td><span class="chipx" :class="m.activated ? 'on' : (m.enabled ? 'hid' : 'off')" x-text="m.activated ? 'active' : (m.enabled ? 'loaded' : 'disabled')"></span></td></tr></template></tbody></table></div></div>
+            <div class="card" x-show="modcur()"><h3><span class="mono" x-text="modcur() ? modcur().name : ''"></span><span x-text="modcur() ? modcur().version : ''"></span></h3>
+              <p x-text="modcur() ? modcur().description : ''"></p>
+              <dl class="kv" x-show="modcur()"><dt>Author</dt><dd x-text="modcur() ? modcur().author : ''"></dd><dt>Activated</dt><dd x-text="modcur() ? (modcur().activatedOn ? modcur().activatedOn + ' in ' + modcur().activationMs + ' ms' : 'no') : ''"></dd><dt>Path</dt><dd class="mono" x-text="modcur() ? modcur().path : ''"></dd><dt x-show="modcur() && modcur().publicMapping">Public mapping</dt><dd class="mono" x-show="modcur() && modcur().publicMapping" x-text="modcur() ? modcur().publicMapping : ''"></dd><dt x-show="modcur() && modcur().parent">Nested in</dt><dd x-show="modcur() && modcur().parent" x-text="modcur() ? modcur().parent : ''"></dd><dt x-show="modcur() && modcur().nested.length">Nested modules</dt><dd x-show="modcur() && modcur().nested.length" x-text="modcur() ? modcur().nested.join(', ') : ''"></dd><dt x-show="modcur() && modcur().dependencies.length">Depends on</dt><dd x-show="modcur() && modcur().dependencies.length" x-text="modcur() ? modcur().dependencies.join(', ') : ''"></dd></dl>
+              <template x-for="g in [['bifs', 'Functions'], ['components', 'Components'], ['memberMethods', 'Member methods'], ['interceptors', 'Interceptors'], ['interceptionPoints', 'Interception points']]" :key="g[0]"><div x-show="modcur() && modcur()[g[0]].length"><h3 style="margin-top:10px"><span x-text="g[1]"></span><span x-text="modcur() ? modcur()[g[0]].length : ''"></span></h3><div style="display:flex;flex-wrap:wrap;gap:4px"><template x-for="n in (modcur() ? modcur()[g[0]].slice(0, 80) : [])" :key="n"><span class="chipx hid mono" x-text="n"></span></template></div></div></template>
+              <div class="tools" style="margin-top:10px" x-show="modcur() && modcur().webURL"><span class="sub">Home: <span class="mono" x-text="modcur() ? modcur().webURL : ''"></span></span></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
       <!-- Environment -->
       <section x-show="tab === 'environment'">
         <h1 class="h1">Environment <small>what this server is made of, secrets hidden</small></h1>
