@@ -75,19 +75,22 @@ public final class LensService {
 	/**
 	 * Placeholder written by lensRender() and replaced with the bar when the request ends.
 	 */
-	public static final String			MARKER		= "<!--bxlens:here-->";
+	public static final String			MARKER			= "<!--bxlens:here-->";
 
 	private static volatile LensService	instance;
 
 	private volatile BoxRuntime			runtime;
-	private volatile LensConfig			config		= LensConfig.defaults();
-	private volatile AccessGuard		guard		= new AccessGuard( config );
-	private volatile RequestStore		store		= new RequestStore( 50 );
+	private volatile LensConfig			config			= LensConfig.defaults();
+	private volatile AccessGuard		barGuard		= new AccessGuard( config, "bar.access", false );
+	private volatile AccessGuard		consoleGuard	= new AccessGuard( config, "console.access", true );
+	private volatile ConsoleAuth		auth			= new ConsoleAuth( config );
+	private volatile RequestStore		store			= new RequestStore( 50 );
 	private volatile BarRenderer		renderer;
-	private volatile String				version		= "0.0.0";
-	private final GlobalStats			stats		= new GlobalStats();
-	private final LensRegistry			registry	= new LensRegistry();
-	private final List<ILensCollector>	collectors	= Collections.synchronizedList( new ArrayList<>() );
+	private volatile String				version			= "0.0.0";
+	private volatile String				moduleDir		= "";
+	private final GlobalStats			stats			= new GlobalStats();
+	private final LensRegistry			registry		= new LensRegistry();
+	private final List<ILensCollector>	collectors		= Collections.synchronizedList( new ArrayList<>() );
 	private volatile BoxLangLogger		logger;
 
 	private LensService() {
@@ -119,26 +122,40 @@ public final class LensService {
 	 */
 	public synchronized void activate( BoxRuntime runtime, Map<?, ?> settings, String moduleDir, String version ) {
 		shutdown();
-		this.runtime	= runtime;
-		this.version	= version == null ? "" : version;
-		this.config		= new LensConfig( settings );
-		this.guard		= new AccessGuard( this.config );
-		this.store		= new RequestStore( this.config.maxRequests );
-		this.renderer	= new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
+		this.runtime		= runtime;
+		this.version		= version == null ? "" : version;
+		this.moduleDir		= moduleDir == null ? "" : moduleDir;
+		this.config			= new LensConfig( settings );
+		this.barGuard		= new AccessGuard( this.config, "bar.access", this.config.getBool( "bar.allowAllIPs", false ) );
+		this.consoleGuard	= new AccessGuard( this.config, "console.access", true );
+		this.auth			= new ConsoleAuth( this.config );
+		this.store			= new RequestStore( this.config.maxRequests );
+		this.renderer		= new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
 		if ( !this.renderer.isComplete() ) {
 			getLogger().warn( "bx-lens assets are missing under [{}]. The bar will not render.", moduleDir );
 		}
-		if ( !this.config.enabled ) {
-			getLogger().info( "bx-lens is installed but disabled. Set modules.bxLens.settings.enabled to true to turn it on." );
-			// The lifecycle collector still registers so a runtime config reload can be picked up later
+		if ( !this.config.barEnabled && !this.config.consoleEnabled ) {
+			getLogger().info( "bx-lens is installed but off. Set bar.enabled or console.enabled in the module settings to turn it on." );
+		}
+		if ( this.barGuard.isDowngraded() ) {
+			getLogger().error(
+			    "bx-lens: bar.access is [all] but bar.allowAllIPs is not true. Showing the bar to loopback only. Set bar.allowAllIPs to true to confirm you want every IP to see request internals." );
+		}
+		if ( this.config.consoleEnabled && this.config.consolePassword().isBlank() ) {
+			getLogger().error( "bx-lens: console.enabled is true but console.password is empty or cannot be decrypted. The console stays unavailable." );
+		}
+		if ( this.config.consoleEnabled && this.consoleGuard.isOpenToAll() ) {
+			getLogger().warn( "bx-lens: console.access is [all]. Use HTTPS and a strong password." );
 		}
 		for ( ILensCollector c : builtIns() ) {
-			if ( c instanceof LifecycleCollector || this.config.isCollectorEnabled( c.id(), c.enabledByDefault() ) ) {
+			boolean heavyBlocked = this.config.light && c.heavy();
+			if ( c instanceof LifecycleCollector || ( !heavyBlocked && this.config.isCollectorEnabled( c.id(), c.enabledByDefault() ) ) ) {
 				register( c );
 			}
 		}
 		announceRegister();
-		getLogger().info( "bx-lens {} active: enabled={}, collectors={}", this.version, this.config.enabled, collectorIds() );
+		getLogger().info( "bx-lens {} active: bar={}, console={}, collect={}, collectors={}", this.version, this.config.barEnabled, this.config.consoleEnabled,
+		    this.config.collectLevel, collectorIds() );
 	}
 
 	/**
@@ -196,7 +213,7 @@ public final class LensService {
 	 * @return the tracked request or null
 	 */
 	public LensRequest begin( RequestBoxContext rc ) {
-		if ( !config.enabled || rc == null ) {
+		if ( !config.active || rc == null ) {
 			return null;
 		}
 		LensRequest existing = rc.getAttachment( Keys.requestAttach );
@@ -211,10 +228,13 @@ public final class LensService {
 		if ( config.isExcluded( uri ) ) {
 			return null;
 		}
-		if ( !guard.isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( guard.requiredHeader() ) ) ) {
+		// The bar only shows for allowed callers. The console collects every request so production traffic is visible to it.
+		boolean showBar = config.barEnabled && barGuard.isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( barGuard.requiredHeader() ) );
+		if ( !showBar && !config.consoleEnabled ) {
 			return null;
 		}
 		LensRequest req = new LensRequest();
+		req.showBar			= showBar;
 		req.requestContext	= rc;
 		req.method			= ex.method();
 		req.url				= ex.url();
@@ -227,7 +247,9 @@ public final class LensService {
 		req.template	= uri;
 		rc.putAttachment( Keys.requestAttach, req );
 		try {
-			ex.setResponseHeader( config.idHeader, req.id );
+			if ( showBar ) {
+				ex.setResponseHeader( config.idHeader, req.id );
+			}
 		} catch ( Throwable t ) {
 			// Headers already sent
 		}
@@ -291,7 +313,7 @@ public final class LensService {
 		if ( req.html || config.trackNonHtml ) {
 			store.add( new RequestStore.Entry( req.id, Snapshot.summary( req ), json ) );
 		}
-		if ( trigger == Trigger.END && req.html && renderer != null && renderer.isComplete() && ex != null && !ex.responseStarted() ) {
+		if ( trigger == Trigger.END && req.showBar && req.html && renderer != null && renderer.isComplete() && ex != null && !ex.responseStarted() ) {
 			try {
 				StringBuffer	buffer		= rc.getBuffer();
 				int				markerAt	= buffer.indexOf( MARKER );
@@ -404,7 +426,23 @@ public final class LensService {
 	}
 
 	public boolean isEnabled() {
-		return config.enabled;
+		return config.active;
+	}
+
+	public AccessGuard getConsoleGuard() {
+		return consoleGuard;
+	}
+
+	public AccessGuard getBarGuard() {
+		return barGuard;
+	}
+
+	public ConsoleAuth getAuth() {
+		return auth;
+	}
+
+	public String getModuleDir() {
+		return moduleDir;
 	}
 
 	public List<ILensCollector> getCollectors() {

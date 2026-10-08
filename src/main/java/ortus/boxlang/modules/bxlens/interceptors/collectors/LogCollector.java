@@ -35,6 +35,11 @@ import ortus.boxlang.runtime.types.IStruct;
 public class LogCollector extends BaseCollector {
 
 	@Override
+	public boolean heavy() {
+		return true;
+	}
+
+	@Override
 	public String id() {
 		return "logs";
 	}

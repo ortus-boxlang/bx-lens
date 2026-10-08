@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>BX Lens Console</title>
+<link rel="stylesheet" href="{{base}}/assets/console.css">
+<script defer src="{{base}}/assets/console.js"></script>
+<script defer src="{{base}}/assets/alpine.min.js"></script>
+</head>
+<body data-base="{{base}}" data-csrf="{{csrf}}">
+<!--ICONS-->
+<div class="shell" x-data="lensApp()" x-init="init()" x-cloak>
+  <header class="top">
+    <span class="mark" aria-hidden="true"></span><b>BX Lens</b>
+    <span class="hostinfo" x-show="state" x-text="state ? state.host + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
+    <span class="spacer"></span>
+    <span class="lic" :class="licenseClass()" x-show="state" x-text="state ? state.license.label : ''"></span>
+    <button class="live" :class="live ? '' : 'off'" @click="live = !live" :aria-pressed="live" title="Refresh every 3 seconds"><i></i><span x-text="live ? 'live 3s' : 'paused'"></span></button>
+    <button class="btn" @click="logout()"><svg class="ic"><use href="#ph-sign-out"/></svg>Log out</button>
+  </header>
+  <div class="banner" x-show="showBanner()">You are on a trial. Plus features stop working when it ends and need a license.</div>
+  <div class="app">
+    <nav class="side" aria-label="Console">
+      <template x-for="g in groups()" :key="g.name">
+        <div style="display:contents">
+          <h4 x-text="g.name"></h4>
+          <template x-for="t in g.tabs" :key="t.id">
+            <button class="nav" :aria-current="tab === t.id ? 'page' : null" @click="go(t.id)">
+              <svg class="ic"><use :href="icon(t.icon)"/></svg><span x-text="t.label"></span>
+              <span class="badge" x-show="t.id === 'requests' && requests.length" x-text="requests.length"></span>
+            </button>
+          </template>
+        </div>
+      </template>
+    </nav>
+    <main class="main">
+
+      <!-- Overview -->
+      <section x-show="tab === 'overview'">
+        <h1 class="h1">Overview <small>this server only, last <span x-text="overview && overview.windowMinutes ? overview.windowMinutes + ' minutes' : 'requests in memory'"></span></small></h1>
+        <template x-if="overview">
+          <div>
+            <div class="tiles">
+              <div class="card"><h3>Requests</h3><div class="big" x-text="overview.requests"></div><div class="sub" x-text="overview.perSecond + ' / s'"></div>
+                <svg viewBox="0 0 240 46" width="100%" height="46" role="img" aria-label="Requests over the last 5 minutes"><path :d="spark()" fill="none" stroke="var(--cyan)" stroke-width="1.6"/></svg></div>
+              <div class="card"><h3>Errors</h3><div class="big" :style="overview.errors ? 'color:var(--crit)' : ''"><span x-text="overview.errorRate"></span><small>%</small></div><div class="sub" x-text="overview.errors + ' of ' + overview.requests + ' returned 5xx'"></div></div>
+              <div class="card"><h3>p95 time</h3><div class="big"><span x-text="Math.round(overview.p95Ms)"></span><small>ms</small></div><div class="sub" x-text="'median ' + Math.round(overview.medianMs) + ' ms'"></div></div>
+              <div class="card"><h3>Queries</h3><div class="big" x-text="overview.queriesPerRequest"></div><div class="sub">per request</div></div>
+            </div>
+            <div class="grid2">
+              <div class="card"><h3>Needs attention</h3>
+                <div class="empty" x-show="!overview.attention.length">Nothing needs attention.</div>
+                <div class="attn"><template x-for="a in overview.attention" :key="a.text"><button @click="go(a.go)"><span class="sev" :class="a.severity" x-text="a.severity"></span><span x-text="a.text"></span></button></template></div></div>
+              <div class="card"><h3>Slowest routes <span>p95</span></h3>
+                <div class="empty" x-show="!overview.slowest.length">No requests yet.</div>
+                <div class="scroll" x-show="overview.slowest.length"><table><thead><tr><th>Route</th><th class="num">p95</th><th class="num">Calls</th><th class="num">Errors</th></tr></thead><tbody>
+                  <template x-for="r in overview.slowest" :key="r.route"><tr><td class="mono" x-text="r.route"></td><td class="num" x-text="fmt(r.p95Ms)"></td><td class="num" x-text="r.calls"></td><td class="num" :style="r.errors ? 'color:var(--crit)' : ''" x-text="r.errors"></td></tr></template></tbody></table></div></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Requests -->
+      <section x-show="tab === 'requests'">
+        <h1 class="h1">Requests <small>in memory, newest first, recycled at <span x-text="capacity"></span></small></h1>
+        <div class="msg warn" style="margin:0 0 10px" x-show="state && state.collectLevel === 'light'">Collect level is light: no bindings, scopes, headers or stack traces are recorded.</div>
+        <div class="tools">
+          <div class="seg"><template x-for="f in [['all','All'],['err','Errors'],['slow','Slow'],['json','JSON']]" :key="f[0]"><button :class="rf === f[0] ? 'on' : ''" @click="rf = f[0]" x-text="f[1]"></button></template></div>
+          <input type="search" placeholder="Filter by URL" aria-label="Filter requests" x-model="rq">
+        </div>
+        <div class="split">
+          <div class="card scroll" style="padding:0"><table><thead><tr><th>Time</th><th>Method</th><th>URL</th><th class="num">Status</th><th class="num">Time</th><th class="num">SQL</th><th class="num">Issues</th></tr></thead><tbody>
+            <template x-for="r in filtered()" :key="r.id"><tr class="row" :class="rsel === r.id ? 'sel' : ''" tabindex="0" @click="pick(r.id)" @keydown.enter="pick(r.id)">
+              <td class="mono" x-text="time(r.at)"></td><td x-text="r.method"></td><td class="mono" x-text="r.url"></td>
+              <td class="num"><span class="pill" :class="statusClass(r.status)" x-text="r.status"></span></td><td class="num" x-text="fmt(r.ms)"></td><td class="num" x-text="r.queries"></td>
+              <td class="num" :style="r.issues ? 'color:var(--warn)' : ''" x-text="r.issues"></td></tr></template>
+            <tr x-show="!filtered().length"><td colspan="7" class="empty">No requests match.</td></tr></tbody></table></div>
+          <div class="card">
+            <div class="empty" x-show="!detail && !detailErr">Pick a request.</div>
+            <div class="empty" x-show="detailErr" x-text="detailErr"></div>
+            <template x-if="detail">
+              <div>
+                <h3><span class="mono" style="color:var(--ink)" x-text="detail.request.method + ' ' + detail.request.uri"></span><span x-text="time(Date.parse(detail.request.startedAt))"></span></h3>
+                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-text="detail.request.remoteAddr"></span></div>
+                <template x-for="i in detail.issues" :key="i.title + i.message"><div class="issue" :class="i.severity === 'crit' ? 'crit' : ''"><b x-text="i.severity === 'crit' ? 'Error' : 'Warn'"></b><span x-text="i.title + ': ' + i.message"></span></div></template>
+                <h3 style="margin-top:8px">Timeline</h3>
+                <div class="wf" :style="'height:' + wfHeight() + 'px'" role="img" aria-label="Request timeline"><template x-for="b in bars()" :key="b.key"><div :class="b.type" :style="'left:' + b.left + '%;width:' + b.width + '%;top:' + b.top + 'px'" :title="b.label" x-text="b.label"></div></template></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings -->
+      <section x-show="tab === 'settings'">
+        <h1 class="h1">Settings <small>effective values, read-only. Edit <span class="mono">boxlang.json</span> and reload the module.</small></h1>
+        <template x-if="settings">
+          <div class="grid2">
+            <div class="card"><h3>Access and collection</h3>
+              <dl class="kv"><template x-for="(v, k) in settings.access" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd x-text="Array.isArray(v) ? v.join(', ') : String(v)"></dd></div></template></dl></div>
+            <div class="card"><h3>Collectors <span>heavy ones are skipped at the light level</span></h3>
+              <div class="scroll"><table><thead><tr><th>Collector</th><th>Cost</th></tr></thead><tbody><template x-for="c in settings.collectors" :key="c.id"><tr><td class="mono" x-text="c.id"></td><td><span class="chipx" :class="c.heavy ? 'off' : 'on'" x-text="c.heavy ? 'heavy' : 'light'"></span></td></tr></template></tbody></table></div>
+              <p class="sub">Hidden tabs: <span class="mono" x-text="settings.hiddenTabs.length ? settings.hiddenTabs.join(', ') : 'none'"></span></p></div>
+          </div>
+        </template>
+      </section>
+    </main>
+  </div>
+  <div class="toast" x-show="toastMsg" x-text="toastMsg" role="status"></div>
+</div>
+</body>
+</html>

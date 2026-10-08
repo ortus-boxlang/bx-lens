@@ -40,6 +40,13 @@ public interface ILensCollector {
 	}
 
 	/**
+	 * Is this collector too heavy or too revealing for the light collect level? Heavy collectors are not registered at that level.
+	 */
+	default boolean heavy() {
+		return false;
+	}
+
+	/**
 	 * Called when a tracked request starts.
 	 */
 	default void onRequestStart( LensRequest request ) {

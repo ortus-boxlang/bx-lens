@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import ortus.boxlang.modules.bxlens.LensService;
 import ortus.boxlang.modules.bxlens.LensConfig;
 import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
 import ortus.boxlang.modules.bxlens.model.LensRequest;
@@ -108,7 +109,7 @@ public class ExceptionCollector extends BaseCollector {
 		m.put( "line", frames.isEmpty() ? 0 : frames.get( 0 ).get( "line" ) );
 		List<String> java = new ArrayList<>();
 		for ( StackTraceElement e : t.getStackTrace() ) {
-			if ( java.size() >= 12 ) {
+			if ( LensService.getInstance().getConfig().light || java.size() >= 12 ) {
 				break;
 			}
 			java.add( e.toString() );

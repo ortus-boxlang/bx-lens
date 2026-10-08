@@ -65,7 +65,7 @@ public final class Snapshot {
 		m.put( "request", r );
 
 		Map<String, Object> headers = new LinkedHashMap<>();
-		if ( exchange != null ) {
+		if ( exchange != null && !cfg.light ) {
 			try {
 				exchange.requestHeaders().forEach( ( k, v ) -> headers.put( k, clean.cleanKeyed( k, v ) ) );
 			} catch ( Throwable t ) {

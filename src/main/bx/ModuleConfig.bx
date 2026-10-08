@@ -14,6 +14,8 @@ class {
 
 	this.version      = "@build.version@+@build.number@";
 	this.mapping      = "bxlens";
+	// The console lives at /~bxlens/index.bxm (a bare /~bxlens/ is not served by every web server)
+	this.publicMapping = { name : "~bxlens", usePrefix : false, path : "public" };
 	this.author       = "Ortus Solutions";
 	this.description  = "A request level debug bar for BoxLang web applications: timeline, queries, templates, cache, modules and more.";
 	this.webURL       = "https://github.com/ortus-boxlang/bx-lens";
@@ -25,19 +27,37 @@ class {
 	 */
 	function configure() {
 		settings = {
-			// Master switch. Lens is off by default. Never turn it on for a public site.
-			enabled : false,
+			// The bar: a strip injected into HTML pages for developers. Off by default.
+			bar : {
+				enabled      : false,
+				// "local" (loopback only), "all", or a list of IPs, CIDRs and the words local and private
+				access       : "local",
+				// A second key for "all": any IP could then see request internals. Never on for a public site without a reason
+				allowAllIPs  : false
+			},
 
-			// Who may be tracked and shown the bar
+			// The standalone console at /~bxlens/index.bxm. Off by default and needs a password. Use a bxsecret: value in boxlang.json
+			console : {
+				enabled          : false,
+				password         : "",
+				access           : "local",
+				sessionMinutes   : 30,
+				maxLoginAttempts : 5,
+				lockoutMinutes   : 5
+			},
+
+			// off | light | full. Light is for production: no bindings, scopes, headers, stack traces, function or log collectors
+			collect : { level : "full" },
+
+			// Tabs to hide in the bar and the console. A disabled collector hides its tab too
+			tabs : { hide : [] },
+
+			// Extra checks for both the bar and the console
 			access : {
-				// Exact IPs, CIDR ranges, or "*" for everyone (dangerous)
-				allowedIPs           : [ "127.0.0.1", "::1" ],
-				// Also allow private network ranges (10/8, 172.16/12, 192.168/16, fc00::/7, link-local)
-				allowPrivateNetworks : true,
 				// Restrict to these Host header names. Empty means any host
-				allowedHosts         : [],
+				allowedHosts : [],
 				// Require a request header: "Name" or "Name=value". Empty means none
-				requireHeader        : ""
+				requireHeader : ""
 			},
 
 			// Inject the bar before </body> on HTML responses. Set false and call lensRender() to place it yourself

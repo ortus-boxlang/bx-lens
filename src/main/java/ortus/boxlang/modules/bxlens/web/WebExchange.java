@@ -22,6 +22,7 @@ import java.util.Map;
 
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.web.context.WebRequestBoxContext;
+import ortus.boxlang.web.exchange.BoxCookie;
 import ortus.boxlang.web.exchange.IBoxHTTPExchange;
 
 /**
@@ -108,6 +109,81 @@ public final class WebExchange {
 
 	public void setResponseHeader( String name, String value ) {
 		exchange.setResponseHeader( name, value );
+	}
+
+	/**
+	 * Path after the script name, for example <code>/api/requests</code> in <code>/~bxlens/index.bxm/api/requests</code>.
+	 */
+	public String pathInfo() {
+		return safe( exchange.getRequestPathInfo() );
+	}
+
+	public boolean secure() {
+		try {
+			return exchange.isRequestSecure() || "https".equalsIgnoreCase( exchange.getRequestHeader( "X-Forwarded-Proto" ) );
+		} catch ( Throwable t ) {
+			return false;
+		}
+	}
+
+	public String urlParam( String name ) {
+		Map<String, String[]>	m	= exchange.getRequestURLMap();
+		String[]				v	= m == null ? null : m.get( name );
+		return v == null || v.length == 0 ? null : v[ 0 ];
+	}
+
+	public String formParam( String name ) {
+		Map<String, String[]>	m	= exchange.getRequestFormMap();
+		String[]				v	= m == null ? null : m.get( name );
+		return v == null || v.length == 0 ? null : v[ 0 ];
+	}
+
+	/**
+	 * The request body as text.
+	 */
+	public String body() {
+		Object b = exchange.getRequestBody();
+		if ( b == null ) {
+			return "";
+		}
+		if ( b instanceof byte[] bytes ) {
+			return new String( bytes, java.nio.charset.StandardCharsets.UTF_8 );
+		}
+		return b.toString();
+	}
+
+	/**
+	 * The request body exactly as web support hands it over: text, bytes or an already parsed map.
+	 */
+	public Object rawBody() {
+		return exchange.getRequestBody();
+	}
+
+	public String cookie( String name ) {
+		BoxCookie c = exchange.getRequestCookie( name );
+		return c == null ? null : c.getValue();
+	}
+
+	/**
+	 * Set a cookie. A negative max age makes it a session cookie, zero deletes it.
+	 */
+	public void setCookie( String name, String value, boolean httpOnly, boolean secure, String sameSite, int maxAgeSeconds, String path ) {
+		BoxCookie c = new BoxCookie( name, value );
+		c.setPath( path );
+		c.setHttpOnly( httpOnly );
+		c.setSecure( secure );
+		if ( sameSite != null ) {
+			c.setSameSite( true );
+			c.setSameSiteMode( sameSite );
+		}
+		if ( maxAgeSeconds >= 0 ) {
+			c.setMaxAge( maxAgeSeconds );
+		}
+		exchange.addResponseCookie( c );
+	}
+
+	public void setStatus( int code ) {
+		exchange.setResponseStatus( code );
 	}
 
 	private static String safe( String s ) {

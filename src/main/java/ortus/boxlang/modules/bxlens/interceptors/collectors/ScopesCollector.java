@@ -45,6 +45,11 @@ public class ScopesCollector extends BaseCollector {
 	}
 
 	@Override
+	public boolean heavy() {
+		return true;
+	}
+
+	@Override
 	public String id() {
 		return "scopes";
 	}

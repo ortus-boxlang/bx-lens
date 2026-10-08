@@ -2,7 +2,18 @@
 	"modules": {
 		"bxLens": {
 			"settings": {
-				"enabled": true,
+				"bar": {
+					"enabled": true,
+					"access": "local"
+				},
+				"console": {
+					"enabled": true,
+					"password": "lens-demo",
+					"access": "local"
+				},
+				"collect": {
+					"level": "full"
+				},
 				"ui": {
 					"startOpen": false,
 					"autoOpenOnException": true

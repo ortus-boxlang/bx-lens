@@ -35,7 +35,19 @@ public final class LensConfig {
 
 	private final Map<String, Object>	root;
 
-	public final boolean				enabled;
+	/** The bar is turned on. It is only shown to callers allowed by <code>bar.access</code>. */
+	public final boolean				barEnabled;
+	/** The standalone console is turned on. It also needs a password. */
+	public final boolean				consoleEnabled;
+	/** Requests are collected: the bar or the console is on and the collect level is not off. */
+	public final boolean				active;
+	/** off, light or full. Light skips bindings, scopes, headers, stack traces and the expensive collectors. */
+	public final String					collectLevel;
+	public final boolean				light;
+	public final int					sessionMinutes;
+	public final int					maxLoginAttempts;
+	public final int					lockoutMinutes;
+	public final List<String>			hiddenTabs;
 	public final boolean				inject;
 	public final boolean				trackNonHtml;
 	public final int					maxRequests;
@@ -59,23 +71,32 @@ public final class LensConfig {
 	 */
 	public LensConfig( Map<?, ?> settings ) {
 		this.root			= deepCopy( settings );
-		this.enabled		= getBool( "enabled", false );
-		this.inject			= getBool( "inject", true );
-		this.trackNonHtml	= getBool( "history.trackNonHtml", true );
-		this.maxRequests	= Math.max( 1, getInt( "history.maxRequests", 50 ) );
-		this.idHeader		= getString( "history.header", "X-BxLens-Id" );
-		this.contentTypes	= lower( getList( "contentTypes", List.of( "text/html" ) ) );
-		this.excludePaths	= getList( "excludePaths", List.of( "/~bxlens/*", "/favicon.ico" ) );
-		this.redactKeys		= lower( getList( "redact.keys",
+		this.barEnabled		= getBool( "bar.enabled", false );
+		this.consoleEnabled	= getBool( "console.enabled", false );
+		String level = getString( "collect.level", "full" ).trim().toLowerCase( Locale.ROOT );
+		this.collectLevel		= List.of( "off", "light", "full" ).contains( level ) ? level : "full";
+		this.light				= "light".equals( this.collectLevel );
+		this.active				= ( this.barEnabled || this.consoleEnabled ) && !"off".equals( this.collectLevel );
+		this.sessionMinutes		= Math.max( 1, getInt( "console.sessionMinutes", 30 ) );
+		this.maxLoginAttempts	= Math.max( 1, getInt( "console.maxLoginAttempts", 5 ) );
+		this.lockoutMinutes		= Math.max( 1, getInt( "console.lockoutMinutes", 5 ) );
+		this.hiddenTabs			= lower( getList( "tabs.hide", List.of() ) );
+		this.inject				= getBool( "inject", true );
+		this.trackNonHtml		= getBool( "history.trackNonHtml", true );
+		this.maxRequests		= Math.max( 1, getInt( "history.maxRequests", 50 ) );
+		this.idHeader			= getString( "history.header", "X-BxLens-Id" );
+		this.contentTypes		= lower( getList( "contentTypes", List.of( "text/html" ) ) );
+		this.excludePaths		= getList( "excludePaths", List.of( "/~bxlens/*", "/favicon.ico" ) );
+		this.redactKeys			= lower( getList( "redact.keys",
 		    List.of( "password", "pwd", "passwd", "token", "secret", "apikey", "api_key", "authorization", "cookie", "credential" ) ) );
-		this.redactMask		= getString( "redact.mask", "[redacted]" );
-		this.slowRequestMs	= getInt( "thresholds.slowRequestMs", 500 );
-		this.slowQueryMs	= getInt( "thresholds.slowQueryMs", 25 );
-		this.slowTemplateMs	= getInt( "thresholds.slowTemplateMs", 100 );
-		this.nPlusOneMin	= Math.max( 2, getInt( "thresholds.nPlusOneMin", 3 ) );
-		this.maxString		= getInt( "limits.maxString", 2000 );
-		this.maxDepth		= getInt( "limits.maxDepth", 4 );
-		this.maxItems		= getInt( "limits.maxItems", 100 );
+		this.redactMask			= getString( "redact.mask", "[redacted]" );
+		this.slowRequestMs		= getInt( "thresholds.slowRequestMs", 500 );
+		this.slowQueryMs		= getInt( "thresholds.slowQueryMs", 25 );
+		this.slowTemplateMs		= getInt( "thresholds.slowTemplateMs", 100 );
+		this.nPlusOneMin		= Math.max( 2, getInt( "thresholds.nPlusOneMin", 3 ) );
+		this.maxString			= getInt( "limits.maxString", 2000 );
+		this.maxDepth			= getInt( "limits.maxDepth", 4 );
+		this.maxItems			= getInt( "limits.maxItems", 100 );
 	}
 
 	/**
@@ -188,11 +209,32 @@ public final class LensConfig {
 	}
 
 	/**
+	 * The password for the console. A <code>bxsecret:</code> value is decrypted with the runtime seed.
+	 *
+	 * @return the plain password or an empty string when none is set or it cannot be decrypted
+	 */
+	public String consolePassword() {
+		String v = getString( "console.password", "" );
+		if ( v.isBlank() ) {
+			return "";
+		}
+		try {
+			return ortus.boxlang.runtime.util.ConfigSecretUtil.decryptIfEncrypted( v );
+		} catch ( Throwable t ) {
+			return "";
+		}
+	}
+
+	/**
 	 * Does a request path match one of the excluded path patterns? A trailing * means prefix match.
 	 */
 	public boolean isExcluded( String path ) {
 		if ( path == null ) {
 			return false;
+		}
+		// The console is never tracked, whatever the user configures
+		if ( path.startsWith( "/~bxlens/" ) || path.equals( "/~bxlens" ) ) {
+			return true;
 		}
 		for ( String p : excludePaths ) {
 			if ( p.endsWith( "*" ) ? path.startsWith( p.substring( 0, p.length() - 1 ) ) : path.equals( p ) ) {

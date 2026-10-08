@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>BX Lens Console</title>
+<link rel="stylesheet" href="{{base}}/assets/console.css">
+<script defer src="{{base}}/assets/console.js"></script>
+<script defer src="{{base}}/assets/alpine.min.js"></script>
+</head>
+<body data-base="{{base}}">
+<!--ICONS-->
+<div class="centerwrap" x-data="lensLogin()" x-cloak>
+  <form class="card login" @submit.prevent="submit()">
+    <div class="logo" aria-hidden="true"></div>
+    <h1>BX Lens Console</h1>
+    <p>Sign in to inspect this server.</p>
+    <label for="pw">Password</label>
+    <input id="pw" type="password" autocomplete="current-password" autofocus x-model="pw" :disabled="locked > 0">
+    <div class="msg err" x-show="err" x-text="err" role="alert"></div>
+    <div class="msg warn" x-show="insecure">This connection is not encrypted. Anyone on the network can read the password. Use HTTPS.</div>
+    <button class="go" :disabled="busy || locked > 0 || !pw">Sign in</button>
+    <div class="foot"><span>BX Lens {{version}}</span><span>One server. For clusters use BX Insights.</span></div>
+  </form>
+</div>
+</body>
+</html>

@@ -44,6 +44,8 @@ public final class LensRequest {
 	public final AtomicBoolean						injected		= new AtomicBoolean( false );
 
 	public volatile boolean							enabled			= true;
+	/** Is the bar shown to this caller? False when the request is collected only for the console. */
+	public volatile boolean							showBar			= true;
 	public volatile long							endNanos		= -1;
 	public volatile String							method			= "";
 	public volatile String							url				= "";

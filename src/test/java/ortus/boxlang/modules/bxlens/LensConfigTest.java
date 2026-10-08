@@ -31,7 +31,10 @@ public class LensConfigTest {
 	@DisplayName( "Lens is off by default" )
 	public void disabledByDefault() {
 		LensConfig cfg = LensConfig.defaults();
-		assertThat( cfg.enabled ).isFalse();
+		assertThat( cfg.barEnabled ).isFalse();
+		assertThat( cfg.consoleEnabled ).isFalse();
+		assertThat( cfg.active ).isFalse();
+		assertThat( cfg.collectLevel ).isEqualTo( "full" );
 		assertThat( cfg.maxRequests ).isEqualTo( 50 );
 		assertThat( cfg.slowQueryMs ).isEqualTo( 25 );
 		assertThat( cfg.nPlusOneMin ).isEqualTo( 3 );
@@ -41,11 +44,12 @@ public class LensConfigTest {
 	@DisplayName( "Nested keys are read case insensitively with defaults for the missing ones" )
 	public void nestedLookups() {
 		LensConfig cfg = new LensConfig( Map.of(
-		    "enabled", true,
+		    "bar", Map.of( "enabled", true ),
 		    "history", Map.of( "maxRequests", 5 ),
 		    "collectors", Map.of( "Queries", Map.of( "enabled", false, "max", 7 ), "cache", true )
 		) );
-		assertThat( cfg.enabled ).isTrue();
+		assertThat( cfg.barEnabled ).isTrue();
+		assertThat( cfg.active ).isTrue();
 		assertThat( cfg.maxRequests ).isEqualTo( 5 );
 		assertThat( cfg.trackNonHtml ).isTrue();
 		assertThat( cfg.isCollectorEnabled( "queries", true ) ).isFalse();
@@ -53,6 +57,44 @@ public class LensConfigTest {
 		assertThat( cfg.isCollectorEnabled( "cache", false ) ).isTrue();
 		assertThat( cfg.isCollectorEnabled( "functions", false ) ).isFalse();
 		assertThat( cfg.isCollectorEnabled( "jvm", true ) ).isTrue();
+	}
+
+	@Test
+	@DisplayName( "The console and the bar switch collection on independently" )
+	public void surfaces() {
+		assertThat( new LensConfig( Map.of( "console", Map.of( "enabled", true ) ) ).active ).isTrue();
+		assertThat( new LensConfig( Map.of( "bar", Map.of( "enabled", true ), "collect", Map.of( "level", "off" ) ) ).active ).isFalse();
+	}
+
+	@Test
+	@DisplayName( "Collect level accepts off, light and full and ignores anything else" )
+	public void collectLevels() {
+		assertThat( new LensConfig( Map.of( "collect", Map.of( "level", "LIGHT" ) ) ).light ).isTrue();
+		assertThat( new LensConfig( Map.of( "collect", Map.of( "level", "off" ) ) ).collectLevel ).isEqualTo( "off" );
+		assertThat( new LensConfig( Map.of( "collect", Map.of( "level", "turbo" ) ) ).collectLevel ).isEqualTo( "full" );
+	}
+
+	@Test
+	@DisplayName( "Tabs can be hidden from settings" )
+	public void hiddenTabs() {
+		assertThat( new LensConfig( Map.of( "tabs", Map.of( "hide", List.of( "Modules", "cache" ) ) ) ).hiddenTabs ).containsExactly( "modules", "cache" );
+		assertThat( LensConfig.defaults().hiddenTabs ).isEmpty();
+	}
+
+	@Test
+	@DisplayName( "The console path is never tracked, whatever excludePaths says" )
+	public void consoleNeverTracked() {
+		LensConfig cfg = new LensConfig( Map.of( "excludePaths", List.of() ) );
+		assertThat( cfg.isExcluded( "/~bxlens/index.bxm" ) ).isTrue();
+		assertThat( cfg.isExcluded( "/~bxlens/index.bxm/api/state" ) ).isTrue();
+		assertThat( cfg.isExcluded( "/~bxlensfoo" ) ).isFalse();
+	}
+
+	@Test
+	@DisplayName( "A plain console password is returned and an empty one is empty" )
+	public void consolePassword() {
+		assertThat( new LensConfig( Map.of( "console", Map.of( "password", "s3cret" ) ) ).consolePassword() ).isEqualTo( "s3cret" );
+		assertThat( LensConfig.defaults().consolePassword() ).isEmpty();
 	}
 
 	@Test

@@ -56,10 +56,10 @@ public class QueryCollector extends BaseCollector {
 			if ( span != null ) {
 				Sanitizer clean = new Sanitizer( config() );
 				span.detail.put( "sql", clean.text( sql ) );
-				if ( config().collectorBool( id(), "includeParams", true ) ) {
+				if ( !config().light && config().collectorBool( id(), "includeParams", true ) ) {
 					span.detail.put( "params", clean.clean( event.get( Keys.bindings ) ) );
 				}
-				if ( config().collectorBool( id(), "captureCaller", true ) ) {
+				if ( !config().light && config().collectorBool( id(), "captureCaller", true ) ) {
 					Callers.Location where = Callers.current();
 					span.file	= where.file();
 					span.line	= where.line();

@@ -33,6 +33,11 @@ import ortus.boxlang.runtime.types.IStruct;
 public class FunctionCollector extends BaseCollector {
 
 	@Override
+	public boolean heavy() {
+		return true;
+	}
+
+	@Override
 	public String id() {
 		return "functions";
 	}

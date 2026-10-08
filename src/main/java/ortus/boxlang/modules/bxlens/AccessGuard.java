@@ -20,30 +20,62 @@ package ortus.boxlang.modules.bxlens;
 import java.math.BigInteger;
 import java.net.InetAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Decides whether a caller may see (and be tracked by) Lens. Default policy: loopback and private networks only.
+ * Decides whether a caller may see the bar or the console. One guard per surface, built from a rule at a settings path such as
+ * <code>bar.access</code> or <code>console.access</code>.
  * <p>
- * Settings read: <code>access.allowedIPs</code> (exact IP, CIDR or <code>*</code>), <code>access.allowPrivateNetworks</code>,
- * <code>access.allowedHosts</code> (request Host header names, empty = any) and <code>access.requireHeader</code> (<code>Name</code> or
- * <code>Name=value</code>).
+ * The rule is <code>"local"</code> (loopback only, the default), <code>"all"</code>, or a list of exact IPs, CIDR ranges and the
+ * keywords <code>local</code> and <code>private</code> (10/8, 172.16/12, 192.168/16, fc00::/7 and link-local). The shared extras
+ * <code>access.allowedHosts</code> (Host header names, empty means any) and <code>access.requireHeader</code> (<code>Name</code> or
+ * <code>Name=value</code>) apply on top of the rule.
  */
 public final class AccessGuard {
 
-	private final List<String>	allowedIPs;
-	private final boolean		allowPrivate;
+	private final List<String>	rules;
+	private final boolean		allowAll;
+	private final boolean		downgraded;
 	private final List<String>	allowedHosts;
 	private final String		requireHeaderName;
 	private final String		requireHeaderValue;
-	private final boolean		allowAll;
 
-	public AccessGuard( LensConfig config ) {
-		List<String> ips = new ArrayList<>( config.getList( "access.allowedIPs", List.of( "127.0.0.1", "::1" ) ) );
-		this.allowAll		= ips.contains( "*" );
-		this.allowedIPs		= ips;
-		this.allowPrivate	= config.getBool( "access.allowPrivateNetworks", true );
+	/**
+	 * @param config            the settings
+	 * @param rulePath          dotted path of the rule, for example <code>bar.access</code>
+	 * @param allowAllPermitted may the rule be <code>all</code>? When false an <code>all</code> rule is replaced by <code>local</code>
+	 */
+	public AccessGuard( LensConfig config, String rulePath, boolean allowAllPermitted ) {
+		Object			raw		= config.get( rulePath );
+		List<String>	list	= new ArrayList<>();
+		boolean			all		= false;
+		if ( raw instanceof Collection<?> c ) {
+			for ( Object o : c ) {
+				if ( o != null && !o.toString().isBlank() ) {
+					list.add( o.toString().trim() );
+				}
+			}
+		} else if ( raw != null && !raw.toString().isBlank() ) {
+			list.add( raw.toString().trim() );
+		}
+		if ( list.isEmpty() ) {
+			list.add( "local" );
+		}
+		for ( String r : list ) {
+			if ( "all".equalsIgnoreCase( r ) || "*".equals( r ) ) {
+				all = true;
+			}
+		}
+		this.downgraded = all && !allowAllPermitted;
+		if ( this.downgraded ) {
+			this.allowAll	= false;
+			this.rules		= List.of( "local" );
+		} else {
+			this.allowAll	= all;
+			this.rules		= list;
+		}
 		List<String> hosts = new ArrayList<>();
 		for ( String h : config.getList( "access.allowedHosts", List.of() ) ) {
 			hosts.add( h.toLowerCase( Locale.ROOT ) );
@@ -57,6 +89,20 @@ public final class AccessGuard {
 			this.requireHeaderName	= rh.trim();
 			this.requireHeaderValue	= null;
 		}
+	}
+
+	/**
+	 * True when the rule asked for <code>all</code> but that was not permitted, so <code>local</code> applies.
+	 */
+	public boolean isDowngraded() {
+		return downgraded;
+	}
+
+	/**
+	 * Does this guard let everyone in?
+	 */
+	public boolean isOpenToAll() {
+		return allowAll;
 	}
 
 	/**
@@ -91,11 +137,16 @@ public final class AccessGuard {
 		if ( addr == null ) {
 			return false;
 		}
-		if ( allowPrivate && ( addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress() || isUniqueLocalV6( addr ) ) ) {
-			return true;
-		}
-		for ( String rule : allowedIPs ) {
-			if ( matches( rule, addr ) ) {
+		for ( String rule : rules ) {
+			if ( "local".equalsIgnoreCase( rule ) ) {
+				if ( addr.isLoopbackAddress() ) {
+					return true;
+				}
+			} else if ( "private".equalsIgnoreCase( rule ) ) {
+				if ( addr.isLoopbackAddress() || addr.isSiteLocalAddress() || addr.isLinkLocalAddress() || isUniqueLocalV6( addr ) ) {
+					return true;
+				}
+			} else if ( matches( rule, addr ) ) {
 				return true;
 			}
 		}
