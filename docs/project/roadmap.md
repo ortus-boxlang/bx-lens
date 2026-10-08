@@ -29,9 +29,9 @@ See [Core gaps](../reference/events.md#core-gaps).
 
 ## Not implemented
 
-- `lensDumpHeap` and heap dumps. Thread dumps are in the console Threads page.
+- The `lensDumpHeap` BIF. Heap dumps are in the console System page and are off by default. Thread dumps are in the console Threads page.
 - The `bx:lens` component.
-- A feature split between free and BoxLang+. It is not decided, see [Licensing](../licensing.md).
+- A final feature split between free and BoxLang+. Today only the disk store and the long request history need Plus or a trial, and this may change, see [Licensing](../licensing.md#what-plus-or-a-trial-adds-today).
 
 ## Relation to BX Insights
 
@@ -39,7 +39,7 @@ Lens works on one server. The bar shows what one request did, right on the page.
 
 BX Insights is the separate observability product. It is the answer for clusters, history over time and alerting.
 
-Lens will not add persistence or cross-node views. It keeps requests in memory and clears them on restart. The only file it writes is the saved bar layout.
+Lens will not add cross-node views or a database. It keeps requests in memory and clears them on restart. With BoxLang+ or a trial it saves errors and reports to disk so they survive restarts. Besides that it writes only the saved bar layout, the saved settings changes and the audit log.
 
 ## Design spec
 

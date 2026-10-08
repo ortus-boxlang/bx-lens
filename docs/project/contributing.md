@@ -86,7 +86,7 @@ Set `LENS_CHROMIUM` to the path of a local Chromium to use it instead of the dow
 
 The Playwright config starts the harness itself (`bash ../harness/start.sh` with `SKIP_BUILD=1`, so run `./gradlew shadowJar` first or set `SKIP_BUILD=` to build). It reuses a harness that is already running on the port, except in CI. Tests run one at a time because they share one server. `PORT` changes the port.
 
-The suite covers the bar, panels, problems, History, extension panels, the timeline, security, request cost, the console (login, requests, executors, tasks, system, threads, live stream), the bar designer and the bar-to-console links.
+The suite covers the bar, panels, problems, History, extension panels, the timeline, security, request cost, the console (login, roles, requests, executors, tasks, datasources, caches, logs, environment, queries, errors and reports, settings, system, heap dump, threads, live stream, AI help), the bar designer and the bar-to-console links.
 
 ## Documentation screenshots
 
@@ -97,7 +97,7 @@ cd e2e
 npx playwright test screens.spec.ts
 ```
 
-Keep the file names stable, because the docs reference them. The console pages use `console-login`, `console-login-error`, `console-overview`, `console-requests`, `console-executors`, `console-tasks`, `console-task-run`, `console-system`, `console-threads`, `console-designer`, `console-settings`, `bar-menu` and `license-trial`.
+Keep the file names stable, because the docs reference them. The console pages use `console-login`, `console-login-error`, `console-overview`, `console-requests`, `console-executors`, `console-tasks`, `console-task-run`, `console-system`, `console-threads`, `console-designer`, `console-settings`, `console-settings-edit`, `console-system-heap`, `console-datasources`, `console-caches`, `console-logs`, `console-environment`, `console-queries`, `console-errors`, `console-reports`, `console-inflight`, `console-ask`, `bar-menu` and `license-trial`. The screenshots for the newest console pages are referenced in the docs before the files exist and are generated later.
 
 ## Continuous integration
 

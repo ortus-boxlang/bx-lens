@@ -8,11 +8,11 @@ icon: lucide:circle-help
 # FAQ
 
 ::: expandable "Is Lens safe for production?"
-The bar is a development tool, keep it off. The console can run on a live server if you set a `bxsecret:` password, a tight `console.access` list, HTTPS and `collect.level: "light"`. See [Running Lens in production](guides/production.md).
+The bar is a development tool, keep it off. The console can run on a live server if you set a `bxsecret:` password, a tight `console.access` list, `console.requireHttps` and `collect.level: "light"`. See [Running Lens in production](guides/production.md).
 :::
 
 ::: expandable "What is the difference between the bar and the console?"
-The bar is a strip on your HTML pages that shows one request. The console is a separate page at `/~bxlens/index.bxm` for one server: requests, executors, tasks, system and threads. They are switched on independently with `bar.enabled` and `console.enabled`. See [Console](console/index.md).
+The bar is a strip on your HTML pages that shows one request. The console is a separate page at `/~bxlens/index.bxm` for one server: requests, errors, queries, datasources, caches, logs, executors, tasks, system and threads. They are switched on independently with `bar.enabled` and `console.enabled`. See [Console](console/index.md).
 :::
 
 ::: expandable "Why does /~bxlens/ give a 404?"
@@ -24,15 +24,47 @@ Run `boxlang generatesecret "your password"` and put the `bxsecret:` value in `c
 :::
 
 ::: expandable "Is BX Lens open source? Does it need a license?"
-BX Lens is a product of Ortus Solutions and license terms apply. Which features need BoxLang+ is not decided yet, so every feature works in every license state today. See [Licensing](licensing.md).
+BX Lens is a product of Ortus Solutions and license terms apply. Today BoxLang+ or a trial adds two things: the disk store for errors and reports, and a request history longer than 25. Everything else works in every license state. This split is the current state and may change. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today).
 :::
 
 ::: expandable "Does the console call out to the internet?"
-No. Alpine.js and the Phosphor icons are bundled and fonts are system fonts. A strict Content-Security-Policy blocks any other request, so it works on an air gapped network.
+The page does not. Alpine.js and the Phosphor icons are bundled and fonts are system fonts. A strict Content-Security-Policy blocks any other request, so it works on an air gapped network. The server makes an outside call only if an admin turns on `ai.enabled` with a hosted provider. The Ask ChatGPT and Ask Claude buttons open a new tab in your browser and send nothing from the page.
 :::
 
 ::: expandable "Does Lens store data?"
-Only in memory. History keeps the last 50 requests (`history.maxRequests`) and clears on restart or module reload. The one file Lens writes is the bar layout you save in the designer, `config/bxlens-layout.json` in the BoxLang home. There is no database.
+Mostly in memory. History keeps the last 50 requests (`history.maxRequests`, 25 without BoxLang+ or a trial), and errors, reports and query statistics live in memory too. They clear on restart or module reload. With BoxLang+ or a trial, errors and reports are also saved to `lens-data` (`store.dir`) so they survive restarts. Lens also writes the bar layout (`config/bxlens-layout.json`), the settings you change in the console (`config/bxlens-settings.json`) and the audit log (`bxlens-audit.log`). There is no database. See [Errors and Reports](console/errors-and-reports.md#the-disk-store).
+:::
+
+::: expandable "Can I change settings without a restart?"
+Yes, many of them. An admin can change them on the Settings page of the console. The change applies at once and is saved, so it survives a restart and wins over `boxlang.json`. Passwords, access rules and a few more can only be set in `boxlang.json`. See [Live settings](configuration.md#live-settings).
+:::
+
+::: expandable "What can a viewer do?"
+A viewer signs in with `console.viewerPassword`. They can look at every page. They cannot change anything, and cannot download thread dumps, heap dumps, log files or the diagnostic bundle, or read cache values. See [Roles](security.md#roles).
+:::
+
+::: expandable "How do I lock the console to view only?"
+Set `console.readOnly` to `true` in `boxlang.json`. Nobody can then change settings, run tasks, clear caches or reset counters from the console. See [Console settings](console/settings.md#view-only).
+:::
+
+::: expandable "Is a heap dump safe?"
+A heap dump holds everything in memory, including passwords and session data, and Lens cannot redact it. It is off by default. An admin must turn on `console.allowHeapDump`, confirm the dump, and download the file, which Lens deletes soon after. See [Heap dumps](security.md#heap-dumps).
+:::
+
+::: expandable "What does the AI help send, and where?"
+Copy prompt and the Ask ChatGPT and Ask Claude buttons send nothing from the server: you paste the prompt yourself. Explain with AI and Ask Lens send a redacted prompt through the `bx-ai` module, only when an admin sets `ai.enabled`. A local provider such as Ollama keeps it inside your network. See [Ask Lens and AI help](console/ask-lens-and-ai.md) and the [data flow](security.md#ai-data-flow).
+:::
+
+::: expandable "Does the AI help need bx-ai?"
+Only Explain with AI and Ask Lens do. `bx-ai` is a soft dependency: Lens loads without it. Lens was checked with `bx-ai` 3.0.0.
+:::
+
+::: expandable "Why are my errors and reports gone after a restart?"
+Without BoxLang+ or a trial they are kept in memory only. With one of them they are saved to disk. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today).
+:::
+
+::: expandable "What is in the diagnostic bundle?"
+A zip with a thread dump, the environment, system, executor, task, datasource and cache data, and the Lens settings, with secrets hidden by name. No request data and no log files. See [Environment](console/environment.md#diagnostic-bundle).
 :::
 
 ::: expandable "Does it work with APIs and JSON responses?"

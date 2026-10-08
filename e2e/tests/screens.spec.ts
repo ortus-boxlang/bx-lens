@@ -205,6 +205,75 @@ test.describe( '@screens documentation screenshots', () => {
 		await consoleShot( page, 'console-settings' );
 	} );
 
+	test( 'console datasources, caches, logs and environment', async ( { page, request } ) => {
+		for ( const u of [ '/orders.bxm', '/n-plus-one.bxm', '/cache.bxm' ] ) {
+			await request.get( u );
+		}
+		await consoleLogin( page );
+		await page.click( '.nav:has-text("Datasources")' );
+		await page.waitForTimeout( 800 );
+		await page.click( 'button:has-text("Test connection")' );
+		await expect( page.locator( '.main section:visible' ) ).toContainText( 'Connection opened and validated' );
+		await consoleShot( page, 'console-datasources' );
+		await page.click( '.nav:has-text("Caches")' );
+		await page.locator( '.main section:visible tbody tr' ).first().locator( 'button:has-text("View")' ).click();
+		await expect( page.locator( '.main section:visible pre.code' ).last() ).toBeVisible();
+		await consoleShot( page, 'console-caches' );
+		await page.click( '.nav:has-text("Logs")' );
+		await page.locator( 'tr.row', { hasText: 'bxlens-audit.log' } ).click();
+		await page.fill( 'input[placeholder="Search this file"]', 'login' );
+		await page.waitForTimeout( 800 );
+		await consoleShot( page, 'console-logs' );
+		await page.click( '.nav:has-text("Environment")' );
+		await page.click( 'button:has-text("Modules")' );
+		await consoleShot( page, 'console-environment' );
+	} );
+
+	test( 'console queries, errors, reports and in flight', async ( { page, request } ) => {
+		for ( const u of [ '/n-plus-one.bxm', '/n-plus-one.bxm', '/slow.bxm', '/query-error.bxm', '/orders.bxm', '/caught-exception.bxm' ] ) {
+			await request.get( u );
+		}
+		await request.get( '/error.bxm', { failOnStatusCode: false } );
+		await request.get( '/error.bxm', { failOnStatusCode: false } );
+		await consoleLogin( page );
+		await page.click( '.nav:has-text("Queries")' );
+		await page.locator( '.main section:visible tr.row' ).first().click();
+		await consoleShot( page, 'console-queries' );
+		await page.click( '.nav:has-text("Errors")' );
+		await page.locator( '.main section:visible tr.row', { hasText: 'thrown on purpose' } ).first().click();
+		await page.waitForTimeout( 500 );
+		await consoleShot( page, 'console-errors' );
+		await page.click( '.nav:has-text("Reports")' );
+		await page.waitForTimeout( 800 );
+		await consoleShot( page, 'console-reports' );
+		await page.click( '.nav:has-text("In flight")' );
+		const slow = request.get( '/stall.bxm', { timeout: 20_000 } );
+		const row = page.locator( '.main section:visible tr.row', { hasText: '/stall.bxm' } );
+		await expect( row ).toBeVisible( { timeout: 8_000 } );
+		await row.click();
+		await page.waitForTimeout( 500 );
+		await consoleShot( page, 'console-inflight' );
+		await slow;
+	} );
+
+	test( 'console ask, settings edit and heap', async ( { page } ) => {
+		await consoleLogin( page );
+		await page.click( '.nav:has-text("Ask Lens")' );
+		await page.fill( 'textarea', 'Why was the server slow in the last few minutes?' );
+		await consoleShot( page, 'console-ask' );
+		await page.click( '.nav:has-text("Settings")' );
+		await page.locator( '.srow', { hasText: 'thresholds.slowQueryMs' } ).locator( 'input[type=number]' ).fill( '40' );
+		await page.locator( '.srow', { hasText: 'thresholds.slowQueryMs' } ).scrollIntoViewIfNeeded();
+		await consoleShot( page, 'console-settings-edit' );
+		await page.click( '.sbar button:has-text("Discard")' );
+		await page.click( '.nav:has-text("System")' );
+		await page.waitForTimeout( 1200 );
+		await page.click( 'button:has-text("Run GC")' );
+		await page.locator( '.card', { hasText: 'Heap and garbage collection' } ).scrollIntoViewIfNeeded();
+		await page.waitForTimeout( 500 );
+		await consoleShot( page, 'console-system-heap' );
+	} );
+
 	test( 'bar menu', async ( { lens, page } ) => {
 		await show( lens, '/n-plus-one.bxm', 'Timeline' );
 		await page.locator( '#bxlens .more .ibtn' ).click();

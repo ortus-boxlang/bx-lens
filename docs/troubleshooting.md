@@ -31,15 +31,83 @@ Check these in order.
 
 ## I cannot sign in
 
-Wrong passwords are counted per address. After `console.maxLoginAttempts` the address is locked for `console.lockoutMinutes` and the page says how long. A restart signs everyone out. Behind a proxy, all callers may share one address, so one person's mistakes can lock out the rest.
+Wrong passwords are counted per address. After `console.maxLoginAttempts` the address is locked for `console.lockoutMinutes` and the page says how long. A restart signs everyone out. Behind a proxy, all callers may share one address unless Lens reads the client address from the proxy header, so one person's mistakes can lock out the rest. See [Behind a proxy](security.md#behind-a-proxy).
+
+The admin password and the viewer password are different. The one you type decides the role, shown in the console header. The viewer password does nothing when `console.password` is empty.
 
 ## Live data does not update
 
 The console uses one Server-Sent Events stream and polls every 3 seconds if it cannot. A proxy that buffers responses can break the stream. Turn buffering off for `/~bxlens/index.bxm/stream` (the response sends `X-Accel-Buffering: no`). `console.maxStreams` caps open streams.
 
+## The console answers 403 "HTTPS is required"
+
+`console.requireHttps` is on and the request came over plain HTTP from a non-loopback address. Use HTTPS. If TLS ends at a proxy, the runtime must see the request as secure. Either it reports HTTPS itself, or the proxy sends `X-Forwarded-Proto: https` and its address is in `access.proxyPeers`. A request from loopback is always allowed.
+
+## A user is blocked, or Lens sees the wrong address
+
+Behind a proxy, Lens sees the proxy's address unless it may read the client address from a header. Check `access.trustProxyHeader`, `access.proxyHeader` and `access.proxyPeers`. The header is only believed when the direct connection comes from a listed peer, and the default `private` covers private networks only. A public proxy address must be listed. A header naming `127.0.0.1` never makes a remote peer a loopback caller. See [Behind a proxy](security.md#behind-a-proxy).
+
+## "The viewer role cannot do this"
+
+You signed in with `console.viewerPassword`. A viewer can look but cannot change anything, download thread dumps, heap dumps, log files or the bundle, or read cache values. Sign in with the admin password. See [Roles](security.md#roles).
+
+## "The console is read-only (console.readOnly)"
+
+`console.readOnly` is `true` in `boxlang.json`. It refuses every change from the console and can only be changed there. Heap dumps, the datasource connection test and AI calls are not stopped by it.
+
+## A setting I changed in boxlang.json has no effect
+
+A change made on the Settings page is saved to `config/bxlens-settings.json` (or `console.overridesFile`) and wins over `boxlang.json`. The setting shows `changed`. Press **Reset** on it, or **Reset all to defaults**, to go back to the `boxlang.json` value. Also check that the file is writable. If it cannot be saved, the page shows "Could not save the overrides".
+
+## A setting says "boxlang.json only"
+
+That setting cannot be changed from the browser. This covers passwords, access rules, `console.*`, `store.*`, `ai.*` and `history.maxRequests`. Edit `boxlang.json` and restart. See [Live settings](configuration.md#live-settings).
+
+## A page is missing in the console
+
+Pages follow the collector switches. `collectors.datasources`, `caches`, `logfiles`, `environment`, `inflight`, `errors`, `reports`, `ask`, `queries`, `executors`, `tasks`, `system` and `threads` each control one page, and `tabs.hide` removes pages by id. Check both, and the Settings page, where collector switches may have been changed and saved.
+
+## Datasources show "timings are not collected"
+
+The pool already has its own Hikari metrics tracker. Lens leaves it alone. The pool numbers still show. A pool that has not started shows `idle` until its first query.
+
+## The Logs page shows no file, or refuses one
+
+Lens lists regular files in the BoxLang logs directory and one level of folders below it. A name outside that directory, or a link that points outside, answers 404. Check the logs directory in your BoxLang logging configuration. Download needs the admin role.
+
+## Errors, Reports or totals are gone after a restart
+
+Without BoxLang+ or a trial, Errors and Reports are in memory only. With one of them, they are saved to `store.dir` (default `lens-data` in the BoxLang home). Check `store.enabled`, that the license state in the console header is Plus or Trial, that the folder is writable, and that the folder is on a volume that survives a restart. Query statistics are never saved. See [Licensing](licensing.md#what-plus-or-a-trial-adds-today).
+
+## Only 25 requests are in the history
+
+Without BoxLang+ or a trial the history is capped at 25, whatever `history.maxRequests` says. The cap follows the license state after the next license check, which is cached for up to 5 minutes.
+
+## A failing query is missing from Queries
+
+Lens counts a failure when a query started and never finished, or when a database exception with SQL reached the request. A statement that fails to prepare is only seen when the error reaches the request. If your code catches it and does not rethrow, it is not counted. See [Queries](console/in-flight-and-queries.md#how-failures-are-counted).
+
+## The heap dump is refused
+
+- "Heap dumps are off": set `console.allowHeapDump` to `true` in `boxlang.json` and restart.
+- "Not enough free disk space": the temporary folder needs at least 1.2 times the heap in use free.
+- "A heap dump is already running" or "waiting to be downloaded": download or discard the current one.
+- "This JVM cannot write heap dumps": the JVM is not HotSpot based.
+- A viewer cannot take one.
+
+## AI help does not answer
+
+- "AI is off": set `ai.enabled` to `true`.
+- "The bx-ai module is not installed": install `bx-ai`. Copy prompt and the chat links work without it.
+- Lens was checked with `bx-ai` 3.0.0. Version 2.0.0 fails to start on the current BoxLang snapshot.
+- "Too many AI requests": the limit is 10 per minute. "An AI request is already running": wait for it.
+- "The model did not answer in time": the call waits 90 seconds. Check that the provider, and for Ollama the server and the model, are reachable.
+- "The AI call failed" has the reason from the provider. The log has more.
+- Only admins can call the model.
+
 ## Run now or Pause does nothing
 
-`console.actions` may be `false`. The buttons are greyed out and the server refuses the call.
+`console.actions` may be `false`, `console.readOnly` may be `true`, or you may be signed in as a viewer. The buttons are greyed out and the server refuses the call.
 
 ## A JSON or ajax request shows nothing
 
@@ -63,7 +131,7 @@ Keys listed in `redact.keys` are masked on the server. Remove a key from the lis
 
 ## A setting has no effect
 
-Settings live under `modules.bxLens.settings`. Restart the runtime after you change them. The Settings page in the console shows the values Lens is really using.
+Settings live under `modules.bxLens.settings`. Restart the runtime after you change them in `boxlang.json`. The Settings page in the console shows the values Lens is really using, and marks the ones that a saved console change overrides.
 
 ## The panel takes extra page weight
 

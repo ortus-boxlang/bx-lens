@@ -15,6 +15,7 @@ icon: lucide:shield
 - Everything is off. `bar.enabled` and `console.enabled` are both `false`.
 - The bar and the console each have their own access rule. Both default to `"local"`, which means loopback only (`127.0.0.1`, `::1`).
 - The console also needs a password. Without one nobody can sign in.
+- Heap dumps (`console.allowHeapDump`) and AI calls to a model (`ai.enabled`) are off. See [Heap dumps](#heap-dumps) and [AI data flow](#ai-data-flow). The disk store writes only with BoxLang+ or a trial, see [Licensing](licensing.md).
 - A caller that is not allowed gets nothing. The bar is not injected, and the console answers a plain 404, so it does not reveal that it exists.
 
 ## Access rules
@@ -43,7 +44,26 @@ icon: lucide:shield
 }
 ```
 
-Behind a proxy or load balancer, the address Lens sees is the one the web server reports. Check what that is before you rely on an IP list.
+Behind a proxy or load balancer, see [Behind a proxy](#behind-a-proxy).
+
+## Behind a proxy
+
+With a proxy or load balancer in front, the direct connection comes from the proxy, not from the user. Lens can take the client address from a header so `console.access`, `bar.access` and the login lockout use the real address.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `access.trustProxyHeader` | `true` | Use the header at all. |
+| `access.proxyHeader` | `"X-Forwarded-For"` | The header to read. |
+| `access.proxyPeers` | `"private"` | Which direct connections may set the header: `private`, `local`, or a list of IPs and CIDR ranges. |
+
+The rules:
+
+- The header is believed only when the direct connection comes from one of `proxyPeers`. From any other address the header is ignored, so a user cannot pick an address by sending the header.
+- With a list of addresses in the header, Lens reads it from the right and uses the first address that is not a trusted proxy.
+- A header can never turn a remote peer into a loopback caller. If the header names `127.0.0.1` and the peer is not loopback, Lens keeps the peer address.
+- The `X-Forwarded-Proto` header is believed under the same rule, when Lens decides whether a request is HTTPS.
+
+The default `private` trusts any proxy on a private network. If other machines on that network can reach the runtime directly, list your proxy addresses in `access.proxyPeers`. If no proxy is in front, set `access.trustProxyHeader` to `false`.
 
 ## Two collection rules
 
@@ -56,7 +76,7 @@ The console is a single page with these protections.
 
 | Protection | Detail |
 |---|---|
-| One password | Set `console.password` to a `bxsecret:` value. BoxLang decrypts it with the runtime seed at load time. The settings page shows only `set` or `not set`. |
+| Passwords | Set `console.password` (and optionally `console.viewerPassword`) to a `bxsecret:` value. BoxLang decrypts it with the runtime seed at load time. The settings page shows only `set` or `not set`. |
 | Sessions in memory | A restart signs everyone out. The cookie is `bxlens_session`: HttpOnly, SameSite=Strict, and Secure on HTTPS. |
 | Timeouts | Idle timeout `console.sessionMinutes` (30), and a fixed 12 hour maximum. |
 | Lockout | After `console.maxLoginAttempts` (5) wrong passwords, the address is locked for `console.lockoutMinutes` (5). Failures are counted in a 10 minute window. |
@@ -66,8 +86,96 @@ The console is a single page with these protections.
 | No outside requests | Alpine.js and the Phosphor icons are vendored, fonts are system fonts. The console runs on an air gapped network. |
 | Fixed assets | Only `console.css`, `console.js` and `alpine.min.js` are served as assets. |
 | Not tracked | Console requests never appear in Requests. |
+| HTTPS | `console.requireHttps` refuses plain HTTP, see [HTTPS](#https). |
+| Roles | Admin and viewer, see [Roles](#roles). |
+| Audit log | Logins and changes are written to `bxlens-audit.log`, see [Audit log](#audit-log). |
 
-Actions that change things (pause, resume, run, reload, saving the bar layout) are written to the log with the caller's address. Set `console.actions` to `false` to make the console read-only for tasks.
+Set `console.actions` to `false` to turn off task actions, and `console.readOnly` to `true` to refuse every change from the console.
+
+## Roles
+
+The password decides the role. `console.password` gives the admin role. `console.viewerPassword` (optional, ignored when no admin password is set) gives the viewer role.
+
+| | Viewer | Admin |
+|---|---|---|
+| See every page and its data | yes | yes |
+| Change settings, task actions, the bar layout | no | yes |
+| Cache evict, reap and clear, reset Queries, Errors and Reports, Run GC | no | yes |
+| Test a datasource connection | no | yes |
+| Call a model (Explain with AI, Ask) | no | yes |
+| Download a thread dump, a heap dump, a log file or the diagnostic bundle | no | yes |
+| Read a cache value | no | yes |
+| Copy a prompt | yes | yes |
+
+A viewer who sends such a request gets a 403, and the attempt goes to the audit log as `denied`. The list of routes only admins can use is `ADMIN_ONLY` in `ConsoleRouter`, plus every request that changes state.
+
+!!! warning "A viewer still sees a lot"
+    A viewer reads request data, queries, scope snapshots, key names of caches, the Environment page and the lines of every log file on screen. The viewer role limits what a person can change or take away as a file, not what they can read. Treat the viewer password as sensitive.
+
+`console.readOnly` is stricter: it refuses every change for both roles. Heap dumps (own switch), the datasource connection test and the AI calls are not stopped by it. See [Console settings](console/settings.md#view-only).
+
+## HTTPS
+
+The password and everything on screen travel over the connection, so use HTTPS.
+
+- `console.requireHttps: true` answers a plain HTTP request with a 403. Loopback callers are exempt, so a local tunnel still works.
+- With the option off, the console shows a warning banner on every page when a non-loopback caller uses plain HTTP.
+- The session cookie is marked Secure when the request is HTTPS.
+- Behind a proxy that ends TLS, the proxy must send `X-Forwarded-Proto: https` from a trusted peer, or the runtime must see the request as secure. See [Behind a proxy](#behind-a-proxy).
+
+## Audit log
+
+Lens writes a line for every login, failed login, lockout, logout, denied attempt and change to its own log, `bxlens-audit.log`, through the BoxLang logging service. It is in the BoxLang logs directory, so you can read it on the [Logs](console/logs.md) page. A line looks like this:
+
+```text
+event=settings.change role=admin ip=10.0.0.12 keys={thresholds.slowQueryMs=50}
+```
+
+The events are:
+
+| Group | Events |
+|---|---|
+| Access | `login.ok`, `login.fail`, `login.locked`, `logout`, `denied` |
+| Settings | `settings.change`, `settings.reset`, `bar.layout`, `bar.reset` |
+| Tasks | `task.<action>`, for example `task.run` |
+| Downloads | `threads.dump`, `logfile.download`, `bundle.download`, `heapdump.download`, `cache.value` |
+| Actions | `gc.run`, `heapdump.start`, `heapdump.refused`, `heapdump.discard`, `cache.clear`, `cache.evict`, `cache.reap`, `datasource.test`, `queries.reset`, `errors.reset`, `reports.reset` |
+| AI | `ai.explain`, `ai.ask` (size and provider only, never the prompt or the answer) |
+
+Passwords and keys are never written. A line is cut at 500 characters and line breaks are removed. Lens keeps no other record and does not rotate or trim the file itself.
+
+## Heap dumps
+
+A heap dump is a copy of everything in the JVM's memory: passwords, session data, keys, personal data. Lens cannot redact it.
+
+- It is off. Set `console.allowHeapDump` to `true` in `boxlang.json` to turn it on, and turn it off again when you are done.
+- Only admins can take and download one. A confirmation is required, and `console.readOnly` does not block it.
+- The file is written to a private folder in the temporary directory, one at a time, after a disk space check. It is deleted 5 minutes after the download, or 10 minutes after it was written if nobody downloads it. A restart of the module deletes it too.
+- Every step is in the audit log.
+
+Download over HTTPS only, keep the file in a safe place, and delete it when you are done. See [System and Threads](console/system-and-threads.md#run-gc-and-heap-dumps).
+
+## AI data flow
+
+AI help is optional and has three levels. Lens never calls a model unless an admin sets `ai.enabled` and the `bx-ai` module is installed.
+
+| Level | What leaves the server |
+|---|---|
+| Copy prompt | Nothing. The text goes to your clipboard. |
+| Ask ChatGPT, Ask Claude | Nothing from the server. Your browser opens the site and you paste the prompt. |
+| Explain with AI, Ask (through `bx-ai`) | The prompt goes to the provider you configured. |
+
+What a prompt holds is limited to data Lens has already redacted: stack frames, SQL text without parameter values, query strings with secret parameters hidden, short messages, and a summary of server health. Credentials in URLs and secret-looking parameters are removed from the whole prompt, and a prompt is cut at 8000 characters. Passwords, parameter values, scope contents and the configuration are not included.
+
+Two limits you should know. Exception messages and SQL text are included as the application produced them, so data your code puts into a message is in the prompt. The question you type on the Ask Lens page is sent as you typed it.
+
+A local provider, such as Ollama, keeps the prompt inside your network. A hosted provider receives it, so check its terms. The API key is a `bxsecret:` value and is never shown. Calls are limited to 10 per minute and one at a time, and each is in the audit log without its content. See [Ask Lens and AI help](console/ask-lens-and-ai.md).
+
+## The diagnostic bundle
+
+The bundle is a zip for support tickets. It holds a thread dump, the environment (configuration, modules, JVM arguments, environment variables, system properties), the system, executor, task, datasource and cache data, and the Lens settings. It holds no request data and no log files.
+
+Secrets are hidden by name, not by value. A variable, property or setting whose name looks secret (password, token, key, secret, credential, cookie, session and similar) shows as `[hidden]`, URL credentials are removed and `bxsecret:` values show as `[encrypted]`. A secret kept under a harmless name is not hidden. Look inside the zip before you send it. Only admins can download it, and each download is in the audit log.
 
 ## Redaction
 
@@ -83,6 +191,8 @@ Lens masks values on the server before they reach the page. A key is masked when
 ```
 
 Add your own keys, for example `ssn`. Because matching is by substring, `token` also masks `apiToken` and `csrfToken`.
+
+The Logs page does not redact. The Environment page and the diagnostic bundle hide secrets by name with a fixed check, described under [The diagnostic bundle](#the-diagnostic-bundle), not with `redact.keys`.
 
 ## Size caps
 
@@ -102,8 +212,13 @@ Lens also looks at your responses. Missing security headers and cookie flags sho
 ## Checklist
 
 1. Keep `bar.enabled` false in every shared or production config.
-2. Turn the console on only with a `bxsecret:` password, a tight `console.access` list and HTTPS.
+2. Turn the console on only with a `bxsecret:` password, a tight `console.access` list and HTTPS (`console.requireHttps: true`).
 3. Use `collect.level: "light"` where real users send traffic.
 4. Add your own sensitive keys to `redact.keys`.
 5. Leave the `cookie`, `session`, `request`, `application` and `variables` scope dumps off unless you need them.
-6. Set `console.actions` to `false` if nobody should pause or run tasks from the console.
+6. Set `console.actions` to `false` if nobody should pause or run tasks from the console, and `console.readOnly` to `true` if nobody should change anything.
+7. Give people who only look the viewer password.
+8. Behind a proxy, list it in `access.proxyPeers`.
+9. Leave `console.allowHeapDump` off.
+10. Keep `ai.enabled` off, or use a local provider.
+11. Read `bxlens-audit.log` now and then.

@@ -24,12 +24,23 @@ When the console is on, Lens collects every request on the server, not only thos
 				"console": {
 					"enabled": true,
 					"password": "bxsecret:AbCdEf123...==",
+					"viewerPassword": "bxsecret:GhIjKl456...==",
+					"requireHttps": true,
 					"access": [ "10.8.0.0/24" ],
 					"sessionMinutes": 15,
-					"actions": false
+					"actions": false,
+					"readOnly": true,
+					"allowHeapDump": false
 				},
 				"collect": { "level": "light" },
-				"access": { "allowedHosts": [ "ops.example.com" ] },
+				"access": {
+					"allowedHosts": [ "ops.example.com" ],
+					"trustProxyHeader": true,
+					"proxyHeader": "X-Forwarded-For",
+					"proxyPeers": [ "10.0.1.5" ]
+				},
+				"store": { "dir": "/var/lib/boxlang/lens-data" },
+				"ai": { "enabled": false },
 				"history": { "maxRequests": 100 }
 			}
 		}
@@ -37,26 +48,37 @@ When the console is on, Lens collects every request on the server, not only thos
 }
 ```
 
+`readOnly: true` and `actions: false` suit a console that is only for looking. Take them out when your operators need to change settings or run tasks from the console.
+
 ## Step by step
 
-1. **Encrypt the password.** Run `boxlang generatesecret "a long random password"` and paste the `bxsecret:` value into `console.password`. Pin the seed with `BOXLANG_SECURITY_SECRETSEED` if several machines share one config. Never commit a plain text password.
-2. **Limit who can reach it.** Set `console.access` to a VPN range or a short list of IPs and CIDRs. Keep `"local"` if you tunnel in with SSH. Avoid `"all"`: it works, but Lens logs a warning. Add `access.allowedHosts` for the host name you use, and `access.requireHeader` if a proxy can add a secret header.
-3. **Use HTTPS.** The session cookie is marked Secure only when the request is HTTPS, and the password travels in the login request. Terminate TLS in front of the runtime and make sure the runtime sees the request as secure. Check the cookie in your browser tools.
-4. **Collect lightly.** `collect.level: "light"` skips request headers, bound query parameters, the caller of each query, scope contents, Java stack traces, and the `functions`, `logs` and `scopes` collectors. SQL text, timings and counts stay. Use `full` only on a machine you control.
-5. **Turn the bar off.** Leave `bar.enabled` false. Developers do not need a strip injected into live pages.
-6. **Decide on actions.** Set `console.actions` to `false` if nobody should run, pause or reload tasks from here. The Tasks page stays readable.
-7. **Hide what you do not need.** `tabs.hide` removes pages, for example `["threads", "designer"]`.
-8. **Size the history.** `history.maxRequests` is the memory you spend. Each request holds its full snapshot in memory.
+1. **Encrypt the passwords.** Run `boxlang generatesecret "a long random password"` and paste the `bxsecret:` value into `console.password`. Do the same, with another password, for `console.viewerPassword`. Pin the seed with `BOXLANG_SECURITY_SECRETSEED` if several machines share one config. Never commit a plain text password.
+2. **Give people the right role.** Operators who only look use the viewer password. A viewer cannot change anything or download dumps, logs or the bundle, but can still read a lot, so keep the password private. See [Roles](../security.md#roles).
+3. **Limit who can reach it.** Set `console.access` to a VPN range or a short list of IPs and CIDRs. Keep `"local"` if you tunnel in with SSH. Avoid `"all"`: it works, but Lens logs a warning. Add `access.allowedHosts` for the host name you use, and `access.requireHeader` if a proxy can add a secret header.
+4. **Use HTTPS and require it.** Set `console.requireHttps` to `true`. Terminate TLS in front of the runtime and make sure the runtime sees the request as secure: either it reports HTTPS itself, or your proxy sends `X-Forwarded-Proto: https`. Check the cookie in your browser tools.
+5. **Say which proxies to trust.** Behind a proxy or load balancer, set `access.proxyPeers` to the addresses of your proxies, not the whole private network, so only they can name the client address. Without a proxy, set `access.trustProxyHeader` to `false`. See [Behind a proxy](../security.md#behind-a-proxy).
+6. **Collect lightly.** `collect.level: "light"` skips request headers, bound query parameters, the caller of each query, scope contents, Java stack traces, and the `functions`, `logs` and `scopes` collectors. SQL text, timings and counts stay. Use `full` only on a machine you control.
+7. **Turn the bar off.** Leave `bar.enabled` false. Developers do not need a strip injected into live pages.
+8. **Decide on changes.** Set `console.actions` to `false` if nobody should run, pause or reload tasks from here. Set `console.readOnly` to `true` if nobody should change anything from the console. The pages stay readable.
+9. **Keep heap dumps off.** Leave `console.allowHeapDump` at `false`. A heap dump holds every secret in memory. Turn it on for the time you need it, then off. See [Heap dumps](../security.md#heap-dumps).
+10. **Decide on AI.** Leave `ai.enabled` false, or use a local provider so prompts stay in your network. See [AI data flow](../security.md#ai-data-flow).
+11. **Put the store on a volume.** With BoxLang+ or a trial, errors and reports are saved to `store.dir`. In a container, mount a volume there, or the data is lost when the container is replaced. Set `store.retentionHours` and `store.maxMB` to what you want to keep. See [Errors and Reports](../console/errors-and-reports.md#the-disk-store).
+12. **Hide what you do not need.** `tabs.hide` removes pages, for example `["threads", "designer", "environment"]`.
+13. **Size the history.** `history.maxRequests` is the memory you spend. Each request holds its full snapshot in memory. Without BoxLang+ or a trial the history is capped at 25.
+14. **Watch the audit log.** `bxlens-audit.log` in the logs directory records logins, failed logins, denied attempts and every change. Read it on the Logs page or ship it with your other logs.
 
 ## Check it
 
 - Request `/~bxlens/index.bxm` from a machine that is not allowed. You get a plain 404.
-- Request it from an allowed machine. You see the login page.
-- The Settings page shows `console.password` as `set` and `collect.level` as `light`.
+- Request it over plain HTTP from an allowed non-loopback machine. You get a 403 with `HTTPS is required for the console`.
+- Request it from an allowed machine over HTTPS. You see the login page.
+- Sign in with the viewer password and try to change a setting. The fields are disabled, and a direct call gets a 403.
+- The Settings page shows the passwords as `set`, `collect.level` as `light` and `console.readOnly` as true.
 - The log shows `bx-lens ... active: bar=false, console=true, collect=light`.
+- After a restart, the Reports page still shows "Since first install" (needs BoxLang+ or a trial).
 
 ## Know the limits
 
-The console is for one server. It keeps recent requests in memory and loses them at a restart. For several nodes, history over time and alerts, use BX Insights.
+The console is for one server. It keeps recent requests, query statistics and in-flight data in memory and loses them at a restart. With BoxLang+ or a trial, errors and reports survive restarts. For several nodes, history over time and alerts, use BX Insights.
 
 See also [Security](../security.md#console-protection).

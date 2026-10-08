@@ -57,7 +57,7 @@ test.describe( 'live settings', () => {
 		const row = page.locator( '.srow', { hasText: 'thresholds.slowRequestMs' } );
 		await row.locator( 'input[type=number]' ).fill( '-5' );
 		await page.click( '.sbar button:has-text("Apply and save")' );
-		await expect( page.locator( '.msg.err' ) ).toContainText( 'between' );
+		await expect( page.locator( '.main .msg.err' ) ).toContainText( 'between' );
 		await page.click( '.sbar button:has-text("Discard")' );
 	} );
 

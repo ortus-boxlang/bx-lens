@@ -181,12 +181,14 @@
 				resetErrors: async function () { if (!confirm("Forget every error group?")) { return; } this.errl = await (await this.api("errors/reset", { method: "POST" })).json(); this.esel = ""; this.egroup = null; },
 				loadReports: async function () { this.rep = await (await this.api("reports")).json(); },
 				resetReports: async function () { if (!confirm("Reset the counters for this run? Totals since first install are kept.")) { return; } this.rep = await (await this.api("reports/reset", { method: "POST" })).json(); },
-				repBars: function () {
-					var s = this.rep ? this.rep.series : [], n = Math.max(1, this.rep ? this.rep.seriesMinutes : 60), max = 1, out = [], w = 400 / Math.min(n, 120);
-					s = s.slice(-120);
+				repPath: function (errors) {
+					var s = this.rep ? this.rep.series.slice(-120) : [], max = 1, w = 400 / 120, d = "";
 					s.forEach(function (p) { if (p.requests > max) { max = p.requests; } });
-					s.forEach(function (p, i) { var h = p.requests * 80 / max, eh = p.errors * 80 / max; out.push({ x: i * w, w: Math.max(1, w - 1), y: 88 - h, h: h, ey: 88 - eh, eh: eh }); });
-					return out;
+					s.forEach(function (p, i) {
+						var v = errors ? p.errors : p.requests, h = v * 80 / max;
+						if (h > 0) { d += "M" + (i * w).toFixed(1) + " " + (88 - h).toFixed(1) + "h" + Math.max(1, w - 1).toFixed(1) + "v" + h.toFixed(1) + "h-" + Math.max(1, w - 1).toFixed(1) + "z"; }
+					});
+					return d;
 				},
 				inf: null, isel: "", istack: null, qs: null, qsort: "max", qfilter: "", qpick: null,
 				loadInflight: async function () { this.inf = await (await this.api("inflight")).json(); if (this.isel) { this.pickInflight(this.isel); } },

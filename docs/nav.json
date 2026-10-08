@@ -16,6 +16,13 @@
 			"console/index.md",
 			"console/executors.md",
 			"console/tasks.md",
+			"console/datasources.md",
+			"console/caches.md",
+			"console/logs.md",
+			"console/environment.md",
+			"console/in-flight-and-queries.md",
+			"console/errors-and-reports.md",
+			"console/ask-lens-and-ai.md",
 			"console/system-and-threads.md",
 			"console/bar-designer.md",
 			"console/settings.md"

@@ -16,7 +16,7 @@
 
 <p>&nbsp;</p>
 
-A debug bar and a console for BoxLang web applications. The **bar** gives every HTML page a strip at the bottom with the request timeline, queries, templates, exceptions, HTTP calls, cache, modules, scopes, cost and more. The **console** is a password-protected page for one server with live requests, executor health, scheduled tasks (with Run now), JVM numbers, threads and a bar designer. Everything is collected by Java code in memory. Nothing is written to disk except the bar layout you save.
+A debug bar and a console for BoxLang web applications. The **bar** gives every HTML page a strip at the bottom with the request timeline, queries, templates, exceptions, HTTP calls, cache, modules, scopes, cost and more. The **console** is a password-protected page for one server with live requests, errors, query statistics, datasources, caches, logs, executor health, scheduled tasks (with Run now), JVM numbers, threads and a bar designer. Everything is collected by Java code in memory. Lens writes to disk only the bar layout you save, the settings you change in the console, the audit log, and, with BoxLang+ or a trial, saved errors and reports.
 
 ![BX Lens on an N+1 page](docs/assets/screenshots/overview.png)
 
@@ -70,7 +70,26 @@ Upgrading? `enabled` is now `bar.enabled` and `access.allowedIPs` is now `bar.ac
 
 The Issues tab also names where a slow request was stuck (a stack sample after `thresholds.slowRequestMs`) and lists security Notes for missing headers and cookie flags.
 
-The console pages are Overview, Requests, Executors, Tasks, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
+The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, Caches, Logs, Environment, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
+
+## What the console adds
+
+| Feature | What it does |
+|---|---|
+| **Live settings** | An admin edits settings on the Settings page. Changes apply at once, are saved and survive restarts. `console.readOnly` turns editing off. |
+| **Roles** | `console.viewerPassword` gives a view-only role that cannot change anything or download dumps, logs or the bundle. |
+| **Proxy and HTTPS** | The client address comes from a proxy header only from a trusted peer. `console.requireHttps` refuses plain HTTP. |
+| **Audit log** | Logins, denied attempts and every change go to `bxlens-audit.log`. |
+| **Datasources** | Hikari pool numbers, timings and a connection test. |
+| **Caches** | Statistics, a key list capped at 100, a value view cut at 2 KB, evict, reap and clear. |
+| **Logs** | Every log file with search, a level filter, a live tail and an admin download. |
+| **Environment** | Configuration, modules, JVM arguments, variables and properties with secrets hidden, and a diagnostic bundle zip. |
+| **In flight and Queries** | Running requests with a live stack, and runs, average, maximum, total, failures and slow runs per SQL statement. |
+| **Errors and Reports** | Errors grouped by cause with redacted samples, and totals, p50, p95 and p99, status classes, URLs and a minute series. |
+| **System** | Run GC, a heap dump (off by default, admin only) and a deadlock banner. |
+| **AI help** | Optional. Copy a redacted prompt, open ChatGPT or Claude, or let the server call a model through `bx-ai`. A local provider such as Ollama keeps the data inside your network. |
+
+BoxLang+ or a trial adds a disk store for errors and reports (totals since first install survive restarts) and a request history longer than 25. Everything else is open. This split is the current state and may change. See [Licensing](docs/licensing.md).
 
 A collapsed health strip turns amber or red when something is wrong and opens on Issues when an exception was caught. Resize it, detach it as a floating window, switch themes, and use the keyboard: <kbd>Ctrl</kbd>+<kbd>`</kbd> toggles, <kbd>1</kbd> to <kbd>9</kbd> switch tabs, <kbd>/</kbd> searches.
 
@@ -134,7 +153,7 @@ Set `LENS_CHROMIUM` to use a Chromium you already have. CI runs the Java tests o
 How it fits together:
 
 - `src/main/java/.../LensService` owns the settings, the collectors, the in-memory history, the injector and the slow request watchdog.
-- `ConsoleRouter`, `ConsoleAuth` and `ConsoleData` are the console: routes and security headers, login and sessions, and the data for executors, tasks, system and threads. `AccessGuard` checks callers for the bar and the console. `Licensing` detects BoxLang+. `LayoutStore` keeps the bar layout.
+- `ConsoleRouter`, `ConsoleAuth` and `ConsoleData` are the console: routes and security headers, login, roles and sessions, and the data for executors, tasks, system and threads. `DatasourceData`, `CacheData`, `LogData`, `EnvironmentData`, `QueryStats`, `ErrorStore` and `Reports` feed the other pages. `SettingsRegistry` and `SettingsStore` are the live settings. `AccessGuard` and `ClientIp` check callers for the bar and the console. `Audit` writes the audit log. `HeapDumper` takes heap dumps. `AiService` and `AiPrompts` are the optional AI help. `Licensing` detects BoxLang+. `LayoutStore` keeps the bar layout.
 - `interceptors/collectors/*` are the Java collectors, one per panel. They run as BoxLang interceptors.
 - `model/` holds the per request data, the issue engine and the snapshot that the UI reads.
 - `src/main/bx/assets/` is the UI for the bar (`lens.*`) and the console (`console.*`): Alpine.js, vendored Phosphor icons, CSS and templates. The bar's data travels as JSON inside the page.
@@ -144,7 +163,7 @@ Lens works on one server. BX Insights is the separate observability product for 
 
 ## License
 
-BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans) and [Licensing](docs/licensing.md). Which features need BoxLang+ is not decided yet, so every feature works in every license state today. Phosphor Icons are MIT licensed, see `src/main/bx/assets/ICONS-LICENSE.txt`.
+BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans) and [Licensing](docs/licensing.md). Today BoxLang+ or a trial adds the disk store and a request history longer than 25. This may change. Phosphor Icons are MIT licensed, see `src/main/bx/assets/ICONS-LICENSE.txt`.
 
 ## Ortus Sponsors
 

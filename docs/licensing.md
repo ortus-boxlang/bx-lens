@@ -1,7 +1,7 @@
 ---
 title: Licensing
 order: 6
-description: How BX Lens detects BoxLang+, what the license states mean, and what is not decided yet.
+description: How BX Lens detects BoxLang+, what the license states mean, and what Plus or a trial adds today.
 icon: lucide:badge-check
 ---
 
@@ -9,9 +9,22 @@ icon: lucide:badge-check
 
 BX Lens is a product of Ortus Solutions. License terms apply, see the [BoxLang+ plans page](https://boxlang.io/plans).
 
-## Which features need BoxLang+
+## What Plus or a trial adds today
 
-Not decided yet. The split between free features and BoxLang+ (Plus) features has not been made, so **today every feature is available in every license state**. The license state is detected and shown, but it does not switch any feature on or off. Nothing on this site should be read as a feature split. This page will change when the split is decided.
+This is the current state and it may change. When it does, this page changes with it.
+
+Lens checks the license in one place (`Licensing.has()`). Today two features need BoxLang+ or an active trial. Everything else is open in every license state, including the whole console, the AI help and the bar.
+
+| | Free | BoxLang+ or trial |
+|---|---|---|
+| Requests kept in memory | 25 at most, even if `history.maxRequests` is higher | `history.maxRequests`, as configured (default 50) |
+| Errors and Reports | In memory only. Totals start at zero after a restart. The minute series covers the last 60 minutes. | Saved to disk by the disk store. Totals since first install survive restarts and upgrades. The minute series covers `store.retentionHours`. |
+
+The disk store (`store.enabled`, on by default) writes `errors.json` and `reports.json` to `store.dir` (default `lens-data` in the BoxLang home). It keeps data for `store.retentionHours` (72), limits the errors file to `store.maxMB` (50) and writes every `store.flushSeconds` (30). Each file is replaced atomically. See [Errors and Reports](console/errors-and-reports.md#the-disk-store).
+
+Without the license the store settings have no effect, and the Errors and Reports pages say that the data is kept in memory only. If a trial ends or a license expires, the disk store stops writing and the request history returns to 25 at the next license check (the answer is cached for 5 minutes). The saved files stay on disk. Lens reads them at the next start if the license is valid then.
+
+The split is not final. The pages of the console and the settings do not depend on it, so nothing you configure now has to change when it does.
 
 ## License states
 
@@ -26,7 +39,7 @@ Lens detects the state through the `bx-plus` module, the same way other BoxLang+
 
 ![The trial banner in the console](assets/screenshots/license-trial.png)
 
-The state shows in the console header and on the [Settings](console/settings.md) page.
+The state shows in the console header.
 
 ## Safe by design
 

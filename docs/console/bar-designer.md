@@ -1,6 +1,6 @@
 ---
 title: Bar designer
-order: 5
+order: 12
 description: Choose and order the tabs of the bar, then see the result in a live preview.
 icon: lucide:layout
 ---

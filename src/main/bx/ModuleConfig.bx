@@ -42,6 +42,8 @@ class {
 				password         : "",
 				// Optional second password: this role can look but not change anything or download dumps. Use a bxsecret: value
 				viewerPassword   : "",
+				// Allow heap dumps from the System page (admin only, with a confirmation). A dump holds everything in memory, including secrets
+				allowHeapDump    : false,
 				// Refuse the console over plain HTTP (loopback is exempt). Turn on in production
 				requireHttps     : false,
 				access           : "local",
