@@ -242,6 +242,13 @@ public final class WebExchange {
 		}
 	}
 
+	/**
+	 * Stream a file as the response body.
+	 */
+	public void sendFile( java.io.File f ) {
+		exchange.sendResponseFile( f );
+	}
+
 	public void setStatus( int code ) {
 		exchange.setResponseStatus( code );
 	}

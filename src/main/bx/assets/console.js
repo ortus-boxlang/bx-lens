@@ -132,9 +132,34 @@
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
 				},
+				hd: null, hdConfirm: false, gcBusy: false, gcResult: "", hdTimer: null,
+				hdHref: function () { return base() + "/api/heapdump/download"; },
+				loadHd: async function () {
+					try {
+						this.hd = await (await this.api("heapdump")).json();
+						var self = this;
+						clearTimeout(this.hdTimer);
+						if (this.hd.state === "running" || (this.hd.state === "ready" && this.tab === "system")) { this.hdTimer = setTimeout(function () { if (self.tab === "system") { self.loadHd(); } }, 2000); }
+					} catch (e) { /* offline */ }
+				},
+				startHd: async function () {
+					this.hdConfirm = false;
+					var r = await this.api("heapdump", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: "confirm=true" });
+					if (!r.ok) { this.toast((await r.json()).error || "Could not start"); }
+					await this.loadHd();
+				},
+				discardHd: async function () { await this.api("heapdump/discard", { method: "POST" }); await this.loadHd(); },
+				runGc: async function () {
+					this.gcBusy = true;
+					try {
+						var r = await this.api("gc", { method: "POST" }); var j = await r.json();
+						this.gcResult = r.ok ? "Freed " + this.bytes(j.freedBytes) + " in " + j.ms + " ms (" + this.bytes(j.beforeBytes) + " to " + this.bytes(j.afterBytes) + ")" : (j.error || "Could not run GC");
+					} finally { this.gcBusy = false; }
+				},
 				onTab: function () {
 					var self = this;
 					clearInterval(this.threadTimer);
+					if (this.tab === "system") { this.loadHd(); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
 					if (this.tab === "threads") {
 						this.loadThreads();

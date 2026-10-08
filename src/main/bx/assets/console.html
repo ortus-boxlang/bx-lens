@@ -216,6 +216,23 @@
                   <div class="rowbar" style="margin:8px 0 3px" x-show="system.ram.swapTotal > 0"><span class="mono">Swap</span><span class="mute mono" x-text="bytes(system.ram.swapTotal - system.ram.swapFree) + ' / ' + bytes(system.ram.swapTotal)"></span></div></div>
                 <h3 style="margin-top:14px">Disks</h3>
                 <template x-for="d in system.disks" :key="d.path"><div style="margin-bottom:8px"><div class="rowbar" style="margin:0 0 3px"><span class="mono" x-text="d.path"></span><span class="mute mono" x-text="bytes(d.total - d.usable) + ' / ' + bytes(d.total)"></span></div><div class="bar"><div :style="'width:' + pctOf(d.total - d.usable, d.total) + '%'"></div></div></div></template></div>
+              <div class="card"><h3>Heap and garbage collection <span x-show="state && state.role === 'viewer'">admin only</span></h3>
+                <div class="tools" style="margin-bottom:10px"><button class="btn" :disabled="!state || state.readOnly || gcBusy" @click="runGc()"><svg class="ic"><use href="#ph-arrows-clockwise"/></svg>Run GC</button><span class="sub" x-text="gcResult"></span></div>
+                <template x-if="hd">
+                  <div>
+                    <p class="sub" x-show="!hd.enabled">Heap dumps are off. Set <span class="mono">console.allowHeapDump</span> to true in <span class="mono">boxlang.json</span> to turn them on.</p>
+                    <div x-show="hd.enabled">
+                      <p class="sub" x-show="hd.state === 'idle' || hd.state === 'failed'">A heap dump holds <b>everything in memory</b>, including passwords and session data. It pauses the JVM while it is written. Estimated size <span class="mono" x-text="bytes(hd.estimateBytes)"></span>, free disk in <span class="mono" x-text="hd.tempDir"></span> <span class="mono" x-text="bytes(hd.freeDiskBytes)"></span>.</p>
+                      <div class="msg err" x-show="hd.state === 'failed' || !hd.enoughDisk" x-text="hd.state === 'failed' ? 'The last dump failed: ' + hd.error : 'Not enough free disk space for a dump.'"></div>
+                      <div class="tools" x-show="hd.state === 'idle' || hd.state === 'failed'"><button class="btn warnb" :disabled="!hd.enoughDisk || !hd.supported || !state || state.role === 'viewer'" @click="hdConfirm = true"><svg class="ic"><use href="#ph-download-simple"/></svg>Take a heap dump</button></div>
+                      <div class="confirm" x-show="hdConfirm"><span>Write a full heap dump now? Live objects only (a full GC runs first). The JVM pauses while it is written.</span><button class="btn mini primary" @click="startHd()">Take the dump</button><button class="btn mini" @click="hdConfirm = false">Cancel</button></div>
+                      <p class="sub" x-show="hd.state === 'running'">Writing the dump... <span class="mono" x-text="dur((now - hd.startedAt) / 1000)"></span></p>
+                      <div x-show="hd.state === 'ready'"><p class="sub">Ready: <span class="mono" x-text="bytes(hd.bytes)"></span>. It is removed from the server after you download it (after 5 minutes) or <span x-text="dur(Math.max(0, (hd.expiresAt - now) / 1000))"></span> from now at the latest.</p>
+                        <div class="tools"><a class="btn primary" :href="hdHref()"><svg class="ic"><use href="#ph-download-simple"/></svg>Download .hprof</a><button class="btn" @click="discardHd()">Discard</button></div></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
               <div class="card"><h3>Runtime</h3>
                 <dl class="kv"><dt>JVM</dt><dd x-text="system.runtime.vm"></dd><dt>Vendor</dt><dd x-text="system.runtime.vendor"></dd><dt>Java</dt><dd x-text="system.runtime.java"></dd><dt>OS</dt><dd x-text="system.cpu.os + ' ' + system.cpu.arch"></dd><dt>PID</dt><dd x-text="system.runtime.pid"></dd><dt>Uptime</dt><dd x-text="dur(system.runtime.uptimeMs / 1000)"></dd>
                   <dt>Classes</dt><dd x-text="system.classes.loaded + ' loaded, ' + system.classes.unloaded + ' unloaded'"></dd><dt>Flags</dt><dd><template x-for="f in system.runtime.flags" :key="f"><div x-text="f"></div></template><span x-show="!system.runtime.flags.length">none</span></dd></dl></div>
@@ -230,7 +247,8 @@
         <h1 class="h1">Threads <small>refreshes every 5 seconds while open</small></h1>
         <template x-if="threads">
           <div>
-            <div class="msg err" style="margin:0 0 10px" x-show="threads.deadlocked.length">Deadlock detected between <span x-text="threads.deadlocked.length"></span> threads.</div>
+            <div class="msg err" style="margin:0 0 10px" x-show="threads.deadlocked.length"><b>Deadlock detected</b> between <span x-text="threads.deadlocked.length"></span> threads.
+              <template x-for="t in threads.threads.filter(function (x) { return threads.deadlocked.indexOf(x.id) >= 0; })" :key="t.id"><div class="mono" x-text="t.name + ' waits for ' + (t.lock || '?') + ' held by ' + (t.lockOwner || '?')"></div></template></div>
             <div class="tools">
               <div class="seg"><template x-for="f in ['ALL','RUNNABLE','WAITING','TIMED_WAITING','BLOCKED']" :key="f"><button :class="tf === f ? 'on' : ''" @click="tf = f" x-text="(f === 'ALL' ? 'All' : f.replace('_', ' ').toLowerCase()) + ' ' + tcount(f)"></button></template></div>
               <select x-model="tpool" aria-label="Filter by pool" class="btn"><option value="">All pools</option><template x-for="p in pools()" :key="p"><option :value="p" x-text="p"></option></template></select>

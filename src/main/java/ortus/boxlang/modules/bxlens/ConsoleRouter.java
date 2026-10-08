@@ -197,7 +197,7 @@ public final class ConsoleRouter {
 			json( context, ex, 403, Map.of( "error", "Bad CSRF token" ) );
 			return;
 		}
-		if ( !method.equals( "GET" ) && service.getConfig().getBool( "console.readOnly", false ) ) {
+		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && service.getConfig().getBool( "console.readOnly", false ) ) {
 			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
 			return;
 		}
@@ -221,6 +221,21 @@ public final class ConsoleRouter {
 			}
 		} else if ( route.equals( "settings" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, settings( session( ex ) ) );
+		} else if ( route.startsWith( "heapdump" ) ) {
+			heapDump( context, ex, method, route, s );
+		} else if ( route.equals( "gc" ) && method.equals( "POST" ) && panelOn( "system" ) ) {
+			long	before	= java.lang.management.ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();
+			long	t0		= System.nanoTime();
+			System.gc();
+			long				after	= java.lang.management.ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();
+			Map<String, Object>	g		= new LinkedHashMap<>();
+			g.put( "ok", true );
+			g.put( "beforeBytes", before );
+			g.put( "afterBytes", after );
+			g.put( "freedBytes", Math.max( 0, before - after ) );
+			g.put( "ms", ( System.nanoTime() - t0 ) / 1_000_000L );
+			service.getAudit().log( "gc.run", s.role, ex.remoteAddr(), "freed=" + g.get( "freedBytes" ) );
+			json( context, ex, 200, g );
 		} else if ( route.equals( "settings" ) && method.equals( "POST" ) ) {
 			changeSettings( context, ex );
 		} else if ( route.equals( "settings/reset" ) && method.equals( "POST" ) ) {
@@ -338,6 +353,55 @@ public final class ConsoleRouter {
 
 	private Map<String, Object> license() {
 		return service.getLicensing().status();
+	}
+
+	/**
+	 * Heap dump: <code>GET heapdump</code> info, <code>POST heapdump</code> start (needs <code>confirm=true</code>), <code>GET heapdump/download</code>,
+	 * <code>POST heapdump/discard</code>. Needs <code>console.allowHeapDump</code>. Read-only mode does not block it.
+	 */
+	private void heapDump( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
+		boolean		allowed	= service.getConfig().getBool( "console.allowHeapDump", false );
+		HeapDumper	hd		= service.getHeapDumper();
+		if ( route.equals( "heapdump" ) && method.equals( "GET" ) ) {
+			json( context, ex, 200, hd.info( allowed ) );
+			return;
+		}
+		if ( !allowed ) {
+			json( context, ex, 403, Map.of( "ok", false, "error", "Heap dumps are off. Set console.allowHeapDump to true in boxlang.json." ) );
+			return;
+		}
+		if ( route.equals( "heapdump" ) && method.equals( "POST" ) ) {
+			if ( !"true".equals( ex.formParam( "confirm" ) ) ) {
+				json( context, ex, 400, Map.of( "ok", false, "error", "Confirmation is required" ) );
+				return;
+			}
+			String refused = hd.start();
+			service.getAudit().log( refused == null ? "heapdump.start" : "heapdump.refused", s.role, ex.remoteAddr(), refused == null ? "" : refused );
+			if ( refused != null ) {
+				json( context, ex, 409, Map.of( "ok", false, "error", refused ) );
+			} else {
+				json( context, ex, 202, hd.info( true ) );
+			}
+		} else if ( route.equals( "heapdump/download" ) && method.equals( "GET" ) ) {
+			java.io.File f = hd.takeForDownload();
+			if ( f == null ) {
+				json( context, ex, 404, Map.of( "ok", false, "error", "There is no heap dump to download" ) );
+				return;
+			}
+			service.getAudit().log( "heapdump.download", s.role, ex.remoteAddr(), "bytes=" + f.length() );
+			String name = "lens-heap-" + java.time.LocalDateTime.now().format( java.time.format.DateTimeFormatter.ofPattern( "yyyyMMdd-HHmmss" ) ) + ".hprof";
+			ex.setResponseHeader( "Content-Type", "application/octet-stream" );
+			ex.setResponseHeader( "Content-Disposition", "attachment; filename=\"" + name + "\"" );
+			ex.setResponseHeader( "Cache-Control", "no-store" );
+			ex.setResponseHeader( "X-Content-Type-Options", "nosniff" );
+			ex.sendFile( f );
+		} else if ( route.equals( "heapdump/discard" ) && method.equals( "POST" ) ) {
+			hd.discard();
+			service.getAudit().log( "heapdump.discard", s.role, ex.remoteAddr(), "" );
+			json( context, ex, 200, hd.info( true ) );
+		} else {
+			json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+		}
 	}
 
 	private Map<String, Object> settings( ConsoleAuth.Session s ) {

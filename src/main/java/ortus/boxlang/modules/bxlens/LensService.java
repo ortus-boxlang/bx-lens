@@ -108,6 +108,7 @@ public final class LensService {
 	private volatile BoxLangLogger									logger;
 	private volatile BoxLangLogger									auditLogger;
 	private final Audit												audit				= new Audit( this );
+	private volatile HeapDumper										heapDumper			= new HeapDumper();
 
 	private LensService() {
 	}
@@ -208,6 +209,8 @@ public final class LensService {
 	 * Unregister all collectors and clear history.
 	 */
 	public synchronized void shutdown() {
+		heapDumper.shutdown();
+		heapDumper = new HeapDumper();
 		if ( watchdog != null ) {
 			watchdog.shutdownNow();
 			watchdog = null;
@@ -755,6 +758,10 @@ public final class LensService {
 			auditLogger	= l;
 		}
 		return l;
+	}
+
+	public HeapDumper getHeapDumper() {
+		return heapDumper;
 	}
 
 	public Audit getAudit() {
