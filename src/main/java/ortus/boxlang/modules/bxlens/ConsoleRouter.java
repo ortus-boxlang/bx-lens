@@ -267,6 +267,21 @@ public final class ConsoleRouter {
 			json( context, ex, v == null ? 404 : 200, v == null ? Map.of( "error", "Unknown cache" ) : v );
 		} else if ( route.startsWith( "logfiles" ) && method.equals( "GET" ) && panelOn( "logfiles" ) ) {
 			logFiles( context, ex, route, s );
+		} else if ( route.equals( "environment" ) && method.equals( "GET" ) && panelOn( "environment" ) ) {
+			json( context, ex, 200, service.getEnvironment().environment() );
+		} else if ( route.equals( "bundle" ) && method.equals( "GET" ) ) {
+			service.getAudit().log( "bundle.download", s.role, ex.remoteAddr(), "" );
+			String name = "lens-diagnostics-" + java.time.LocalDateTime.now().format( java.time.format.DateTimeFormatter.ofPattern( "yyyyMMdd-HHmmss" ) )
+			    + ".zip";
+			ex.setResponseHeader( "Content-Type", "application/zip" );
+			ex.setResponseHeader( "Content-Disposition", "attachment; filename=\"" + name + "\"" );
+			ex.setResponseHeader( "Cache-Control", "no-store" );
+			ex.setResponseHeader( "X-Content-Type-Options", "nosniff" );
+			try {
+				ex.sendBinary( service.getEnvironment().bundle() );
+			} catch ( java.io.IOException e ) {
+				json( context, ex, 500, Map.of( "error", "Could not build the bundle" ) );
+			}
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
 			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
@@ -349,6 +364,7 @@ public final class ConsoleRouter {
 		    { "datasources", "Datasources", "database", "Runtime" },
 		    { "caches", "Caches", "package", "Runtime" },
 		    { "logfiles", "Logs", "file-text", "Runtime" },
+		    { "environment", "Environment", "sliders-horizontal", "Runtime" },
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },
 		    { "designer", "Bar designer", "layout", "Config" },

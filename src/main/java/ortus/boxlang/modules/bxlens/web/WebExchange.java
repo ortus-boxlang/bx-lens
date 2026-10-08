@@ -249,6 +249,13 @@ public final class WebExchange {
 		exchange.sendResponseFile( f );
 	}
 
+	/**
+	 * Send bytes as the response body.
+	 */
+	public void sendBinary( byte[] data ) {
+		exchange.sendResponseBinary( data );
+	}
+
 	public void setStatus( int code ) {
 		exchange.setResponseStatus( code );
 	}

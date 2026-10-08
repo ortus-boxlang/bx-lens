@@ -137,6 +137,12 @@
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
 				},
+				envd: null, envView: "config", envq: "", base: base(),
+				loadEnv: async function () { this.envd = await (await this.api("environment")).json(); },
+				envRows: function () {
+					var rows = this.envView === "env" ? this.envd.env : this.envd.properties, q = this.envq.toLowerCase();
+					return rows.filter(function (r) { return !q || r.name.toLowerCase().indexOf(q) >= 0; });
+				},
 				logl: null, lfile: "", llines: [], lq: "", llevel: "", lcount: "500", lcut: false, llive: true, loffset: 0, lastLevel: "",
 				logHref: function () { return base() + "/api/logfiles/download?file=" + encodeURIComponent(this.lfile); },
 				lineClass: function (l) { return /\[\s*ERROR\s*]/.test(l) ? "lerr" : /\[\s*WARN\s*]/.test(l) ? "lwarn" : /^\s+(at |\.\.\.|Caused by)/.test(l) ? "lmute" : ""; },
@@ -217,6 +223,7 @@
 					clearInterval(this.threadTimer);
 					if (this.tab === "system") { this.loadHd(); }
 					if (this.tab === "logfiles") { this.loadLogs(); }
+					if (this.tab === "environment" && !this.envd) { this.loadEnv(); }
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
