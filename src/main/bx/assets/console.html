@@ -193,6 +193,42 @@
         </template>
       </section>
 
+      <!-- Datasources -->
+      <section x-show="tab === 'datasources'">
+        <h1 class="h1">Datasources <small>connection pools, live</small></h1>
+        <template x-if="dsl">
+          <div>
+            <p class="sub" x-show="!dsl.datasources.length">No datasource has been registered yet.</p>
+            <div class="grid2">
+              <template x-for="d in dsl.datasources" :key="d.id">
+                <div class="card"><h3><span class="mono" x-text="d.name"></span><span><span class="chipx" :class="dsClass(d)" x-text="d.state"></span></span></h3>
+                  <p class="sub"><span x-text="d.driver"></span><span x-show="d.application"> · app <span x-text="d.application"></span></span><span x-show="d.onTheFly"> · on the fly</span><span x-show="d.url"> · <span class="mono" x-text="d.url"></span></span></p>
+                  <template x-if="d.pooling">
+                    <div>
+                      <div class="rowbar" style="margin:6px 0 3px"><span class="mono">connections</span><span class="mute mono" x-text="d.pool.active + ' active, ' + d.pool.idle + ' idle, ' + d.pool.total + ' of ' + d.pool.max"></span></div>
+                      <div class="bar" :class="d.pool.utilization >= 90 ? 'crit' : d.pool.utilization >= 70 ? 'warn' : ''"><div :style="'width:' + Math.min(100, d.pool.utilization) + '%'"></div></div>
+                      <p class="sub" x-show="d.pool.pending > 0"><b x-text="d.pool.pending"></b> thread(s) waiting for a connection</p>
+                      <dl class="kv" x-show="d.metrics" style="margin-top:8px">
+                        <dt>Wait for a connection</dt><dd x-text="d.metrics ? d.metrics.acquireAvgMs + ' ms avg, ' + d.metrics.acquireMaxMs + ' ms max, ' + d.metrics.acquired + ' times' : ''"></dd>
+                        <dt>Connection held</dt><dd x-text="d.metrics ? d.metrics.usageAvgMs + ' ms avg, ' + d.metrics.usageMaxMs + ' ms max' : ''"></dd>
+                        <dt>Opening a connection</dt><dd x-text="d.metrics ? d.metrics.createAvgMs + ' ms avg, ' + d.metrics.created + ' opened' : ''"></dd>
+                        <dt>Timeouts</dt><dd x-text="d.metrics ? d.metrics.timeouts : ''"></dd>
+                      </dl>
+                      <p class="sub" x-show="!d.metrics">Timings are not collected: this pool already has its own metrics tracker.</p>
+                      <details style="margin-top:8px"><summary class="sub">Pool settings</summary>
+                        <dl class="kv"><dt>Min idle / max</dt><dd x-text="d.pool.min + ' / ' + d.pool.max"></dd><dt>Connection timeout</dt><dd x-text="d.config.connectionTimeoutMs + ' ms'"></dd><dt>Idle timeout</dt><dd x-text="d.config.idleTimeoutMs + ' ms'"></dd><dt>Max lifetime</dt><dd x-text="d.config.maxLifetimeMs + ' ms'"></dd><dt>Keepalive</dt><dd x-text="d.config.keepaliveMs + ' ms'"></dd><dt>Leak detection</dt><dd x-text="d.config.leakDetectionMs > 0 ? d.config.leakDetectionMs + ' ms' : 'off'"></dd><dt>Auto commit</dt><dd x-text="d.config.autoCommit"></dd><dt>Read only</dt><dd x-text="d.config.readOnly"></dd><dt>Isolation</dt><dd x-text="d.config.isolation"></dd><dt>User</dt><dd x-text="d.user"></dd></dl></details>
+                    </div>
+                  </template>
+                  <p class="sub" x-show="!d.pooling">The pool has not started yet. It starts on the first query.</p>
+                  <div class="tools" style="margin-top:10px"><button class="btn" :disabled="!d.pooling || !state || state.role === 'viewer' || dsBusy === d.id" @click="testDs(d)"><svg class="ic"><use href="#ph-pulse"/></svg>Test connection</button>
+                    <span class="sub" :style="dsRes[d.id] && !dsRes[d.id].ok ? 'color:var(--crit)' : ''" x-show="dsRes[d.id]" x-text="dsRes[d.id] ? dsRes[d.id].message + (dsRes[d.id].ok ? ' (open ' + dsRes[d.id].openMs + ' ms, validate ' + dsRes[d.id].validateMs + ' ms)' : '') : ''"></span></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </section>
+
       <!-- System -->
       <section x-show="tab === 'system'">
         <h1 class="h1">System <small>JVM and host numbers, live</small></h1>

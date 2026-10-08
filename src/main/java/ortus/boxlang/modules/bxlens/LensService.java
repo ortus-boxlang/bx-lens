@@ -109,6 +109,7 @@ public final class LensService {
 	private volatile BoxLangLogger									auditLogger;
 	private final Audit												audit				= new Audit( this );
 	private volatile HeapDumper										heapDumper			= new HeapDumper();
+	private final DatasourceData									datasources			= new DatasourceData();
 
 	private LensService() {
 	}
@@ -146,7 +147,7 @@ public final class LensService {
 		this.baseConfig		= new LensConfig( settings );
 		allBuiltIns.clear();
 		allBuiltIns.addAll( builtIns() );
-		List<String> ids = new ArrayList<>( List.of( "executors", "tasks", "system", "threads" ) );
+		List<String> ids = new ArrayList<>( List.of( "executors", "tasks", "datasources", "system", "threads" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
 				ids.add( c.id() );
@@ -536,10 +537,9 @@ public final class LensService {
 	/**
 	 * Once a request runs longer than the slow request limit, take one stack sample of its thread, so the issue can say where it was stuck.
 	 */
+	private int tick;
+
 	private void startWatchdog() {
-		if ( !config.active || config.slowRequestMs <= 0 || !config.getBool( "checks.slowSample", true ) ) {
-			return;
-		}
 		watchdog = java.util.concurrent.Executors.newSingleThreadScheduledExecutor( r -> {
 			Thread t = new Thread( r, "bxlens-watchdog" );
 			t.setDaemon( true );
@@ -547,6 +547,12 @@ public final class LensService {
 		} );
 		watchdog.scheduleWithFixedDelay( () -> {
 			try {
+				if ( config.consoleEnabled && ++tick % 25 == 0 ) {
+					datasources.attachAll();
+				}
+				if ( !config.active || config.slowRequestMs <= 0 || !config.getBool( "checks.slowSample", true ) ) {
+					return;
+				}
 				long now = System.nanoTime();
 				for ( LensRequest r : active.values() ) {
 					if ( !r.data.containsKey( "slowSample" ) && ( now - r.startNanos ) / 1_000_000L >= config.slowRequestMs && r.thread != null
@@ -758,6 +764,10 @@ public final class LensService {
 			auditLogger	= l;
 		}
 		return l;
+	}
+
+	public DatasourceData getDatasources() {
+		return datasources;
 	}
 
 	public HeapDumper getHeapDumper() {

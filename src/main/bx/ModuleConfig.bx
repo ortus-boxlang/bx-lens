@@ -160,6 +160,7 @@ class {
 				// Console pages. Turn one off and its page disappears
 				executors    : { enabled : true },
 				tasks        : { enabled : true },
+				datasources  : { enabled : true },
 				system       : { enabled : true },
 				threads      : { enabled : true }
 			}

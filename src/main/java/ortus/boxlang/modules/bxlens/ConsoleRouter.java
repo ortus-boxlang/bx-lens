@@ -197,7 +197,8 @@ public final class ConsoleRouter {
 			json( context, ex, 403, Map.of( "error", "Bad CSRF token" ) );
 			return;
 		}
-		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && service.getConfig().getBool( "console.readOnly", false ) ) {
+		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && !route.endsWith( "/test" )
+		    && service.getConfig().getBool( "console.readOnly", false ) ) {
 			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
 			return;
 		}
@@ -251,6 +252,12 @@ public final class ConsoleRouter {
 			}
 		} else if ( route.equals( "executors" ) && method.equals( "GET" ) && panelOn( "executors" ) ) {
 			json( context, ex, 200, service.getData().executors() );
+		} else if ( route.equals( "datasources" ) && method.equals( "GET" ) && panelOn( "datasources" ) ) {
+			json( context, ex, 200, service.getDatasources().list() );
+		} else if ( route.startsWith( "datasources/" ) && route.endsWith( "/test" ) && method.equals( "POST" ) && panelOn( "datasources" ) ) {
+			String id = decode( route.substring( "datasources/".length(), route.length() - "/test".length() ) );
+			service.getAudit().log( "datasource.test", s.role, ex.remoteAddr(), "datasource=" + id );
+			json( context, ex, 200, service.getDatasources().test( id ) );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
 			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
@@ -330,6 +337,7 @@ public final class ConsoleRouter {
 		    { "requests", "Requests", "list-bullets", "Inspect" },
 		    { "executors", "Executors", "lightning", "Runtime" },
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
+		    { "datasources", "Datasources", "database", "Runtime" },
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },
 		    { "designer", "Bar designer", "layout", "Config" },
@@ -649,6 +657,9 @@ public final class ConsoleRouter {
 				}
 				if ( want.contains( "tasks" ) && panelOn( "tasks" ) ) {
 					tick.put( "tasks", tasksFor( s ) );
+				}
+				if ( want.contains( "datasources" ) && panelOn( "datasources" ) ) {
+					tick.put( "datasources", service.getDatasources().list() );
 				}
 				if ( want.contains( "system" ) && panelOn( "system" ) ) {
 					tick.put( "system", service.getData().system() );

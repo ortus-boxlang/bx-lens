@@ -100,7 +100,7 @@
 					var self = this;
 					this.disconnect();
 					if (!window.EventSource) { return; }
-					var topics = ["requests"].concat(["executors", "tasks", "system"].filter(function (t) { return self.has(t); })).join(",");
+					var topics = ["requests"].concat(["executors", "tasks", "datasources", "system"].filter(function (t) { return self.has(t); })).join(",");
 					this.es = new EventSource(base() + "/stream?topics=" + topics, { withCredentials: true });
 					this.es.addEventListener("tick", function (e) { self.streamOk = true; self.onTick(JSON.parse(e.data)); });
 					this.es.onerror = function () { self.streamOk = false; };
@@ -112,6 +112,7 @@
 					if (d.executors) { this.setExecutors(d.executors); }
 					if (d.tasks) { this.tasks = d.tasks; if (!this.ksel && this.allTasks().length) { this.ksel = this.allTasks()[0].scheduler + "/" + this.allTasks()[0].name; } }
 					if (d.system) { this.setSystem(d.system); }
+					if (d.datasources) { this.dsl = d.datasources; }
 				},
 				load: async function () {
 					this.state = await (await this.api("state")).json();
@@ -120,6 +121,7 @@
 					if (this.has("executors")) { this.setExecutors(await (await this.api("executors")).json()); }
 					if (this.has("tasks")) { this.tasks = await (await this.api("tasks")).json(); var a = this.allTasks(); if (a.length) { this.ksel = a[0].scheduler + "/" + a[0].name; } }
 					if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
+					if (this.has("datasources")) { this.dsl = await (await this.api("datasources")).json(); }
 				},
 				refresh: async function () {
 					try {
@@ -131,6 +133,12 @@
 						if (this.has("tasks")) { this.tasks = await (await this.api("tasks")).json(); }
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
+				},
+				dsl: null, dsRes: {}, dsBusy: "",
+				dsClass: function (d) { return d.state === "ok" || d.state === "idle" ? (d.state === "ok" ? "on" : "hid") : "off"; },
+				testDs: async function (d) {
+					this.dsBusy = d.id;
+					try { var r = await this.api("datasources/" + encodeURIComponent(d.id) + "/test", { method: "POST" }); this.dsRes[d.id] = await r.json(); this.dsRes = Object.assign({}, this.dsRes); } finally { this.dsBusy = ""; }
 				},
 				hd: null, hdConfirm: false, gcBusy: false, gcResult: "", hdTimer: null,
 				hdHref: function () { return base() + "/api/heapdump/download"; },
