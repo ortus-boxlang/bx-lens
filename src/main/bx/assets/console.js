@@ -72,6 +72,29 @@
 					if (r.status === 401) { location.reload(); throw new Error("signed out"); }
 					return r;
 				},
+				sdraft: {}, settingsError: "",
+				sval: function (d) { return Object.prototype.hasOwnProperty.call(this.sdraft, d.key) ? this.sdraft[d.key] : d.value; },
+				sedit: function (d, v) {
+					if (d.type === "int") { v = v === "" ? "" : Number(v); }
+					if (String(v) === String(Array.isArray(d.value) ? d.value.join(", ") : d.value)) { delete this.sdraft[d.key]; } else { this.sdraft[d.key] = v; }
+					this.sdraft = Object.assign({}, this.sdraft);
+				},
+				dirtyCount: function () { return Object.keys(this.sdraft).length; },
+				discardSettings: function () { this.sdraft = {}; this.settingsError = ""; },
+				saveSettings: async function () {
+					var body = new URLSearchParams({ changes: JSON.stringify(this.sdraft) }).toString();
+					var r = await this.api("settings", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: body });
+					var j = await r.json();
+					if (r.ok) { this.settings = j; this.sdraft = {}; this.settingsError = ""; this.toast("Settings applied and saved"); this.state = await (await this.api("state")).json(); }
+					else { this.settingsError = j.error || "Could not save"; }
+				},
+				resetSetting: async function (key) {
+					if (!key && !confirm("Reset every setting you changed in the console?")) { return; }
+					var r = await this.api("settings/reset", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ key: key }).toString() });
+					var j = await r.json();
+					if (r.ok) { this.settings = j; this.sdraft = {}; this.settingsError = ""; this.toast(key ? "Reset" : "All settings reset"); this.state = await (await this.api("state")).json(); }
+					else { this.settingsError = j.error || "Could not reset"; }
+				},
 				has: function (id) { return !!(this.state && this.state.tabs.some(function (t) { return t.id === id; })); },
 				connect: function () {
 					var self = this;

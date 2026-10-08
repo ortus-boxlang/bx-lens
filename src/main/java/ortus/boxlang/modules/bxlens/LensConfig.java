@@ -100,6 +100,34 @@ public final class LensConfig {
 	}
 
 	/**
+	 * The base settings with dotted-key overrides applied on top, for example <code>thresholds.slowQueryMs</code>. The inputs are not changed.
+	 */
+	public static Map<String, Object> overlay( Map<?, ?> base, Map<String, Object> overrides ) {
+		Map<String, Object> out = deepCopy( base );
+		if ( overrides != null ) {
+			for ( Map.Entry<String, Object> e : overrides.entrySet() ) {
+				setPath( out, e.getKey(), copyValue( e.getValue() ) );
+			}
+		}
+		return out;
+	}
+
+	@SuppressWarnings( "unchecked" )
+	private static void setPath( Map<String, Object> root, String path, Object value ) {
+		String[]			parts	= path.split( "\\." );
+		Map<String, Object>	cur		= root;
+		for ( int i = 0; i < parts.length - 1; i++ ) {
+			Object next = cur.get( parts[ i ] );
+			if ( ! ( next instanceof Map ) ) {
+				next = new TreeMap<String, Object>( String.CASE_INSENSITIVE_ORDER );
+				cur.put( parts[ i ], next );
+			}
+			cur = ( Map<String, Object> ) next;
+		}
+		cur.put( parts[ parts.length - 1 ], value );
+	}
+
+	/**
 	 * Defaults only.
 	 */
 	public static LensConfig defaults() {

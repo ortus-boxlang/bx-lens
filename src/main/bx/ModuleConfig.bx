@@ -46,6 +46,10 @@ class {
 				lockoutMinutes   : 5,
 				// Pause, resume, run and reload scheduled tasks from the console
 				actions          : true,
+				// View only: no change can be made from the console (settings, tasks, bar layout). Set it in boxlang.json only
+				readOnly         : false,
+				// Where console changes to the settings are saved. Empty means config/bxlens-settings.json in the BoxLang home
+				overridesFile    : "",
 				runTimeoutSeconds : 60,
 				maxStreams       : 10
 			},

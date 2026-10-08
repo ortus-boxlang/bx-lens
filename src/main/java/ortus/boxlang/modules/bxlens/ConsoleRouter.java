@@ -189,6 +189,10 @@ public final class ConsoleRouter {
 			json( context, ex, 403, Map.of( "error", "Bad CSRF token" ) );
 			return;
 		}
+		if ( !method.equals( "GET" ) && service.getConfig().getBool( "console.readOnly", false ) ) {
+			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
+			return;
+		}
 		if ( route.equals( "state" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, state( s ) );
 		} else if ( route.equals( "overview" ) && method.equals( "GET" ) ) {
@@ -204,6 +208,19 @@ public final class ConsoleRouter {
 			}
 		} else if ( route.equals( "settings" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, settings() );
+		} else if ( route.equals( "settings" ) && method.equals( "POST" ) ) {
+			changeSettings( context, ex );
+		} else if ( route.equals( "settings/reset" ) && method.equals( "POST" ) ) {
+			try {
+				String key = ex.formParam( "key" );
+				service.resetSettings( key );
+				service.getLogger().info( "bx-lens console: settings {} reset by {}", key == null || key.isBlank() ? "(all)" : key, ex.remoteAddr() );
+				json( context, ex, 200, settings() );
+			} catch ( IllegalArgumentException e ) {
+				json( context, ex, 400, Map.of( "ok", false, "error", e.getMessage() ) );
+			} catch ( java.io.IOException e ) {
+				json( context, ex, 500, Map.of( "ok", false, "error", "Could not save the overrides: " + e.getMessage() ) );
+			}
 		} else if ( route.equals( "executors" ) && method.equals( "GET" ) && panelOn( "executors" ) ) {
 			json( context, ex, 200, service.getData().executors() );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
@@ -248,6 +265,7 @@ public final class ConsoleRouter {
 		m.put( "barEnabled", cfg.barEnabled );
 		m.put( "tabs", tabs() );
 		m.put( "actions", cfg.getBool( "console.actions", true ) );
+		m.put( "readOnly", cfg.getBool( "console.readOnly", false ) );
 		m.put( "liveStreams", service.getStreams().get() );
 		m.put( "license", license() );
 		return m;
@@ -290,29 +308,37 @@ public final class ConsoleRouter {
 	}
 
 	private Map<String, Object> settings() {
-		LensConfig			cfg	= service.getConfig();
-		Map<String, Object>	m	= new LinkedHashMap<>();
-		Map<String, Object>	a	= new LinkedHashMap<>();
-		a.put( "console.enabled", cfg.consoleEnabled );
-		a.put( "console.password", service.getAuth().isConfigured() ? "set" : "not set" );
-		a.put( "console.access", cfg.get( "console.access" ) == null ? "local" : cfg.get( "console.access" ) );
-		a.put( "console.sessionMinutes", cfg.sessionMinutes );
-		a.put( "bar.enabled", cfg.barEnabled );
-		a.put( "bar.access", cfg.get( "bar.access" ) == null ? "local" : cfg.get( "bar.access" ) );
-		a.put( "bar.allowAllIPs", cfg.getBool( "bar.allowAllIPs", false ) );
-		a.put( "collect.level", cfg.collectLevel );
-		a.put( "history.maxRequests", cfg.maxRequests );
-		m.put( "access", a );
-		List<Map<String, Object>> cols = new ArrayList<>();
-		for ( ILensCollector c : service.getCollectors() ) {
-			Map<String, Object> cm = new LinkedHashMap<>();
-			cm.put( "id", c.id() );
-			cm.put( "heavy", c.heavy() );
-			cols.add( cm );
-		}
-		m.put( "collectors", cols );
-		m.put( "hiddenTabs", cfg.hiddenTabs );
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put( "readOnly", service.getConfig().getBool( "console.readOnly", false ) );
+		m.put( "groups", SettingsRegistry.GROUPS );
+		m.put( "settings", service.settingsView() );
+		m.put( "overridesFile", String.valueOf( service.getSettingsStore().file() ) );
+		m.put( "overridden", service.getSettingsStore().get().size() );
 		return m;
+	}
+
+	private void changeSettings( IBoxContext context, WebExchange ex ) {
+		try {
+			Object parsed = JSONUtil.fromJSON( ex.formParam( "changes" ) );
+			if ( ! ( parsed instanceof Map<?, ?> in ) ) {
+				json( context, ex, 400, Map.of( "ok", false, "error", "Expected a map of changes" ) );
+				return;
+			}
+			Map<String, Object> changes = new LinkedHashMap<>();
+			for ( Map.Entry<?, ?> e : in.entrySet() ) {
+				String k = e.getKey() instanceof ortus.boxlang.runtime.scopes.Key key ? key.getName() : String.valueOf( e.getKey() );
+				changes.put( k, e.getValue() );
+			}
+			service.changeSettings( changes );
+			service.getLogger().info( "bx-lens console: settings changed by {}: {}", ex.remoteAddr(), changes.keySet() );
+			json( context, ex, 200, settings() );
+		} catch ( IllegalArgumentException e ) {
+			json( context, ex, 400, Map.of( "ok", false, "error", e.getMessage() ) );
+		} catch ( java.io.IOException e ) {
+			json( context, ex, 500, Map.of( "ok", false, "error", "Could not save the overrides: " + e.getMessage() ) );
+		} catch ( Throwable t ) {
+			json( context, ex, 400, Map.of( "ok", false, "error", "Could not read the changes" ) );
+		}
 	}
 
 	/**

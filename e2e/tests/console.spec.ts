@@ -44,9 +44,9 @@ test.describe( 'console', () => {
 	test( 'settings show the effective access rules without the password', async ( { page } ) => {
 		await signIn( page );
 		await page.click( '.nav:has-text("Settings")' );
-		const kv = page.locator( '.main section:visible dl.kv' ).first();
-		await expect( kv ).toContainText( 'console.password' );
-		await expect( kv ).toContainText( 'set' );
+		const row = page.locator( '.srow', { hasText: 'console.password' } );
+		await expect( row ).toContainText( 'set' );
+		await expect( row ).toContainText( 'boxlang.json only' );
 		expect( await page.content() ).not.toContain( PASSWORD );
 	} );
 

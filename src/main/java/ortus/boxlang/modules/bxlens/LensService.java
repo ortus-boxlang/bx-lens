@@ -77,29 +77,34 @@ public final class LensService {
 	/**
 	 * Placeholder written by lensRender() and replaced with the bar when the request ends.
 	 */
-	public static final String										MARKER			= "<!--bxlens:here-->";
+	public static final String										MARKER				= "<!--bxlens:here-->";
 
 	private static volatile LensService								instance;
 
 	private volatile BoxRuntime										runtime;
-	private volatile LensConfig										config			= LensConfig.defaults();
-	private volatile AccessGuard									barGuard		= new AccessGuard( config, "bar.access", false );
-	private volatile AccessGuard									consoleGuard	= new AccessGuard( config, "console.access", true );
-	private volatile ConsoleAuth									auth			= new ConsoleAuth( config );
-	private volatile TaskOutcomes									outcomes		= new TaskOutcomes();
-	private volatile Licensing										licensing		= new Licensing( "" );
-	private volatile LayoutStore									layout			= new LayoutStore( null );
-	private final ConsoleData										consoleData		= new ConsoleData( this );
-	private final AtomicInteger										streams			= new AtomicInteger();
-	private final Map<String, LensRequest>							active			= new java.util.concurrent.ConcurrentHashMap<>();
+	private volatile LensConfig										config				= LensConfig.defaults();
+	private volatile AccessGuard									barGuard			= new AccessGuard( config, "bar.access", false );
+	private volatile AccessGuard									consoleGuard		= new AccessGuard( config, "console.access", true );
+	private volatile ConsoleAuth									auth				= new ConsoleAuth( config );
+	private volatile TaskOutcomes									outcomes			= new TaskOutcomes();
+	private volatile Licensing										licensing			= new Licensing( "" );
+	private volatile LayoutStore									layout				= new LayoutStore( null );
+	private volatile Map<String, Object>							baseSettings		= Map.of();
+	private volatile LensConfig										baseConfig			= LensConfig.defaults();
+	private volatile SettingsRegistry								settingsRegistry	= new SettingsRegistry( List.of() );
+	private volatile SettingsStore									settingsStore		= new SettingsStore( null, settingsRegistry );
+	private final List<ILensCollector>								allBuiltIns			= new ArrayList<>();
+	private final ConsoleData										consoleData			= new ConsoleData( this );
+	private final AtomicInteger										streams				= new AtomicInteger();
+	private final Map<String, LensRequest>							active				= new java.util.concurrent.ConcurrentHashMap<>();
 	private volatile java.util.concurrent.ScheduledExecutorService	watchdog;
-	private volatile RequestStore									store			= new RequestStore( 50 );
+	private volatile RequestStore									store				= new RequestStore( 50 );
 	private volatile BarRenderer									renderer;
-	private volatile String											version			= "0.0.0";
-	private volatile String											moduleDir		= "";
-	private final GlobalStats										stats			= new GlobalStats();
-	private final LensRegistry										registry		= new LensRegistry();
-	private final List<ILensCollector>								collectors		= Collections.synchronizedList( new ArrayList<>() );
+	private volatile String											version				= "0.0.0";
+	private volatile String											moduleDir			= "";
+	private final GlobalStats										stats				= new GlobalStats();
+	private final LensRegistry										registry			= new LensRegistry();
+	private final List<ILensCollector>								collectors			= Collections.synchronizedList( new ArrayList<>() );
 	private volatile BoxLangLogger									logger;
 
 	private LensService() {
@@ -134,7 +139,29 @@ public final class LensService {
 		this.runtime		= runtime;
 		this.version		= version == null ? "" : version;
 		this.moduleDir		= moduleDir == null ? "" : moduleDir;
-		this.config			= new LensConfig( settings );
+		this.baseSettings	= LensConfig.overlay( settings, null );
+		this.baseConfig		= new LensConfig( settings );
+		allBuiltIns.clear();
+		allBuiltIns.addAll( builtIns() );
+		List<String> ids = new ArrayList<>( List.of( "executors", "tasks", "system", "threads" ) );
+		allBuiltIns.forEach( c -> {
+			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
+				ids.add( c.id() );
+			}
+		} );
+		this.settingsRegistry = new SettingsRegistry( ids );
+		Path overridesFile = null;
+		try {
+			String custom = this.baseConfig.getString( "console.overridesFile", "" );
+			overridesFile = custom.isBlank() ? runtime.getRuntimeHome().resolve( "config" ).resolve( "bxlens-settings.json" ) : Path.of( custom );
+		} catch ( Throwable t ) {
+			// No home: overrides live in memory only
+		}
+		this.settingsStore	= new SettingsStore( overridesFile, this.settingsRegistry );
+		this.config			= new LensConfig( LensConfig.overlay( settings, this.settingsStore.get() ) );
+		if ( this.settingsStore.skipped() > 0 ) {
+			getLogger().warn( "bx-lens: ignored {} invalid entries in the settings overrides file [{}]", this.settingsStore.skipped(), overridesFile );
+		}
 		this.barGuard		= new AccessGuard( this.config, "bar.access", this.config.getBool( "bar.allowAllIPs", false ) );
 		this.consoleGuard	= new AccessGuard( this.config, "console.access", true );
 		this.auth			= new ConsoleAuth( this.config );
@@ -168,12 +195,7 @@ public final class LensService {
 		if ( this.config.consoleEnabled && this.consoleGuard.isOpenToAll() ) {
 			getLogger().warn( "bx-lens: console.access is [all]. Use HTTPS and a strong password." );
 		}
-		for ( ILensCollector c : builtIns() ) {
-			boolean heavyBlocked = this.config.light && c.heavy();
-			if ( c instanceof LifecycleCollector || ( !heavyBlocked && this.config.isCollectorEnabled( c.id(), c.enabledByDefault() ) ) ) {
-				register( c );
-			}
-		}
+		reconcileCollectors();
 		startWatchdog();
 		announceRegister();
 		getLogger().info( "bx-lens {} active: bar={}, console={}, collect={}, collectors={}", this.version, this.config.barEnabled, this.config.consoleEnabled,
@@ -220,6 +242,121 @@ public final class LensService {
 			runtime.getInterceptorService().register( bc );
 		}
 		collectors.add( collector );
+	}
+
+	/**
+	 * Remove a collector.
+	 */
+	public void unregister( ILensCollector collector ) {
+		try {
+			if ( collector instanceof BaseCollector bc && runtime != null ) {
+				runtime.getInterceptorService().unregister( bc );
+			}
+		} catch ( Throwable t ) {
+			// Already gone
+		}
+		collectors.remove( collector );
+	}
+
+	/**
+	 * Make the registered collectors match the settings: add the ones now wanted, remove the ones no longer wanted.
+	 */
+	private void reconcileCollectors() {
+		synchronized ( collectors ) {
+			for ( ILensCollector c : allBuiltIns ) {
+				boolean	heavyBlocked	= this.config.light && c.heavy();
+				boolean	want			= c instanceof LifecycleCollector
+				    || ( !heavyBlocked && this.config.isCollectorEnabled( c.id(), c.enabledByDefault() ) );
+				boolean	has				= collectors.contains( c );
+				if ( want && !has ) {
+					register( c );
+				} else if ( !want && has ) {
+					unregister( c );
+				}
+			}
+		}
+	}
+
+	public SettingsRegistry getSettingsRegistry() {
+		return settingsRegistry;
+	}
+
+	public SettingsStore getSettingsStore() {
+		return settingsStore;
+	}
+
+	/**
+	 * Change settings from the console. <code>null</code> removes the override for that key. Everything is checked first: a bad value
+	 * changes nothing.
+	 *
+	 * @throws IllegalArgumentException when a key or value is not valid
+	 */
+	public synchronized void changeSettings( Map<String, Object> changes ) throws java.io.IOException {
+		Map<String, Object> next = new java.util.LinkedHashMap<>( settingsStore.get() );
+		for ( Map.Entry<String, Object> e : changes.entrySet() ) {
+			SettingsRegistry.Def d = settingsRegistry.get( e.getKey() );
+			if ( d == null ) {
+				throw new IllegalArgumentException( "Unknown setting: " + e.getKey() );
+			}
+			if ( e.getValue() == null ) {
+				next.remove( d.key() );
+			} else {
+				next.put( d.key(), e.getValue() );
+			}
+		}
+		settingsStore.set( next );
+		applySettings();
+	}
+
+	/**
+	 * Drop one override, or all of them when the key is null.
+	 */
+	public synchronized void resetSettings( String key ) throws java.io.IOException {
+		Map<String, Object> next = new java.util.LinkedHashMap<>( settingsStore.get() );
+		if ( key == null || key.isBlank() ) {
+			next.clear();
+		} else {
+			SettingsRegistry.Def d = settingsRegistry.get( key );
+			if ( d == null ) {
+				throw new IllegalArgumentException( "Unknown setting: " + key );
+			}
+			next.remove( d.key() );
+		}
+		settingsStore.set( next );
+		applySettings();
+	}
+
+	private void applySettings() {
+		this.config = new LensConfig( LensConfig.overlay( baseSettings, settingsStore.get() ) );
+		reconcileCollectors();
+	}
+
+	/**
+	 * Every known setting with its effective value, where it came from and whether it can be changed. Secrets are never included.
+	 */
+	public List<Map<String, Object>> settingsView() {
+		List<Map<String, Object>> out = new ArrayList<>();
+		for ( SettingsRegistry.Def d : settingsRegistry.all() ) {
+			Map<String, Object>	m			= d.toMap();
+			Object				value		= config.get( d.key() );
+			Object				configured	= baseConfig.get( d.key() );
+			if ( "secret".equals( d.type() ) ) {
+				m.put( "value", value == null || value.toString().isBlank() ? "not set" : "set" );
+				m.put( "configured", m.get( "value" ) );
+			} else {
+				if ( d.key().startsWith( "collectors." ) && d.key().endsWith( ".enabled" ) && value == null ) {
+					value = config.isCollectorEnabled( d.key().split( "\\." )[ 1 ], ( Boolean ) d.def() );
+				}
+				if ( configured == null && d.key().startsWith( "collectors." ) && d.key().endsWith( ".enabled" ) ) {
+					configured = baseConfig.isCollectorEnabled( d.key().split( "\\." )[ 1 ], ( Boolean ) d.def() );
+				}
+				m.put( "value", value == null ? d.def() : value );
+				m.put( "configured", configured == null ? d.def() : configured );
+			}
+			m.put( "source", settingsStore.get().containsKey( d.key() ) ? "override" : "config" );
+			out.add( m );
+		}
+		return out;
 	}
 
 	/**

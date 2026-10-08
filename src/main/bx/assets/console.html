@@ -297,14 +297,41 @@
 
       <!-- Settings -->
       <section x-show="tab === 'settings'">
-        <h1 class="h1">Settings <small>effective values, read-only. Edit <span class="mono">boxlang.json</span> and reload the module.</small></h1>
+        <h1 class="h1">Settings <small>changes apply at once and are saved, so they survive a restart</small></h1>
         <template x-if="settings">
-          <div class="grid2">
-            <div class="card"><h3>Access and collection</h3>
-              <dl class="kv"><template x-for="(v, k) in settings.access" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd x-text="Array.isArray(v) ? v.join(', ') : String(v)"></dd></div></template></dl></div>
-            <div class="card"><h3>Collectors <span>heavy ones are skipped at the light level</span></h3>
-              <div class="scroll"><table><thead><tr><th>Collector</th><th>Cost</th></tr></thead><tbody><template x-for="c in settings.collectors" :key="c.id"><tr><td class="mono" x-text="c.id"></td><td><span class="chipx" :class="c.heavy ? 'off' : 'on'" x-text="c.heavy ? 'heavy' : 'light'"></span></td></tr></template></tbody></table></div>
-              <p class="sub">Hidden tabs: <span class="mono" x-text="settings.hiddenTabs.length ? settings.hiddenTabs.join(', ') : 'none'"></span></p></div>
+          <div>
+            <div class="msg warn" style="margin:0 0 10px" x-show="settings.readOnly">Read-only mode is on (<span class="mono">console.readOnly</span>). Nothing can be changed from the console.</div>
+            <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="!settings.readOnly">
+              <span x-text="settings.overridden"></span> setting(s) overridden. Saved to <span class="mono" x-text="settings.overridesFile"></span>.
+              <button class="btn" style="margin-left:8px" x-show="settings.overridden > 0" @click="resetSetting('')">Reset all to defaults</button>
+            </div>
+            <div class="msg err" style="margin:0 0 10px" x-show="settingsError" x-text="settingsError"></div>
+            <div class="grid2">
+              <template x-for="g in settings.groups" :key="g">
+                <div class="card" x-show="settings.settings.some(function (x) { return x.group === g; })"><h3 x-text="g"></h3>
+                  <template x-for="d in settings.settings.filter(function (x) { return x.group === g; })" :key="d.key">
+                    <div class="srow">
+                      <div class="slabel"><span x-text="d.label"></span> <span class="mono dim" x-text="d.key"></span>
+                        <span class="chipx hid" x-show="d.source === 'override'" :title="'Configured value: ' + String(d.configured)">changed</span>
+                        <span class="chipx hid" x-show="!d.live">boxlang.json only</span></div>
+                      <div class="sctl">
+                        <template x-if="d.type === 'bool' && d.live"><label class="sw"><input type="checkbox" :checked="sval(d) === true" :disabled="settings.readOnly" @change="sedit(d, $event.target.checked)"><span></span></label></template>
+                        <template x-if="d.type === 'enum' && d.live"><select :disabled="settings.readOnly" @change="sedit(d, $event.target.value)"><template x-for="o in d.options" :key="o"><option :value="o" :selected="sval(d) === o" x-text="o"></option></template></select></template>
+                        <template x-if="d.type === 'int' && d.live"><input type="number" :min="d.min" :max="d.max" :value="sval(d)" :disabled="settings.readOnly" @input="sedit(d, $event.target.value)"></template>
+                        <template x-if="(d.type === 'string' || d.type === 'list') && d.live"><input type="text" :value="Array.isArray(sval(d)) ? sval(d).join(', ') : sval(d)" :disabled="settings.readOnly" @input="sedit(d, $event.target.value)"></template>
+                        <template x-if="!d.live"><span class="mono" x-text="Array.isArray(d.value) ? d.value.join(', ') : String(d.value)"></span></template>
+                        <button class="btn" x-show="d.source === 'override' && !settings.readOnly" @click="resetSetting(d.key)" title="Back to the configured value">Reset</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+            <div class="sbar" x-show="dirtyCount() > 0 && !settings.readOnly">
+              <span x-text="dirtyCount() + ' unsaved change(s)'"></span>
+              <button class="btn" @click="discardSettings()">Discard</button>
+              <button class="btn primary" @click="saveSettings()">Apply and save</button>
+            </div>
           </div>
         </template>
       </section>
