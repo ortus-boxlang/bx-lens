@@ -274,6 +274,18 @@ test.describe( '@screens documentation screenshots', () => {
 		await consoleShot( page, 'console-system-heap' );
 	} );
 
+	test( 'console modules', async ( { page } ) => {
+		await consoleLogin( page );
+		await page.click( '.nav:has-text("Modules")' );
+		await page.locator( '.main section:visible tbody tr.row', { hasText: 'bxLens' } ).first().click();
+		await consoleShot( page, 'console-modules' );
+	} );
+
+	test( 'bar bifs', async ( { lens } ) => {
+		await show( lens, '/orders.bxm', 'BIFs' );
+		await shoot( lens.page, 'bar-bifs' );
+	} );
+
 	test( 'bar menu', async ( { lens, page } ) => {
 		await show( lens, '/n-plus-one.bxm', 'Timeline' );
 		await page.locator( '#bxlens .more .ibtn' ).click();
