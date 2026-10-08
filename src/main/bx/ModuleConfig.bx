@@ -74,6 +74,17 @@ class {
 				flushSeconds   : 30
 			},
 
+			// Optional help from a language model through the bx-ai module. Off by default: when on, a redacted prompt leaves this server.
+			// Use a local provider to keep it inside your network. apiKey takes a bxsecret: value. Leave provider and apiKey empty to use the bx-ai settings
+			ai : {
+				enabled  : false,
+				provider : "",
+				model    : "",
+				apiKey   : "",
+				// Show "copy prompt" and the open-in-chat links on errors, deadlocks and queries. These send nothing from the server
+				links    : true
+			},
+
 			// Optional checks
 			checks : {
 				// Notes for missing security headers and cookie flags
@@ -177,6 +188,7 @@ class {
 				inflight     : { enabled : true },
 				errors       : { enabled : true },
 				reports      : { enabled : true },
+				ask          : { enabled : true },
 				system       : { enabled : true },
 				threads      : { enabled : true }
 			}

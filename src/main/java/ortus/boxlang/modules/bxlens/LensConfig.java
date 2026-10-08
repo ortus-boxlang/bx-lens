@@ -252,6 +252,13 @@ public final class LensConfig {
 		return secret( "console.viewerPassword" );
 	}
 
+	/**
+	 * The API key for the language model, a <code>bxsecret:</code> value is decrypted.
+	 */
+	public String aiApiKey() {
+		return secret( "ai.apiKey" );
+	}
+
 	private String secret( String path ) {
 		String v = getString( path, "" );
 		if ( v.isBlank() ) {

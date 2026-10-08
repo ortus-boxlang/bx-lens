@@ -116,6 +116,7 @@ public final class LensService {
 	private final QueryStats										queryStats			= new QueryStats();
 	private final ErrorStore										errors				= new ErrorStore();
 	private final Reports											reports				= new Reports();
+	private final AiService											ai					= new AiService( this );
 	private volatile java.nio.file.Path								storeDir;
 	private volatile long											lastFlush;
 
@@ -156,7 +157,7 @@ public final class LensService {
 		allBuiltIns.clear();
 		allBuiltIns.addAll( builtIns() );
 		List<String> ids = new ArrayList<>(
-		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "errors", "reports", "system",
+		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "errors", "reports", "ask", "system",
 		        "threads" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
@@ -792,6 +793,10 @@ public final class LensService {
 			auditLogger	= l;
 		}
 		return l;
+	}
+
+	public AiService getAi() {
+		return ai;
 	}
 
 	public ErrorStore getErrors() {

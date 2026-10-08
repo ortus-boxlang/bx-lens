@@ -123,6 +123,7 @@
 					this.state = await (await this.api("state")).json();
 					await this.refresh();
 					this.settings = await (await this.api("settings")).json();
+					this.loadAi();
 					if (this.has("executors")) { this.setExecutors(await (await this.api("executors")).json()); }
 					if (this.has("tasks")) { this.tasks = await (await this.api("tasks")).json(); var a = this.allTasks(); if (a.length) { this.ksel = a[0].scheduler + "/" + a[0].name; } }
 					if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
@@ -138,6 +139,39 @@
 						if (this.has("tasks")) { this.tasks = await (await this.api("tasks")).json(); }
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
+				},
+				aiInfo: null, aiBusy: false, aiOut: { open: false, text: "", error: "" }, askQ: "",
+				loadAi: async function () { try { this.aiInfo = await (await this.api("ai")).json(); } catch (e) { this.aiInfo = null; } },
+				promptUrl: function (kind, id, n) { return "ai/prompt?kind=" + kind + "&id=" + encodeURIComponent(id || "") + "&n=" + encodeURIComponent(n === undefined || n === null ? "" : n); },
+				fetchPrompt: async function (kind, id, n) { var r = await this.api(this.promptUrl(kind, id, n)); if (!r.ok) { this.toast("Nothing to explain yet"); return null; } return (await r.json()).prompt; },
+				copyText: async function (text) {
+					try { await navigator.clipboard.writeText(text); return true; } catch (e) {
+						var t = document.createElement("textarea"); t.value = text; t.style.position = "fixed"; t.style.opacity = "0"; document.body.appendChild(t); t.select();
+						var ok = false; try { ok = document.execCommand("copy"); } catch (e2) { ok = false; } document.body.removeChild(t); return ok;
+					}
+				},
+				copyPrompt: async function (kind, id, n) { var p = await this.fetchPrompt(kind, id, n); if (p && await this.copyText(p)) { this.toast("Prompt copied. Paste it into your chat."); } },
+				sendPrompt: async function (site, kind, id, n) {
+					var w = window.open("", "_blank"); if (w) { w.opener = null; }
+					var p = await this.fetchPrompt(kind, id, n);
+					if (!p) { if (w) { w.close(); } return; }
+					var copied = await this.copyText(p);
+					this.toast(copied ? "Prompt copied. Paste it into the chat." : "Could not copy. Use Copy prompt.");
+					if (w) { w.location = site === "claude" ? "https://claude.ai/new" : "https://chatgpt.com/"; }
+				},
+				explain: async function (kind, id, n) {
+					this.aiBusy = true; this.aiOut = { open: true, text: "", error: "" };
+					try {
+						var r = await this.api("ai/explain", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ kind: kind, id: id || "", n: n === undefined || n === null ? "" : n }).toString() });
+						var j = await r.json(); if (r.ok) { this.aiOut.text = j.answer; } else { this.aiOut.error = j.error || "The AI call failed"; }
+					} finally { this.aiBusy = false; }
+				},
+				ask: async function () {
+					this.aiBusy = true; this.aiOut = { open: true, text: "", error: "" };
+					try {
+						var r = await this.api("ai/ask", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ question: this.askQ }).toString() });
+						var j = await r.json(); if (r.ok) { this.aiOut.text = j.answer; } else { this.aiOut.error = j.error || "The AI call failed"; }
+					} finally { this.aiBusy = false; }
 				},
 				errl: null, esel: "", egroup: null, esample: 0, rep: null, repTimer: null,
 				ago: function (t) { var sec = Math.max(0, Math.round((Date.now() - t) / 1000)); return sec < 5 ? "just now" : this.dur(sec) + " ago"; },

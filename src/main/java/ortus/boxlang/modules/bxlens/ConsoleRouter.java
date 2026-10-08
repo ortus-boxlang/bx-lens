@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -197,7 +198,7 @@ public final class ConsoleRouter {
 			json( context, ex, 403, Map.of( "error", "Bad CSRF token" ) );
 			return;
 		}
-		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && !route.endsWith( "/test" )
+		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && !route.startsWith( "ai/" ) && !route.endsWith( "/test" )
 		    && service.getConfig().getBool( "console.readOnly", false ) ) {
 			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
 			return;
@@ -308,6 +309,8 @@ public final class ConsoleRouter {
 			service.getReports().reset();
 			service.getAudit().log( "reports.reset", s.role, ex.remoteAddr(), "" );
 			json( context, ex, 200, service.getReports().snapshot( service.diskStoreOn() ) );
+		} else if ( route.startsWith( "ai" ) && ( route.equals( "ai" ) || route.startsWith( "ai/" ) ) ) {
+			ai( context, ex, method, route, s );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
 			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
@@ -390,6 +393,7 @@ public final class ConsoleRouter {
 		    { "inflight", "In flight", "hourglass", "Inspect" },
 		    { "errors", "Errors", "bug", "Inspect" },
 		    { "reports", "Reports", "chart-bar", "Inspect" },
+		    { "ask", "Ask Lens", "sparkle", "Inspect" },
 		    { "queries", "Queries", "table", "Inspect" },
 		    { "executors", "Executors", "lightning", "Runtime" },
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
@@ -489,6 +493,97 @@ public final class ConsoleRouter {
 			}
 		} catch ( java.io.IOException e ) {
 			json( context, ex, 500, Map.of( "error", "Could not read the log file" ) );
+		}
+	}
+
+	/**
+	 * <code>GET ai</code> status, <code>GET ai/prompt</code> the text to copy, <code>POST ai/explain</code> and <code>POST ai/ask</code> call the model
+	 * (admin only, needs ai.enabled and bx-ai).
+	 */
+	private void ai( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
+		AiService ai = service.getAi();
+		if ( route.equals( "ai" ) && method.equals( "GET" ) ) {
+			json( context, ex, 200, ai.info() );
+			return;
+		}
+		try {
+			if ( route.equals( "ai/prompt" ) && method.equals( "GET" ) ) {
+				String p = promptFor( ex, true );
+				json( context, ex, p == null ? 404 : 200, p == null ? Map.of( "error", "Nothing to explain" ) : Map.of( "prompt", p ) );
+			} else if ( route.equals( "ai/explain" ) && method.equals( "POST" ) ) {
+				String p = promptFor( ex, false );
+				if ( p == null ) {
+					json( context, ex, 404, Map.of( "ok", false, "error", "Nothing to explain" ) );
+					return;
+				}
+				service.getAudit().log( "ai.explain", s.role, ex.remoteAddr(),
+				    "kind=" + ex.formParam( "kind" ) + " chars=" + p.length() + " provider=" + ai.info().get( "provider" ) );
+				json( context, ex, 200, Map.of( "ok", true, "answer", ai.chat( p ) ) );
+			} else if ( route.equals( "ai/ask" ) && method.equals( "POST" ) ) {
+				String q = ex.formParam( "question" );
+				if ( q == null || q.isBlank() || q.length() > 1000 ) {
+					json( context, ex, 400, Map.of( "ok", false, "error", "Ask a question of up to 1000 characters" ) );
+					return;
+				}
+				String p = AiPrompts.ask( q.trim(), ai.context() );
+				service.getAudit().log( "ai.ask", s.role, ex.remoteAddr(), "chars=" + p.length() + " provider=" + ai.info().get( "provider" ) );
+				json( context, ex, 200, Map.of( "ok", true, "answer", ai.chat( p ) ) );
+			} else {
+				json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+			}
+		} catch ( IllegalStateException e ) {
+			json( context, ex, 409, Map.of( "ok", false, "error", e.getMessage() ) );
+		}
+	}
+
+	@SuppressWarnings( "unchecked" )
+	private String promptFor( WebExchange ex, boolean query ) {
+		String	kind	= query ? ex.urlParam( "kind" ) : ex.formParam( "kind" );
+		String	id		= query ? ex.urlParam( "id" ) : ex.formParam( "id" );
+		String	other	= query ? ex.urlParam( "n" ) : ex.formParam( "n" );
+		if ( kind == null ) {
+			return null;
+		}
+		switch ( kind ) {
+			case "error" : {
+				Map<String, Object> g = service.getErrors().get( id == null ? "" : id );
+				if ( g == null ) {
+					return null;
+				}
+				List<Object>	samples	= ( List<Object> ) g.get( "samples" );
+				int				i		= 0;
+				try {
+					i = Integer.parseInt( String.valueOf( other ) );
+				} catch ( NumberFormatException e ) {
+					// First sample
+				}
+				return samples.isEmpty() ? null : AiPrompts.error( g, ( Map<String, Object> ) samples.get( Math.max( 0, Math.min( i, samples.size() - 1 ) ) ) );
+			}
+			case "deadlock" : {
+				Map<String, Object>			t		= service.getData().threads();
+				List<Object>				dead	= ( List<Object> ) t.get( "deadlocked" );
+				List<Map<String, Object>>	mine	= new ArrayList<>();
+				for ( Object th : ( List<Object> ) t.get( "threads" ) ) {
+					Map<String, Object> m = ( Map<String, Object> ) th;
+					if ( dead.contains( m.get( "id" ) ) ) {
+						mine.add( m );
+					}
+				}
+				return mine.isEmpty() ? null : AiPrompts.deadlock( mine );
+			}
+			case "ask" :
+				return id == null || id.isBlank() || id.length() > 1000 ? null : AiPrompts.ask( id.trim(), service.getAi().context() );
+			case "query" : {
+				for ( Object o : ( List<Object> ) service.getQueryStats().snapshot().get( "statements" ) ) {
+					Map<String, Object> m = ( Map<String, Object> ) o;
+					if ( String.valueOf( m.get( "sql" ) ).equals( id ) && String.valueOf( m.get( "datasource" ) ).equals( other == null ? "" : other ) ) {
+						return AiPrompts.query( m );
+					}
+				}
+				return null;
+			}
+			default :
+				return null;
 		}
 	}
 
