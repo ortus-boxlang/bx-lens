@@ -67,6 +67,10 @@ public final class ConsoleRouter {
 			send( context, ex, 404, "text/plain; charset=UTF-8", "Not found", true );
 			return;
 		}
+		if ( cfg.getBool( "console.requireHttps", false ) && !ex.secure() && !AccessGuard.isLoopback( ex.remoteAddr() ) ) {
+			send( context, ex, 403, "text/plain; charset=UTF-8", "HTTPS is required for the console", true );
+			return;
+		}
 		String	path	= ex.pathInfo();
 		String	method	= ex.method().toUpperCase();
 		if ( path.length() > 1 && path.endsWith( "/" ) ) {
@@ -143,9 +147,11 @@ public final class ConsoleRouter {
 		String					password	= ex.formParam( "password" );
 		ConsoleAuth.LoginResult	r			= service.getAuth().login( password, ex.remoteAddr() );
 		if ( r.ok() ) {
+			service.getAudit().log( "login.ok", r.session().role, ex.remoteAddr(), "" );
 			ex.setCookie( COOKIE, r.session().id, true, ex.secure(), "Strict", -1, COOKIE_PATH );
 			json( context, ex, 200, Map.of( "ok", true ) );
 		} else if ( r.lockedSeconds() > 0 ) {
+			service.getAudit().log( "login.locked", "none", ex.remoteAddr(), "seconds=" + r.lockedSeconds() );
 			ex.setResponseHeader( "Retry-After", String.valueOf( r.lockedSeconds() ) );
 			Map<String, Object> m = new LinkedHashMap<>();
 			m.put( "ok", false );
@@ -154,6 +160,7 @@ public final class ConsoleRouter {
 			m.put( "error", "Too many attempts. Try again later." );
 			json( context, ex, 429, m );
 		} else {
+			service.getAudit().log( "login.fail", "none", ex.remoteAddr(), "attemptsLeft=" + r.attemptsLeft() );
 			Map<String, Object> m = new LinkedHashMap<>();
 			m.put( "ok", false );
 			m.put( "attemptsLeft", r.attemptsLeft() );
@@ -169,6 +176,7 @@ public final class ConsoleRouter {
 			return;
 		}
 		if ( s != null ) {
+			service.getAudit().log( "logout", s.role, ex.remoteAddr(), "" );
 			service.getAuth().logout( s.id );
 		}
 		ex.setCookie( COOKIE, "", true, ex.secure(), "Strict", 0, COOKIE_PATH );
@@ -193,8 +201,13 @@ public final class ConsoleRouter {
 			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
 			return;
 		}
+		if ( !isAdmin( s ) && ( !method.equals( "GET" ) || ADMIN_ONLY.stream().anyMatch( route::startsWith ) ) ) {
+			service.getAudit().log( "denied", s.role, ex.remoteAddr(), method + " " + route );
+			json( context, ex, 403, Map.of( "ok", false, "error", "The viewer role cannot do this. Sign in as admin." ) );
+			return;
+		}
 		if ( route.equals( "state" ) && method.equals( "GET" ) ) {
-			json( context, ex, 200, state( s ) );
+			json( context, ex, 200, state( s, ex ) );
 		} else if ( route.equals( "overview" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, overview() );
 		} else if ( route.equals( "requests" ) && method.equals( "GET" ) ) {
@@ -207,15 +220,15 @@ public final class ConsoleRouter {
 				send( context, ex, 200, "application/json; charset=UTF-8", e.json(), true );
 			}
 		} else if ( route.equals( "settings" ) && method.equals( "GET" ) ) {
-			json( context, ex, 200, settings() );
+			json( context, ex, 200, settings( session( ex ) ) );
 		} else if ( route.equals( "settings" ) && method.equals( "POST" ) ) {
 			changeSettings( context, ex );
 		} else if ( route.equals( "settings/reset" ) && method.equals( "POST" ) ) {
 			try {
 				String key = ex.formParam( "key" );
 				service.resetSettings( key );
-				service.getLogger().info( "bx-lens console: settings {} reset by {}", key == null || key.isBlank() ? "(all)" : key, ex.remoteAddr() );
-				json( context, ex, 200, settings() );
+				service.getAudit().log( "settings.reset", s.role, ex.remoteAddr(), "key=" + ( key == null || key.isBlank() ? "(all)" : key ) );
+				json( context, ex, 200, settings( session( ex ) ) );
 			} catch ( IllegalArgumentException e ) {
 				json( context, ex, 400, Map.of( "ok", false, "error", e.getMessage() ) );
 			} catch ( java.io.IOException e ) {
@@ -224,7 +237,7 @@ public final class ConsoleRouter {
 		} else if ( route.equals( "executors" ) && method.equals( "GET" ) && panelOn( "executors" ) ) {
 			json( context, ex, 200, service.getData().executors() );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
-			json( context, ex, 200, service.getData().tasks() );
+			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
 			json( context, ex, 200, service.getData().system() );
 		} else if ( route.equals( "threads" ) && method.equals( "GET" ) && panelOn( "threads" ) ) {
@@ -232,6 +245,7 @@ public final class ConsoleRouter {
 		} else if ( route.equals( "threads/dump" ) && method.equals( "GET" ) && panelOn( "threads" ) ) {
 			String name = "lens-thread-dump-" + java.time.LocalDateTime.now().format( java.time.format.DateTimeFormatter.ofPattern( "yyyyMMdd-HHmmss" ) )
 			    + ".txt";
+			service.getAudit().log( "threads.dump", s.role, ex.remoteAddr(), "" );
 			ex.setResponseHeader( "Content-Disposition", "attachment; filename=\"" + name + "\"" );
 			send( context, ex, 200, "text/plain; charset=UTF-8", service.getData().threadDump(), true );
 		} else if ( route.equals( "bar" ) && method.equals( "GET" ) && panelOn( "designer" ) ) {
@@ -240,6 +254,7 @@ public final class ConsoleRouter {
 			saveLayout( context, ex );
 		} else if ( route.equals( "bar/reset" ) && method.equals( "POST" ) && panelOn( "designer" ) ) {
 			try {
+				service.getAudit().log( "bar.reset", s.role, ex.remoteAddr(), "" );
 				service.getLayout().reset();
 				json( context, ex, 200, bar() );
 			} catch ( java.io.IOException e ) {
@@ -252,7 +267,23 @@ public final class ConsoleRouter {
 		}
 	}
 
-	private Map<String, Object> state( ConsoleAuth.Session s ) {
+	private static final List<String> ADMIN_ONLY = List.of( "threads/dump", "heapdump", "logs/download", "bundle" );
+
+	private static boolean isAdmin( ConsoleAuth.Session s ) {
+		return s != null && "admin".equals( s.role );
+	}
+
+	private boolean canChange( ConsoleAuth.Session s ) {
+		return isAdmin( s ) && !service.getConfig().getBool( "console.readOnly", false );
+	}
+
+	private Map<String, Object> tasksFor( ConsoleAuth.Session s ) {
+		Map<String, Object> t = service.getData().tasks();
+		t.put( "actions", Boolean.TRUE.equals( t.get( "actions" ) ) && canChange( s ) );
+		return t;
+	}
+
+	private Map<String, Object> state( ConsoleAuth.Session s, WebExchange ex ) {
 		LensConfig			cfg	= service.getConfig();
 		Map<String, Object>	m	= new LinkedHashMap<>();
 		m.put( "version", service.getVersion() );
@@ -264,8 +295,10 @@ public final class ConsoleRouter {
 		m.put( "collectLevel", cfg.collectLevel );
 		m.put( "barEnabled", cfg.barEnabled );
 		m.put( "tabs", tabs() );
-		m.put( "actions", cfg.getBool( "console.actions", true ) );
-		m.put( "readOnly", cfg.getBool( "console.readOnly", false ) );
+		m.put( "actions", cfg.getBool( "console.actions", true ) && canChange( s ) );
+		m.put( "readOnly", !canChange( s ) );
+		m.put( "role", s.role );
+		m.put( "insecure", !ex.secure() && !AccessGuard.isLoopback( ex.remoteAddr() ) );
 		m.put( "liveStreams", service.getStreams().get() );
 		m.put( "license", license() );
 		return m;
@@ -307,9 +340,10 @@ public final class ConsoleRouter {
 		return service.getLicensing().status();
 	}
 
-	private Map<String, Object> settings() {
+	private Map<String, Object> settings( ConsoleAuth.Session s ) {
 		Map<String, Object> m = new LinkedHashMap<>();
-		m.put( "readOnly", service.getConfig().getBool( "console.readOnly", false ) );
+		m.put( "readOnly", !canChange( s ) );
+		m.put( "viewer", !isAdmin( s ) );
 		m.put( "groups", SettingsRegistry.GROUPS );
 		m.put( "settings", service.settingsView() );
 		m.put( "overridesFile", String.valueOf( service.getSettingsStore().file() ) );
@@ -318,6 +352,7 @@ public final class ConsoleRouter {
 	}
 
 	private void changeSettings( IBoxContext context, WebExchange ex ) {
+		ConsoleAuth.Session sess = session( ex );
 		try {
 			Object parsed = JSONUtil.fromJSON( ex.formParam( "changes" ) );
 			if ( ! ( parsed instanceof Map<?, ?> in ) ) {
@@ -330,8 +365,8 @@ public final class ConsoleRouter {
 				changes.put( k, e.getValue() );
 			}
 			service.changeSettings( changes );
-			service.getLogger().info( "bx-lens console: settings changed by {}: {}", ex.remoteAddr(), changes.keySet() );
-			json( context, ex, 200, settings() );
+			service.getAudit().log( "settings.change", sess.role, ex.remoteAddr(), "keys=" + changes );
+			json( context, ex, 200, settings( session( ex ) ) );
 		} catch ( IllegalArgumentException e ) {
 			json( context, ex, 400, Map.of( "ok", false, "error", e.getMessage() ) );
 		} catch ( java.io.IOException e ) {
@@ -474,7 +509,7 @@ public final class ConsoleRouter {
 				valid.add( String.valueOf( t.get( "id" ) ) );
 			}
 			service.getLayout().save( c, valid );
-			service.getLogger().info( "bx-lens console: bar layout saved by {}", ex.remoteAddr() );
+			service.getAudit().log( "bar.layout", session( ex ).role, ex.remoteAddr(), "" );
 			json( context, ex, 200, bar() );
 		} catch ( Throwable t ) {
 			json( context, ex, 400, Map.of( "error", "Could not save the layout" ) );
@@ -507,7 +542,7 @@ public final class ConsoleRouter {
 			json( context, ex, 404, Map.of( "error", "Unknown route" ) );
 			return;
 		}
-		service.getLogger().info( "bx-lens console: {} {}{} by {}", action, scheduler, task == null ? "" : "/" + task, ex.remoteAddr() );
+		service.getAudit().log( "task." + action, session( ex ).role, ex.remoteAddr(), "task=" + scheduler + ( task == null ? "" : "/" + task ) );
 		json( context, ex, 200, service.getData().taskAction( action, scheduler, task ) );
 	}
 
@@ -549,7 +584,7 @@ public final class ConsoleRouter {
 					tick.put( "executors", service.getData().executors() );
 				}
 				if ( want.contains( "tasks" ) && panelOn( "tasks" ) ) {
-					tick.put( "tasks", service.getData().tasks() );
+					tick.put( "tasks", tasksFor( s ) );
 				}
 				if ( want.contains( "system" ) && panelOn( "system" ) ) {
 					tick.put( "system", service.getData().system() );

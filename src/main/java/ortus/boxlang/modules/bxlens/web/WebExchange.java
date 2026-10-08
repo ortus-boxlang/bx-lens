@@ -17,6 +17,9 @@
  */
 package ortus.boxlang.modules.bxlens.web;
 
+import ortus.boxlang.modules.bxlens.ClientIp;
+import ortus.boxlang.modules.bxlens.LensConfig;
+import ortus.boxlang.modules.bxlens.LensService;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -71,8 +74,23 @@ public final class WebExchange {
 		return safe( exchange.getRequestQueryString() );
 	}
 
-	public String remoteAddr() {
+	/**
+	 * The address of the direct connection, whatever a proxy header says.
+	 */
+	public String peerAddr() {
 		return safe( exchange.getRequestRemoteAddr() );
+	}
+
+	/**
+	 * The client address. Behind a trusted proxy this is the address the proxy header names.
+	 */
+	public String remoteAddr() {
+		String		peer	= peerAddr();
+		LensConfig	cfg		= LensService.getInstance().getConfig();
+		if ( !cfg.getBool( "access.trustProxyHeader", true ) ) {
+			return peer;
+		}
+		return ClientIp.resolve( cfg, peer, exchange.getRequestHeader( cfg.getString( "access.proxyHeader", "X-Forwarded-For" ) ) );
 	}
 
 	public String host() {
@@ -146,7 +164,11 @@ public final class WebExchange {
 
 	public boolean secure() {
 		try {
-			return exchange.isRequestSecure() || "https".equalsIgnoreCase( exchange.getRequestHeader( "X-Forwarded-Proto" ) );
+			if ( exchange.isRequestSecure() ) {
+				return true;
+			}
+			return ClientIp.trustsProxy( LensService.getInstance().getConfig(), peerAddr() )
+			    && "https".equalsIgnoreCase( exchange.getRequestHeader( "X-Forwarded-Proto" ) );
 		} catch ( Throwable t ) {
 			return false;
 		}

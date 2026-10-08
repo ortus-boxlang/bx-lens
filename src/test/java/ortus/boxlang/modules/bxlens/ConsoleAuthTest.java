@@ -77,4 +77,21 @@ public class ConsoleAuthTest {
 		assertThat( one.length() ).isAtLeast( 40 );
 	}
 
+	@Test
+	@DisplayName( "the viewer password signs in with the viewer role and never as admin" )
+	void viewerRole() {
+		ConsoleAuth a = new ConsoleAuth( new LensConfig( Map.of( "console", Map.of( "password", "admin-pw", "viewerPassword", "view-pw" ) ) ) );
+		assertThat( a.login( "view-pw", "1.1.1.1" ).session().role ).isEqualTo( "viewer" );
+		assertThat( a.login( "admin-pw", "1.1.1.1" ).session().role ).isEqualTo( "admin" );
+		assertThat( a.login( "nope", "1.1.1.1" ).ok() ).isFalse();
+	}
+
+	@Test
+	@DisplayName( "a viewer password without an admin password is ignored" )
+	void viewerNeedsAdmin() {
+		ConsoleAuth a = new ConsoleAuth( new LensConfig( Map.of( "console", Map.of( "viewerPassword", "view-pw" ) ) ) );
+		assertThat( a.isConfigured() ).isFalse();
+		assertThat( a.login( "view-pw", "1.1.1.1" ).ok() ).isFalse();
+	}
+
 }

@@ -106,6 +106,8 @@ public final class LensService {
 	private final LensRegistry										registry			= new LensRegistry();
 	private final List<ILensCollector>								collectors			= Collections.synchronizedList( new ArrayList<>() );
 	private volatile BoxLangLogger									logger;
+	private volatile BoxLangLogger									auditLogger;
+	private final Audit												audit				= new Audit( this );
 
 	private LensService() {
 	}
@@ -746,6 +748,19 @@ public final class LensService {
 	/**
 	 * The bxLens logger.
 	 */
+	public BoxLangLogger auditLogger() {
+		BoxLangLogger l = auditLogger;
+		if ( l == null ) {
+			l			= ( runtime != null ? runtime : BoxRuntime.getInstance() ).getLoggingService().getLogger( "bxlens-audit" );
+			auditLogger	= l;
+		}
+		return l;
+	}
+
+	public Audit getAudit() {
+		return audit;
+	}
+
 	public BoxLangLogger getLogger() {
 		BoxLangLogger l = logger;
 		if ( l == null ) {

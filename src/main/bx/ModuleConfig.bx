@@ -40,6 +40,10 @@ class {
 			console : {
 				enabled          : false,
 				password         : "",
+				// Optional second password: this role can look but not change anything or download dumps. Use a bxsecret: value
+				viewerPassword   : "",
+				// Refuse the console over plain HTTP (loopback is exempt). Turn on in production
+				requireHttps     : false,
 				access           : "local",
 				sessionMinutes   : 30,
 				maxLoginAttempts : 5,
@@ -76,7 +80,12 @@ class {
 				// Restrict to these Host header names. Empty means any host
 				allowedHosts : [],
 				// Require a request header: "Name" or "Name=value". Empty means none
-				requireHeader : ""
+				requireHeader : "",
+				// Behind a proxy or load balancer: use the client address from proxyHeader. Only believed when the direct connection
+				// comes from one of proxyPeers (private = loopback and private networks, or a list of IPs and CIDRs)
+				trustProxyHeader : true,
+				proxyHeader : "X-Forwarded-For",
+				proxyPeers : "private"
 			},
 
 			// Inject the bar before </body> on HTML responses. Set false and call lensRender() to place it yourself

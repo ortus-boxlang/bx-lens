@@ -242,7 +242,18 @@ public final class LensConfig {
 	 * @return the plain password or an empty string when none is set or it cannot be decrypted
 	 */
 	public String consolePassword() {
-		String v = getString( "console.password", "" );
+		return secret( "console.password" );
+	}
+
+	/**
+	 * The optional password of the view-only role. Same format as the admin password.
+	 */
+	public String viewerPassword() {
+		return secret( "console.viewerPassword" );
+	}
+
+	private String secret( String path ) {
+		String v = getString( path, "" );
 		if ( v.isBlank() ) {
 			return "";
 		}

@@ -26,12 +26,15 @@ public final class ConsoleAuth {
 		public final String										id;
 		public final String										csrf;
 		public final String										remoteAddr;
+		/** admin can change things, viewer can only look. */
+		public final String										role;
 		public final long										createdAt;
 		public volatile long									lastSeen;
 		/** The newest live stream of this browser wins, older ones stop. */
 		public final java.util.concurrent.atomic.AtomicInteger	streamGen	= new java.util.concurrent.atomic.AtomicInteger();
 
-		Session( String id, String csrf, String remoteAddr, long now ) {
+		Session( String id, String csrf, String remoteAddr, String role, long now ) {
+			this.role		= role;
 			this.id			= id;
 			this.csrf		= csrf;
 			this.remoteAddr	= remoteAddr;
@@ -52,6 +55,10 @@ public final class ConsoleAuth {
 		public boolean ok() {
 			return session != null;
 		}
+
+		public boolean viewer() {
+			return session != null && "viewer".equals( session.role );
+		}
 	}
 
 	private static final class Attempts {
@@ -68,13 +75,16 @@ public final class ConsoleAuth {
 	private final Map<String, Session>	sessions		= new ConcurrentHashMap<>();
 	private final Map<String, Attempts>	attempts		= new ConcurrentHashMap<>();
 	private final byte[]				passwordHash;
+	private final byte[]				viewerHash;
 	private final long					idleMs;
 	private final int					maxAttempts;
 	private final long					lockoutMs;
 
 	public ConsoleAuth( LensConfig config ) {
 		String pw = config.consolePassword();
-		this.passwordHash	= pw.isEmpty() ? null : sha256( pw );
+		this.passwordHash = pw.isEmpty() ? null : sha256( pw );
+		String vpw = config.viewerPassword();
+		this.viewerHash		= vpw.isEmpty() || pw.isEmpty() ? null : sha256( vpw );
 		this.idleMs			= config.sessionMinutes * 60_000L;
 		this.maxAttempts	= config.maxLoginAttempts;
 		this.lockoutMs		= config.lockoutMinutes * 60_000L;
@@ -101,10 +111,12 @@ public final class ConsoleAuth {
 			if ( a.failures > 0 && now - a.firstAt > WINDOW_MS ) {
 				a.failures = 0;
 			}
-			boolean ok = passwordHash != null && password != null && MessageDigest.isEqual( passwordHash, sha256( password ) );
-			if ( ok ) {
+			byte[]	given		= password == null ? null : sha256( password );
+			boolean	isAdmin		= passwordHash != null && given != null && MessageDigest.isEqual( passwordHash, given );
+			boolean	isViewer	= viewerHash != null && given != null && MessageDigest.isEqual( viewerHash, given );
+			if ( isAdmin || isViewer ) {
 				attempts.remove( key );
-				Session s = new Session( token(), token(), key, now );
+				Session s = new Session( token(), token(), key, isAdmin ? "admin" : "viewer", now );
 				sessions.put( s.id, s );
 				prune( now );
 				return new LoginResult( s, 0, maxAttempts );

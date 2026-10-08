@@ -9,6 +9,7 @@
 				"console": {
 					"enabled": true,
 					"password": "lens-demo",
+					"viewerPassword": "lens-view",
 					"access": "local"
 				},
 				"collect": {

@@ -137,6 +137,21 @@ public final class AccessGuard {
 		if ( addr == null ) {
 			return false;
 		}
+		return matchesAny( rules, addr );
+	}
+
+	/**
+	 * Does an address match any of the rules? Rules are exact IPs, CIDR ranges and the words <code>local</code> and <code>private</code>.
+	 */
+	public static boolean matchesAny( List<String> rules, String addressText ) {
+		InetAddress addr = parse( addressText );
+		if ( addr == null ) {
+			return false;
+		}
+		return matchesAny( rules, addr );
+	}
+
+	private static boolean matchesAny( List<String> rules, InetAddress addr ) {
 		for ( String rule : rules ) {
 			if ( "local".equalsIgnoreCase( rule ) ) {
 				if ( addr.isLoopbackAddress() ) {
@@ -151,6 +166,14 @@ public final class AccessGuard {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Is this a loopback address?
+	 */
+	public static boolean isLoopback( String addressText ) {
+		InetAddress addr = parse( addressText );
+		return addr != null && addr.isLoopbackAddress();
 	}
 
 	/**

@@ -14,6 +14,7 @@
     <span class="mark" aria-hidden="true"></span><b>BX Lens</b>
     <span class="hostinfo" x-show="state" x-text="state ? state.host + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
     <span class="spacer"></span>
+    <span class="chipx hid" x-show="state" x-text="state ? state.role : ''" style="margin-right:6px"></span>
     <span class="lic" :class="licenseClass()" x-show="state" x-text="state ? state.license.label : ''"></span>
     <button class="live" :class="live ? '' : 'off'" @click="live = !live" :aria-pressed="live" title="Refresh every 3 seconds"><i></i><span x-text="live ? 'live 3s' : 'paused'"></span></button>
     <button class="btn" @click="logout()"><svg class="ic"><use href="#ph-sign-out"/></svg>Log out</button>
@@ -63,6 +64,7 @@
       <!-- Requests -->
       <section x-show="tab === 'requests'">
         <h1 class="h1">Requests <small>in memory, newest first, recycled at <span x-text="capacity"></span></small></h1>
+        <div class="msg warn" style="margin:0 0 10px" x-show="state && state.insecure">This console is served over plain HTTP. The password and everything on screen can be read on the network. Use HTTPS (<span class="mono">console.requireHttps</span>).</div>
         <div class="msg warn" style="margin:0 0 10px" x-show="state && state.collectLevel === 'light'">Collect level is light: no bindings, scopes, headers or stack traces are recorded.</div>
         <div class="tools">
           <div class="seg"><template x-for="f in [['all','All'],['err','Errors'],['slow','Slow'],['json','JSON']]" :key="f[0]"><button :class="rf === f[0] ? 'on' : ''" @click="rf = f[0]" x-text="f[1]"></button></template></div>
@@ -300,7 +302,7 @@
         <h1 class="h1">Settings <small>changes apply at once and are saved, so they survive a restart</small></h1>
         <template x-if="settings">
           <div>
-            <div class="msg warn" style="margin:0 0 10px" x-show="settings.readOnly">Read-only mode is on (<span class="mono">console.readOnly</span>). Nothing can be changed from the console.</div>
+            <div class="msg warn" style="margin:0 0 10px" x-show="settings.readOnly"><span x-show="settings.viewer">You are signed in as a viewer. Sign in with the admin password to change things.</span><span x-show="!settings.viewer">Read-only mode is on (<span class="mono">console.readOnly</span>). Nothing can be changed from the console.</span></div>
             <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="!settings.readOnly">
               <span x-text="settings.overridden"></span> setting(s) overridden. Saved to <span class="mono" x-text="settings.overridesFile"></span>.
               <button class="btn" style="margin-left:8px" x-show="settings.overridden > 0" @click="resetSetting('')">Reset all to defaults</button>

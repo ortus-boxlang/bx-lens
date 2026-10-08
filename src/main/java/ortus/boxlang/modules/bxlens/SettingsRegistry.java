@@ -85,6 +85,10 @@ public final class SettingsRegistry {
 		add( "console.allowHeapDump", "bool", "Console", "Allow heap dumps", false, false );
 		add( "console.overridesFile", "string", "Console", "Where overrides are saved", false, "" );
 		add( "console.sessionMinutes", "int", "Console", "Session minutes", false, 30 );
+		add( "console.requireHttps", "bool", "Console", "Require HTTPS", false, false );
+		add( "access.trustProxyHeader", "bool", "Access", "Trust the proxy header", false, true );
+		add( "access.proxyHeader", "string", "Access", "Proxy header", false, "X-Forwarded-For" );
+		add( "access.proxyPeers", "string", "Access", "Trusted proxy peers", false, "private" );
 		add( "bar.access", "string", "Access", "Who sees the bar", false, "local" );
 		add( "bar.allowAllIPs", "bool", "Access", "Confirm bar.access all", false, false );
 		add( "history.maxRequests", "int", "Access", "Requests kept in memory", false, 50 );
