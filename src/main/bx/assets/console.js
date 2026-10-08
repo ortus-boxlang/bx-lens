@@ -100,7 +100,7 @@
 					var self = this;
 					this.disconnect();
 					if (!window.EventSource) { return; }
-					var topics = ["requests"].concat(["executors", "tasks", "datasources", "system"].filter(function (t) { return self.has(t); })).join(",");
+					var topics = ["requests"].concat(["executors", "tasks", "datasources", "inflight", "queries", "system"].filter(function (t) { return self.has(t); })).join(",");
 					var extra = "";
 					if (this.tab === "logfiles" && this.lfile && this.llive) { topics += ",log"; extra = "&logfile=" + encodeURIComponent(this.lfile) + "&logoffset=" + this.loffset; }
 					this.es = new EventSource(base() + "/stream?topics=" + topics + extra, { withCredentials: true });
@@ -115,6 +115,8 @@
 					if (d.tasks) { this.tasks = d.tasks; if (!this.ksel && this.allTasks().length) { this.ksel = this.allTasks()[0].scheduler + "/" + this.allTasks()[0].name; } }
 					if (d.system) { this.setSystem(d.system); }
 					if (d.datasources) { this.dsl = d.datasources; }
+					if (d.inflight) { this.inf = d.inflight; if (this.isel && this.tab === "inflight") { this.pickInflight(this.isel); } }
+					if (d.queries) { this.qs = d.queries; if (this.qpick) { var qp = this.qpick; this.qpick = this.qs.statements.find(function (s) { return s.sql === qp.sql && s.datasource === qp.datasource; }) || qp; } }
 					if (d.log) { this.loffset = d.log.offset; this.onLogLines(d.log.lines); }
 				},
 				load: async function () {
@@ -137,6 +139,16 @@
 						if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
 					} catch (e) { /* signed out or offline: the next tick tries again */ }
 				},
+				inf: null, isel: "", istack: null, qs: null, qsort: "max", qfilter: "", qpick: null,
+				loadInflight: async function () { this.inf = await (await this.api("inflight")).json(); if (this.isel) { this.pickInflight(this.isel); } },
+				pickInflight: async function (id) { this.isel = id; var r = await this.api("inflight/" + encodeURIComponent(id)); this.istack = await r.json(); },
+				loadQueries: async function () { this.qs = await (await this.api("queries")).json(); },
+				qrows: function () {
+					var q = this.qfilter.toLowerCase(), key = { max: "maxMs", total: "totalMs", count: "count", fail: "failures" }[this.qsort];
+					return this.qs.statements.filter(function (s) { return !q || s.sql.toLowerCase().indexOf(q) >= 0; }).sort(function (a, b) { return b[key] - a[key]; }).slice(0, 200);
+				},
+				resetQueries: async function () { this.qs = await (await this.api("queries/reset", { method: "POST" })).json(); this.qpick = null; },
+				openRequest: function (id) { this.go("requests"); this.pick(id); },
 				envd: null, envView: "config", envq: "", base: base(),
 				loadEnv: async function () { this.envd = await (await this.api("environment")).json(); },
 				envRows: function () {
@@ -223,6 +235,8 @@
 					clearInterval(this.threadTimer);
 					if (this.tab === "system") { this.loadHd(); }
 					if (this.tab === "logfiles") { this.loadLogs(); }
+					if (this.tab === "inflight") { this.loadInflight(); }
+					if (this.tab === "queries") { this.loadQueries(); }
 					if (this.tab === "environment" && !this.envd) { this.loadEnv(); }
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }

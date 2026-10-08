@@ -102,6 +102,13 @@ public class ExceptionCollector extends BaseCollector {
 		m.put( "message", clean.text( t.getMessage() ) );
 		m.put( "detail", t instanceof BoxLangException b && b.getDetail() != null ? clean.text( b.getDetail() ) : "" );
 		m.put( "origin", origin );
+		for ( Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause() ) {
+			if ( c instanceof ortus.boxlang.runtime.types.exceptions.DatabaseException db ) {
+				m.put( "sql", clean.text( String.valueOf( db.getSQL() ) ) );
+				m.put( "sqlState", String.valueOf( db.getSQLState() ) );
+				break;
+			}
+		}
 		m.put( "at", Span.ms( req.now() ) );
 		List<Map<String, Object>> frames = Callers.frames( t, 10 );
 		m.put( "frames", frames );

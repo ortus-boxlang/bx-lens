@@ -113,6 +113,7 @@ public final class LensService {
 	private final CacheData											caches				= new CacheData( this );
 	private final LogData											logs				= new LogData();
 	private final EnvironmentData									environment			= new EnvironmentData( this );
+	private final QueryStats										queryStats			= new QueryStats();
 
 	private LensService() {
 	}
@@ -150,7 +151,8 @@ public final class LensService {
 		this.baseConfig		= new LensConfig( settings );
 		allBuiltIns.clear();
 		allBuiltIns.addAll( builtIns() );
-		List<String> ids = new ArrayList<>( List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "system", "threads" ) );
+		List<String> ids = new ArrayList<>(
+		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "system", "threads" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
 				ids.add( c.id() );
@@ -497,6 +499,7 @@ public final class LensService {
 		}
 		announce( Keys.onLensCollect, Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
 		IssueEngine.analyze( req, config );
+		queryStats.record( req, config.slowQueryMs );
 		if ( ex != null ) {
 			try {
 				ortus.boxlang.modules.bxlens.model.SecurityChecks.analyze( req, config, ex.responseHeaders(), ex.responseCookies(), ex.secure() );
@@ -767,6 +770,63 @@ public final class LensService {
 			auditLogger	= l;
 		}
 		return l;
+	}
+
+	public QueryStats getQueryStats() {
+		return queryStats;
+	}
+
+	/**
+	 * The requests running right now.
+	 */
+	public List<Map<String, Object>> inflight() {
+		List<Map<String, Object>>	out	= new ArrayList<>();
+		long						now	= System.nanoTime();
+		for ( LensRequest r : active.values() ) {
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put( "id", r.id );
+			m.put( "method", r.method );
+			m.put( "uri", r.uri );
+			m.put( "queryString", r.queryString );
+			m.put( "app", r.appName );
+			m.put( "remoteAddr", r.remoteAddr );
+			m.put( "startedAt", r.startMillis );
+			m.put( "elapsedMs", ( now - r.startNanos ) / 1_000_000L );
+			Thread t = r.thread;
+			m.put( "thread", t == null ? "" : t.getName() );
+			m.put( "threadState", t == null ? "" : t.getState().name() );
+			m.put( "queries", r.queries.size() );
+			out.add( m );
+		}
+		out.sort( ( a, b ) -> Long.compare( ( Long ) b.get( "elapsedMs" ), ( Long ) a.get( "elapsedMs" ) ) );
+		return out;
+	}
+
+	/**
+	 * What a running request is doing right now: the stack of its thread.
+	 */
+	public Map<String, Object> inflightStack( String id ) {
+		LensRequest r = active.get( id );
+		if ( r == null || r.thread == null ) {
+			return null;
+		}
+		Map<String, Object>			m		= new LinkedHashMap<>();
+		List<Map<String, Object>>	frames	= new ArrayList<>();
+		for ( StackTraceElement e : r.thread.getStackTrace() ) {
+			if ( frames.size() >= 80 ) {
+				break;
+			}
+			Map<String, Object> f = new LinkedHashMap<>();
+			f.put( "text", e.toString() );
+			String file = e.getFileName() == null ? "" : e.getFileName().toLowerCase();
+			f.put( "bx", file.endsWith( ".bx" ) || file.endsWith( ".bxm" ) || file.endsWith( ".bxs" ) || file.endsWith( ".cfc" ) || file.endsWith( ".cfm" ) );
+			frames.add( f );
+		}
+		m.put( "id", id );
+		m.put( "thread", r.thread.getName() );
+		m.put( "state", r.thread.getState().name() );
+		m.put( "frames", frames );
+		return m;
 	}
 
 	public EnvironmentData getEnvironment() {

@@ -301,6 +301,51 @@
         </template>
       </section>
 
+      <!-- In flight -->
+      <section x-show="tab === 'inflight'">
+        <h1 class="h1">In flight <small>requests running right now, longest first</small></h1>
+        <template x-if="inf">
+          <div class="split narrow">
+            <div class="card"><h3>Running <span x-text="inf.requests.length"></span></h3>
+              <p class="sub" x-show="!inf.requests.length">Nothing is running at the moment.</p>
+              <div class="scroll"><table><thead><tr><th>Request</th><th class="num">Elapsed</th><th>Thread</th><th class="num">Queries</th></tr></thead><tbody>
+                <template x-for="r in inf.requests" :key="r.id"><tr class="row" :class="isel === r.id ? 'sel' : ''" @click="pickInflight(r.id)"><td><span class="chipx hid" x-text="r.method"></span> <span class="mono" x-text="r.uri"></span></td><td class="num" :style="r.elapsedMs > 1000 ? 'color:var(--warn)' : ''" x-text="r.elapsedMs >= 1000 ? (r.elapsedMs / 1000).toFixed(1) + ' s' : r.elapsedMs + ' ms'"></td><td class="mono mute" x-text="r.thread + ' ' + r.threadState"></td><td class="num" x-text="r.queries"></td></tr></template></tbody></table></div></div>
+            <div class="card" x-show="isel"><h3>What it is doing <span class="mono" x-text="istack ? istack.state : ''"></span></h3>
+              <p class="sub" x-show="istack && istack.error" x-text="istack ? istack.error : ''"></p>
+              <pre class="code" style="max-height:480px;overflow:auto;white-space:pre-wrap;word-break:break-all"><template x-for="(f, i) in (istack && istack.frames ? istack.frames : [])" :key="i"><div :style="f.bx ? 'color:var(--cyan)' : 'color:var(--dim)'" x-text="f.text"></div></template></pre></div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Queries -->
+      <section x-show="tab === 'queries'">
+        <h1 class="h1">Queries <small>every statement seen since <span x-text="qs ? new Date(qs.since).toLocaleTimeString() : ''"></span>, in memory</small></h1>
+        <template x-if="qs">
+          <div>
+            <div class="tiles">
+              <div class="card"><h3>Executed</h3><div class="big" x-text="qs.executed"></div></div>
+              <div class="card"><h3>Statements</h3><div class="big" x-text="qs.statements.length"></div></div>
+              <div class="card"><h3>Failed</h3><div class="big" :style="qs.failed ? 'color:var(--crit)' : ''" x-text="qs.failed"></div></div>
+              <div class="card"><h3>Slow</h3><div class="big" :style="qs.slow ? 'color:var(--warn)' : ''" x-text="qs.slow"></div></div>
+              <div class="card"><h3>Average</h3><div class="big"><span x-text="qs.avgMs"></span><small>ms</small></div></div>
+            </div>
+            <div class="tools" style="margin:10px 0">
+              <template x-for="o in [['max', 'Slowest'], ['total', 'Longest in total'], ['count', 'Most executed'], ['fail', 'Failures']]" :key="o[0]"><button class="btn" :class="qsort === o[0] ? 'primary' : ''" @click="qsort = o[0]" x-text="o[1]"></button></template>
+              <input type="text" placeholder="Filter statements" x-model="qfilter" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px">
+              <button class="btn" :disabled="!state || state.readOnly" @click="resetQueries()">Reset</button></div>
+            <div class="split wide">
+              <div class="card"><div class="scroll" style="max-height:560px"><table><thead><tr><th>Statement</th><th class="num">Runs</th><th class="num">Avg</th><th class="num">Max</th><th class="num">Total</th><th class="num">Failed</th></tr></thead><tbody>
+                <template x-for="q in qrows()" :key="q.datasource + q.sql"><tr class="row" :class="qpick && qpick.sql === q.sql && qpick.datasource === q.datasource ? 'sel' : ''" @click="qpick = q"><td class="mono" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="q.sql"></td><td class="num" x-text="q.count"></td><td class="num" x-text="q.avgMs"></td><td class="num" :style="q.slow ? 'color:var(--warn)' : ''" x-text="q.maxMs"></td><td class="num" x-text="q.totalMs"></td><td class="num" :style="q.failures ? 'color:var(--crit)' : ''" x-text="q.failures"></td></tr></template></tbody></table></div>
+                <p class="sub" x-show="!qs.statements.length">No queries yet. Load a page that runs one.</p></div>
+              <div class="card" x-show="qpick"><h3>Statement <span x-text="qpick ? qpick.datasource : ''"></span></h3>
+                <pre class="code" style="white-space:pre-wrap;word-break:break-all;max-height:240px;overflow:auto" x-text="qpick ? qpick.sql : ''"></pre>
+                <dl class="kv" x-show="qpick"><dt>Runs</dt><dd x-text="qpick ? qpick.count : ''"></dd><dt>Failed</dt><dd x-text="qpick ? qpick.failures : ''"></dd><dt>Slow</dt><dd x-text="qpick ? qpick.slow : ''"></dd><dt>Min / avg / max</dt><dd x-text="qpick ? qpick.minMs + ' / ' + qpick.avgMs + ' / ' + qpick.maxMs + ' ms' : ''"></dd><dt>Total time</dt><dd x-text="qpick ? qpick.totalMs + ' ms' : ''"></dd><dt>Rows returned</dt><dd x-text="qpick ? qpick.rows : ''"></dd><dt>Called from</dt><dd class="mono" x-text="qpick && qpick.file ? qpick.file + ':' + qpick.line : 'unknown'"></dd><dt x-show="qpick && qpick.lastError">Last error</dt><dd x-show="qpick && qpick.lastError" x-text="qpick ? qpick.lastError : ''"></dd></dl>
+                <div class="tools"><button class="btn" x-show="qpick && qpick.slowestRequest" @click="openRequest(qpick.slowestRequest)">Open the slowest run</button><button class="btn" x-show="qpick && qpick.lastRequest" @click="openRequest(qpick.lastRequest)">Open the latest run</button></div></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
       <!-- System -->
       <section x-show="tab === 'system'">
         <h1 class="h1">System <small>JVM and host numbers, live</small></h1>

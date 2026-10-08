@@ -282,6 +282,17 @@ public final class ConsoleRouter {
 			} catch ( java.io.IOException e ) {
 				json( context, ex, 500, Map.of( "error", "Could not build the bundle" ) );
 			}
+		} else if ( route.equals( "queries" ) && method.equals( "GET" ) && panelOn( "queries" ) ) {
+			json( context, ex, 200, service.getQueryStats().snapshot() );
+		} else if ( route.equals( "queries/reset" ) && method.equals( "POST" ) && panelOn( "queries" ) ) {
+			service.getQueryStats().reset();
+			service.getAudit().log( "queries.reset", s.role, ex.remoteAddr(), "" );
+			json( context, ex, 200, service.getQueryStats().snapshot() );
+		} else if ( route.equals( "inflight" ) && method.equals( "GET" ) && panelOn( "inflight" ) ) {
+			json( context, ex, 200, Map.of( "requests", service.inflight() ) );
+		} else if ( route.startsWith( "inflight/" ) && method.equals( "GET" ) && panelOn( "inflight" ) ) {
+			Map<String, Object> st = service.inflightStack( decode( route.substring( "inflight/".length() ) ) );
+			json( context, ex, st == null ? 404 : 200, st == null ? Map.of( "error", "That request has finished" ) : st );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
 			json( context, ex, 200, tasksFor( s ) );
 		} else if ( route.equals( "system" ) && method.equals( "GET" ) && panelOn( "system" ) ) {
@@ -359,6 +370,8 @@ public final class ConsoleRouter {
 		String[][]					catalog	= {
 		    { "overview", "Overview", "squares-four", "Inspect" },
 		    { "requests", "Requests", "list-bullets", "Inspect" },
+		    { "inflight", "In flight", "hourglass", "Inspect" },
+		    { "queries", "Queries", "table", "Inspect" },
 		    { "executors", "Executors", "lightning", "Runtime" },
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
 		    { "datasources", "Datasources", "database", "Runtime" },
@@ -768,6 +781,12 @@ public final class ConsoleRouter {
 				}
 				if ( want.contains( "datasources" ) && panelOn( "datasources" ) ) {
 					tick.put( "datasources", service.getDatasources().list() );
+				}
+				if ( want.contains( "inflight" ) && panelOn( "inflight" ) ) {
+					tick.put( "inflight", Map.of( "requests", service.inflight() ) );
+				}
+				if ( want.contains( "queries" ) && panelOn( "queries" ) ) {
+					tick.put( "queries", service.getQueryStats().snapshot() );
 				}
 				if ( want.contains( "system" ) && panelOn( "system" ) ) {
 					tick.put( "system", service.getData().system() );
