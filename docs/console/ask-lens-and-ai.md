@@ -21,7 +21,7 @@ Lens can help you read an error, a failing query or a deadlock, and can answer q
 
 The buttons appear where they help: on an [error](errors-and-reports.md#errors), on a [statement](in-flight-and-queries.md#queries) and on the [deadlock banner](system-and-threads.md#deadlock) of the Threads page. The Ask Lens page takes a free question of up to 1000 characters.
 
-A viewer can copy a prompt but cannot call the model.
+A viewer can copy a prompt but cannot call the model. Calls from the server need BoxLang+ or a trial. On Free the Ask Lens page says so and the server answers 409. Copy prompt, Ask ChatGPT and Ask Claude stay free.
 
 ## What a prompt holds
 

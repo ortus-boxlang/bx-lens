@@ -89,6 +89,7 @@ Lens counts a failure when a query started and never finished, or when a databas
 
 ## The heap dump is refused
 
+- "A heap dump is a BoxLang+ feature": heap dumps need BoxLang+ or a trial.
 - "Heap dumps are off": set `console.allowHeapDump` to `true` in `boxlang.json` and restart.
 - "Not enough free disk space": the temporary folder needs at least 1.2 times the heap in use free.
 - "A heap dump is already running" or "waiting to be downloaded": download or discard the current one.
@@ -105,9 +106,13 @@ Lens counts a failure when a query started and never finished, or when a databas
 - "The AI call failed" has the reason from the provider. The log has more.
 - Only admins can call the model.
 
+## A button shows BoxLang+ and is disabled
+
+The feature needs BoxLang+ or a trial and the license state in the console header is Free or License expired. The server answers 403 with a message that names BoxLang+ (AI answers 409). See [Licensing](licensing.md#free-and-boxlang) for the list. If you just added a license, wait up to 5 minutes for the next license check.
+
 ## Run now or Pause does nothing
 
-`console.actions` may be `false`, `console.readOnly` may be `true`, or you may be signed in as a viewer. The buttons are greyed out and the server refuses the call.
+Task actions need BoxLang+ or a trial. On Free the Tasks page shows a BoxLang+ note and the server answers 403. Otherwise `console.actions` may be `false`, `console.readOnly` may be `true`, or you may be signed in as a viewer. The buttons are greyed out and the server refuses the call.
 
 ## A JSON or ajax request shows nothing
 

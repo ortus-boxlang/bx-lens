@@ -1,7 +1,7 @@
 ---
 title: Caches
 order: 5
-description: BoxCache statistics and a capped look inside each cache, with evict, reap and clear.
+description: BoxCache statistics and a capped look inside each cache. Reading a value, evict, reap and clear need BoxLang+.
 icon: lucide:package
 ---
 
@@ -21,9 +21,14 @@ Pick a cache to list its keys. The list is capped at 100 keys. When the cache ho
 
 ## View a value
 
+!!! note "BoxLang+"
+    Reading a value needs BoxLang+ or a trial. On Free the View button is disabled, the page shows a BoxLang+ note and the server answers 403. Statistics and the key list are free.
+
 **View** shows one cached value as JSON. Lens reads it without touching the statistics. Values are masked by key name with the `redact.keys` list and cut to 2 KB (2048 characters), and the page says when a value was cut. Only admins can view a value, and each view is written to the [audit log](../security.md#audit-log) with the cache name and the key.
 
 ## Evict, reap and clear
+
+These need BoxLang+ or a trial. On Free the buttons are disabled and the server answers 403.
 
 | Action | What it does |
 |---|---|

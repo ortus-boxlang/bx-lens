@@ -27,13 +27,15 @@ The System page shows JVM and host numbers from the JDK management beans. It upd
 
 ### Run GC and heap dumps
 
+Run GC is free. Heap dumps need BoxLang+ or a trial. On Free the System page shows a BoxLang+ note instead of the heap dump controls and the server answers 403.
+
 The **Heap and garbage collection** card is for admins. A viewer does not see its buttons.
 
 **Run GC** asks the JVM to run a garbage collection and shows the heap used before and after, the memory freed and the time it took. The JVM may pause briefly. The JVM can ignore the request if it runs with `-XX:+DisableExplicitGC`. Run GC is refused when `console.readOnly` is on.
 
 ![A heap dump ready to download](../assets/screenshots/console-system-heap.png)
 
-**Take a heap dump** writes a `.hprof` file that you can open in a tool such as Eclipse MAT or VisualVM. It is off by default. Set `console.allowHeapDump` to `true` in `boxlang.json` to turn it on.
+**Take a heap dump** writes a `.hprof` file that you can open in a tool such as Eclipse MAT or VisualVM. It needs BoxLang+ or a trial, and it is off by default. Set `console.allowHeapDump` to `true` in `boxlang.json` to turn it on.
 
 !!! danger "A heap dump holds everything in memory"
     The file contains passwords, session data, keys and personal data that were in memory. Lens cannot redact it. Turn the option on only when you need it, download the file over HTTPS, and handle it like a database backup. See [Security](../security.md#heap-dumps).

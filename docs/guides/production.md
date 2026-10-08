@@ -59,12 +59,12 @@ When the console is on, Lens collects every request on the server, not only thos
 5. **Say which proxies to trust.** Behind a proxy or load balancer, set `access.proxyPeers` to the addresses of your proxies, not the whole private network, so only they can name the client address. Without a proxy, set `access.trustProxyHeader` to `false`. See [Behind a proxy](../security.md#behind-a-proxy).
 6. **Collect lightly.** `collect.level: "light"` skips request headers, bound query parameters, the caller of each query, scope contents, Java stack traces, and the `functions`, `logs` and `scopes` collectors. SQL text, timings and counts stay. Use `full` only on a machine you control.
 7. **Turn the bar off.** Leave `bar.enabled` false. Developers do not need a strip injected into live pages.
-8. **Decide on changes.** Set `console.actions` to `false` if nobody should run, pause or reload tasks from here. Set `console.readOnly` to `true` if nobody should change anything from the console. The pages stay readable.
-9. **Keep heap dumps off.** Leave `console.allowHeapDump` at `false`. A heap dump holds every secret in memory. Turn it on for the time you need it, then off. See [Heap dumps](../security.md#heap-dumps).
+8. **Decide on changes.** Set `console.actions` to `false` if nobody should run, pause or reload tasks from here (these actions also need BoxLang+). Set `console.readOnly` to `true` if nobody should change anything from the console. The pages stay readable.
+9. **Keep heap dumps off.** Heap dumps need BoxLang+ or a trial. Leave `console.allowHeapDump` at `false`. A heap dump holds every secret in memory. Turn it on for the time you need it, then off. See [Heap dumps](../security.md#heap-dumps).
 10. **Decide on AI.** Leave `ai.enabled` false, or use a local provider so prompts stay in your network. See [AI data flow](../security.md#ai-data-flow).
 11. **Put the store on a volume.** With BoxLang+ or a trial, errors and reports are saved to `store.dir`. In a container, mount a volume there, or the data is lost when the container is replaced. Set `store.retentionHours` and `store.maxMB` to what you want to keep. See [Errors and Reports](../console/errors-and-reports.md#the-disk-store).
 12. **Hide what you do not need.** `tabs.hide` removes pages, for example `["threads", "designer", "environment"]`.
-13. **Size the history.** `history.maxRequests` is the memory you spend. Each request holds its full snapshot in memory. Without BoxLang+ or a trial the history is capped at 25.
+13. **Size the history.** `history.maxRequests` is the memory you spend. Each request holds its full snapshot in memory. On Free the history is capped at 25.
 14. **Watch the audit log.** `bxlens-audit.log` in the logs directory records logins, failed logins, denied attempts and every change. Read it on the Logs page or ship it with your other logs.
 
 ## The console URL

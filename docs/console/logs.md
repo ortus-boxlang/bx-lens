@@ -7,7 +7,7 @@ icon: lucide:file-text
 
 # Logs
 
-The Logs page shows every file in the BoxLang logs directory. You can read the end of a file, search it, filter by level, follow new lines live and download the file.
+The Logs page shows every file in the BoxLang logs directory. You can read the end of a file, search it, filter by level, follow new lines live. Downloading the file needs BoxLang+.
 
 ![The Logs page](../assets/screenshots/console-logs.png)
 
@@ -29,14 +29,14 @@ Pick a file to see its last lines. Choose 200, 500, 1000 or 2000 lines.
 
 ## Download
 
-**Download** saves the whole file. It is for admins and is written to the audit log.
+**Download** saves the whole file. It needs BoxLang+ or a trial, is for admins and is written to the audit log. On Free the button is disabled with a Plus chip and the server answers 403. Browsing, search, the level filter and the live tail are free.
 
 ## Path checks
 
 A file is chosen from the list by name. Lens resolves the name inside the logs directory, follows symbolic links, and answers 404 for anything that is not a regular file inside that directory. A name such as `../../etc/passwd` or an absolute path is refused.
 
 !!! warning "Logs are not redacted"
-    Lens shows log lines as written. If your application logs a password or a personal detail, it is visible here, to viewers as well. Only the download needs the admin role. See [Security](../security.md#roles).
+    Lens shows log lines as written. If your application logs a password or a personal detail, it is visible here, to viewers as well. Only the download needs the admin role and BoxLang+. See [Security](../security.md#roles).
 
 ## Settings
 

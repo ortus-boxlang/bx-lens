@@ -11,7 +11,7 @@ Each panel comes from one or more collectors. Collectors never throw into your r
 
 | Panel | On by default | What it shows |
 |---|---|---|
-| [Issues](issues.md) | yes | Everything suspicious, ranked. |
+| [Issues](issues.md) | yes | Everything suspicious, ranked. The slow request sample needs BoxLang+. |
 | [Timeline](timeline.md) | yes | One waterfall for templates, functions, queries, HTTP calls, transactions and timers. |
 | [Queries](queries.md) | yes | SQL, timing, params, duplicates and N+1. |
 | [Templates](templates.md) | yes | The include and call tree. Functions need an opt-in. |
@@ -24,8 +24,8 @@ Each panel comes from one or more collectors. Collectors never throw into your r
 | [BIFs](bifs.md) | no | Time spent in built-in functions. Costs time on every BIF call. |
 | [Request](request-and-scopes.md#request) | yes | Request details. |
 | [Scopes](request-and-scopes.md#scopes) | yes | Scope contents. |
-| [Runtime](jvm.md) | yes | JVM, memory and request statistics. |
-| [History](history.md) | yes | The last 50 requests. |
+| [Runtime](jvm.md) | yes | JVM, memory and request statistics. Request cost needs BoxLang+. |
+| [History](history.md) | yes | The last 50 requests (25 on Free). |
 
 The console has its own pages. See [Console](../console/index.md).
 

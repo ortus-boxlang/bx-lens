@@ -15,7 +15,7 @@ icon: lucide:shield
 - Everything is off. `bar.enabled` and `console.enabled` are both `false`.
 - The bar and the console each have their own access rule. Both default to `"local"`, which means loopback only (`127.0.0.1`, `::1`).
 - The console also needs a password. Without one nobody can sign in.
-- Heap dumps (`console.allowHeapDump`) and AI calls to a model (`ai.enabled`) are off. See [Heap dumps](#heap-dumps) and [AI data flow](#ai-data-flow). The disk store writes only with BoxLang+ or a trial, see [Licensing](licensing.md).
+- Heap dumps (`console.allowHeapDump`, BoxLang+ only) and AI calls to a model (`ai.enabled`) are off. See [Heap dumps](#heap-dumps) and [AI data flow](#ai-data-flow). The disk store writes only with BoxLang+ or a trial, see [Licensing](licensing.md).
 - A caller that is not allowed gets nothing. The bar is not injected, and the console answers a plain 404, so it does not reveal that it exists.
 
 ## Access rules
@@ -99,12 +99,15 @@ The password decides the role. `console.password` gives the admin role. `console
 | | Viewer | Admin |
 |---|---|---|
 | See every page and its data | yes | yes |
-| Change settings, task actions, the bar layout | no | yes |
-| Cache evict, reap and clear, reset Queries, Errors and Reports, Run GC | no | yes |
+| Change settings | no | yes |
+| Task actions and saving the bar layout (BoxLang+ or a trial) | no | yes |
+| Cache evict, reap and clear (BoxLang+ or a trial) | no | yes |
+| Reset Queries, Errors and Reports, Run GC | no | yes |
 | Test a datasource connection | no | yes |
 | Call a model (Explain with AI, Ask) | no | yes |
-| Download a thread dump, a heap dump, a log file or the diagnostic bundle | no | yes |
-| Read a cache value | no | yes |
+| Download a thread dump | no | yes |
+| Download a heap dump, a log file or the diagnostic bundle (BoxLang+ or a trial) | no | yes |
+| Read a cache value (BoxLang+ or a trial) | no | yes |
 | Copy a prompt | yes | yes |
 
 A viewer who sends such a request gets a 403, and the attempt goes to the audit log as `denied`. The list of routes only admins can use is `ADMIN_ONLY` in `ConsoleRouter`, plus every request that changes state.
@@ -112,7 +115,7 @@ A viewer who sends such a request gets a 403, and the attempt goes to the audit 
 !!! warning "A viewer still sees a lot"
     A viewer reads request data, queries, scope snapshots, key names of caches, the Environment page and the lines of every log file on screen. The viewer role limits what a person can change or take away as a file, not what they can read. Treat the viewer password as sensitive.
 
-`console.readOnly` is stricter: it refuses every change for both roles. Heap dumps (own switch), the datasource connection test and the AI calls are not stopped by it. See [Console settings](console/settings.md#view-only).
+`console.readOnly` is stricter: it refuses every change for both roles. Heap dumps (own switch, BoxLang+), the datasource connection test and the AI calls are not stopped by it. See [Console settings](console/settings.md#view-only).
 
 ## HTTPS
 
@@ -146,7 +149,7 @@ Passwords and keys are never written. A line is cut at 500 characters and line b
 
 ## Heap dumps
 
-A heap dump is a copy of everything in the JVM's memory: passwords, session data, keys, personal data. Lens cannot redact it.
+Heap dumps need BoxLang+ or a trial. On Free the server answers 403. A heap dump is a copy of everything in the JVM's memory: passwords, session data, keys, personal data. Lens cannot redact it.
 
 - It is off. Set `console.allowHeapDump` to `true` in `boxlang.json` to turn it on, and turn it off again when you are done.
 - Only admins can take and download one. A confirmation is required, and `console.readOnly` does not block it.
@@ -173,7 +176,7 @@ A local provider, such as Ollama, keeps the prompt inside your network. A hosted
 
 ## The diagnostic bundle
 
-The bundle is a zip for support tickets. It holds a thread dump, the environment (configuration, modules, JVM arguments, environment variables, system properties), the system, executor, task, datasource and cache data, and the Lens settings. It holds no request data and no log files.
+The bundle needs BoxLang+ or a trial. On Free the server answers 403. It is a zip for support tickets. It holds a thread dump, the environment (configuration, modules, JVM arguments, environment variables, system properties), the system, executor, task, datasource and cache data, and the Lens settings. It holds no request data and no log files.
 
 Secrets are hidden by name, not by value. A variable, property or setting whose name looks secret (password, token, key, secret, credential, cookie, session and similar) shows as `[hidden]`, URL credentials are removed and `bxsecret:` values show as `[encrypted]`. A secret kept under a harmless name is not hidden. Look inside the zip before you send it. Only admins can download it, and each download is in the audit log.
 

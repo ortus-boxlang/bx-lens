@@ -13,6 +13,8 @@ The Bar designer decides which tabs the bar shows and in what order, for every d
 
 ## Design the bar
 
+The page, the preview, the Open console button and the More menu are free. **Saving or resetting a layout needs BoxLang+ or a trial.** On Free, Save layout and Reset to default are disabled, a "BoxLang+ to save a layout" chip shows, and the server answers 403.
+
 - Turn a tab on or off with the eye button.
 - Reorder tabs by dragging a row, or with the up and down arrows.
 - The preview shows the strip and the tab row as the bar will draw them. The number keys `1` to `9` switch tabs in this order.

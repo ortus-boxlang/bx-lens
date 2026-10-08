@@ -1,7 +1,7 @@
 ---
 title: Environment
 order: 7
-description: What the server is made of, with secrets hidden, and the diagnostic bundle for a support ticket.
+description: What the server is made of, with secrets hidden, and the diagnostic bundle (BoxLang+) for a support ticket.
 icon: lucide:sliders-horizontal
 ---
 
@@ -29,7 +29,7 @@ It works by name. A secret stored under a name that does not look like one, for 
 
 ## Diagnostic bundle
 
-**Diagnostic bundle** downloads one zip file named `lens-diagnostics-{timestamp}.zip` to attach to a support ticket. It holds:
+**Diagnostic bundle** needs BoxLang+ or a trial. On Free the link is disabled with a Plus chip and the server answers 403. It downloads one zip file named `lens-diagnostics-{timestamp}.zip` to attach to a support ticket. It holds:
 
 | File | Content |
 |---|---|

@@ -22,15 +22,16 @@ icon: lucide:map
 | Cache hit and miss events | Needs core. Lens uses statistic differences today. |
 | SOAP events | Needs core. |
 | Bar on core error pages | Needs the web context to announce `onRequestFlushBuffer`. |
+| ORM SQL in Queries | Planned and not built yet. It will be free, like normal queries. Global ORM statistics will need BoxLang+. |
 | Panels from other modules (ORM, Redis, mail, AI, JDBC pools, Quick, qb, ColdBox, cbwire) | Ideas. |
 
 The BIF call collector is shipped, see the [BIFs panel](../panels/bifs.md). See [Core gaps](../reference/events.md#core-gaps).
 
 ## Not implemented
 
-- The `lensDumpHeap` BIF. Heap dumps are in the console System page and are off by default. Thread dumps are in the console Threads page.
+- The `lensDumpHeap` BIF. Heap dumps are in the console System page, need BoxLang+ and are off by default. Thread dumps are in the console Threads page.
 - The `bx:lens` component.
-- A final feature split between free and BoxLang+. Today the disk store, the long request history and AI calls from the server need Plus or a trial, and this may change, see [Licensing](../licensing.md#free-and-boxlang).
+- A frozen feature split between free and BoxLang+. The split in [Licensing](../licensing.md#free-and-boxlang) is the current state and may change.
 
 ## Relation to BX Insights
 

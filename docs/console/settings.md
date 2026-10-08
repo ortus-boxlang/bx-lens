@@ -7,7 +7,7 @@ icon: lucide:settings
 
 # Settings
 
-The Settings page shows the values Lens is running with and lets an admin change many of them without a restart.
+The Settings page shows the values Lens is running with and lets an admin change many of them without a restart. Live settings, read-only mode and the viewer role are free.
 
 ![The Settings page](../assets/screenshots/console-settings.png)
 
@@ -41,10 +41,10 @@ The settings marked **boxlang.json only** are shown with their value but cannot 
 Two things make the page read only.
 
 - **Viewer role.** A viewer who signed in with `console.viewerPassword` sees a notice, and every field is disabled. See [Roles](../security.md#roles).
-- **`console.readOnly`.** When it is `true`, nobody can change anything from the console, not even an admin. The same switch stops task actions, the bar layout, cache actions, resets and Run GC. It can only be set in `boxlang.json`. Heap dumps have their own switch.
+- **`console.readOnly`.** When it is `true`, nobody can change anything from the console, not even an admin. The same switch stops task actions, the bar layout, cache actions, resets and Run GC (task actions, cache actions and the bar layout also need BoxLang+). It can only be set in `boxlang.json`. Heap dumps (BoxLang+) have their own switch.
 
 Every change and reset is written to the [audit log](../security.md#audit-log) with the keys and the new values.
 
 ## The license
 
-The header of every console page shows the license state (BoxLang+ active, Trial, License expired or Free), and your role. See [Licensing](../licensing.md).
+The header of every console page shows the license state (BoxLang+ active, Trial, License expired or Free), and your role. See [Licensing](../licensing.md#free-and-boxlang) for what Free includes and what needs BoxLang+.

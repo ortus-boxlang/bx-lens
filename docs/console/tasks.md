@@ -1,13 +1,13 @@
 ---
 title: Tasks
 order: 3
-description: Schedulers and scheduled tasks, with status, metrics, Run now, pause, resume and reload.
+description: Schedulers and scheduled tasks, with status and metrics. Run now, pause, resume and reload need BoxLang+.
 icon: lucide:clock
 ---
 
 # Tasks
 
-The Tasks page lists the schedulers and scheduled tasks of this server. It reads them from BoxLang's `SchedulerService` and from the definitions in `tasks.json`.
+The Tasks page lists the schedulers and scheduled tasks of this server. It reads them from BoxLang's `SchedulerService` and from the definitions in `tasks.json`. Viewing is free. The actions need BoxLang+.
 
 ![The Tasks page](../assets/screenshots/console-tasks.png)
 
@@ -43,6 +43,9 @@ There is no "running now" flag, because core does not expose one.
 Pick a task to see its runs, successes and failures, the scheduler, executor, group, schedule, last run, next run, last result, host and IP. If the last run failed you see the error and a collapsible stack trace. The **Definition** block shows the entry from `tasks.json` with sensitive keys masked. A task registered in code instead of `tasks.json` says so.
 
 ## Actions
+
+!!! note "BoxLang+"
+    Run now, pause, resume and reload need BoxLang+ or a trial. On Free the page shows a BoxLang+ note, the buttons are disabled and the server answers 403. You still see every task, its history and its definition.
 
 | Action | What it does |
 |---|---|

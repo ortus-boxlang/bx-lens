@@ -61,7 +61,7 @@ There are no user names. The password you type decides the role:
 | Role | Password | Can do |
 |---|---|---|
 | Admin | `console.password` | Everything the console offers. |
-| Viewer | `console.viewerPassword` (optional) | Look at every page. Cannot change anything, and cannot download thread dumps, heap dumps, log files or the diagnostic bundle, or read cache values. |
+| Viewer | `console.viewerPassword` (optional) | Look at every page. Cannot change anything, and cannot download thread dumps, log files, heap dumps or the diagnostic bundle, or read cache values. |
 
 The role shows in the header. See [Roles](../security.md#roles) for the full list.
 
@@ -78,25 +78,27 @@ When someone reaches the console over plain HTTP from a non-loopback address, ev
 | Page | What it is for |
 |---|---|
 | Overview | Requests per second, error rate, p95 and median time, queries per request, slowest routes and what needs attention. |
-| Requests | Every request in memory, with detail. See below. |
+| Requests | Every request in memory (25 on Free), with detail. See below. |
 | [In flight](in-flight-and-queries.md#in-flight) | Requests running right now, with a live stack. |
-| [Errors](errors-and-reports.md#errors) | Errors grouped by cause, with samples. |
+| [Errors](errors-and-reports.md#errors) | Errors grouped by cause, with samples. In memory on Free. |
 | [Reports](errors-and-reports.md#reports) | Totals, percentiles, status codes, URLs and a minute by minute series. |
 | [Ask Lens](ask-lens-and-ai.md) | Questions about the server, and prompts for a model. |
 | [Queries](in-flight-and-queries.md#queries) | Statistics for every SQL statement. |
 | [Executors](executors.md) | Live health of every executor. |
-| [Tasks](tasks.md) | Schedulers and scheduled tasks, with Run now, pause, resume and reload. |
+| [Tasks](tasks.md) | Schedulers and scheduled tasks. Run now, pause, resume and reload need BoxLang+. |
 | [Datasources](datasources.md) | Connection pools with live numbers and a connection test. |
-| [Caches](caches.md) | Cache statistics, a capped key list, and evict, reap and clear. |
-| [Logs](logs.md) | Every log file, with search, a level filter and a live tail. |
-| [Environment](environment.md) | Configuration, modules, JVM arguments, variables, and the diagnostic bundle. |
+| [Caches](caches.md) | Cache statistics and a capped key list. Reading a value, evict, reap and clear need BoxLang+. |
+| [Logs](logs.md) | Every log file, with search, a level filter and a live tail. Download needs BoxLang+. |
+| [Environment](environment.md) | Configuration, modules, JVM arguments, variables. The diagnostic bundle needs BoxLang+. |
 | [Modules](modules.md) | Every loaded module, nested ones too, with version, state, path and what it provides. |
-| [System](system-and-threads.md) | CPU, memory, garbage collection, Run GC, heap dump, classes, disks and runtime details. |
+| [System](system-and-threads.md) | CPU, memory, garbage collection, Run GC, classes, disks and runtime details. A heap dump needs BoxLang+. |
 | [Threads](system-and-threads.md#threads) | Thread viewer, thread dump and deadlock detail. |
-| [Bar designer](bar-designer.md) | Choose and order the tabs of the bar. |
+| [Bar designer](bar-designer.md) | Choose and order the tabs of the bar. Saving a layout needs BoxLang+. |
 | [Settings](settings.md) | The effective settings, editable by an admin. |
 
 Hide a page with `tabs.hide`, or turn its collector off. Settings is always there.
+
+Most of the console is free. The items marked BoxLang+ need a license or trial, and on Free they show a "BoxLang+" note and the server answers 403. See [Licensing](../licensing.md#free-and-boxlang).
 
 ### Requests
 
@@ -126,4 +128,4 @@ Read the full list in [Security](../security.md#console-protection), and use [Ru
 
 ## What the console is not
 
-It is for ONE server. It keeps the last `history.maxRequests` requests in memory (25 without BoxLang+ or a trial, see [Licensing](../licensing.md#free-and-boxlang)). Errors, reports and query statistics are in memory too. With BoxLang+ or a trial, errors and reports are also saved to disk so they survive restarts. Apart from that, Lens writes only the saved bar layout, the saved settings changes and the audit log. For clusters, history over time and alerting, use the separate BX Insights product. See [Roadmap](../project/roadmap.md#relation-to-bx-insights).
+It is for ONE server. It keeps the last `history.maxRequests` requests in memory (25 on Free, see [Licensing](../licensing.md#free-and-boxlang)). Errors, reports and query statistics are in memory too. With BoxLang+ or a trial, errors and reports are also saved to disk so they survive restarts. Apart from that, Lens writes only the saved bar layout, the saved settings changes and the audit log. For clusters, history over time and alerting, use the separate BX Insights product. See [Roadmap](../project/roadmap.md#relation-to-bx-insights).

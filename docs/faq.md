@@ -24,7 +24,7 @@ Run `boxlang generatesecret "your password"` and put the `bxsecret:` value in `c
 :::
 
 ::: expandable "Is BX Lens open source? Does it need a license?"
-No, it is not open source. BX Lens is freeware with limits under a BoxLang+ license. Free keeps the bar and the whole console, with the last 25 requests and errors and reports in memory. BoxLang+ or a trial adds the disk store, a longer request history and AI calls from the server. See [Licensing](licensing.md#free-and-boxlang).
+No, it is not open source. BX Lens is freeware with limits under a BoxLang+ license. Free keeps the bar and most of the console: the last 25 requests, and errors and reports in memory. BoxLang+ or a trial adds request cost and the slow request sample, task and cache actions, log download, the diagnostic bundle, heap dumps, saving a bar layout, AI calls from the server, the disk store and a request history longer than 25. A locked item shows a "BoxLang+" note. See [Licensing](licensing.md#free-and-boxlang). See [Licensing](licensing.md#free-and-boxlang).
 :::
 
 ::: expandable "Does the console call out to the internet?"
@@ -40,15 +40,15 @@ Yes, many of them. An admin can change them on the Settings page of the console.
 :::
 
 ::: expandable "What can a viewer do?"
-A viewer signs in with `console.viewerPassword`. They can look at every page. They cannot change anything, and cannot download thread dumps, heap dumps, log files or the diagnostic bundle, or read cache values. See [Roles](security.md#roles).
+A viewer signs in with `console.viewerPassword`. They can look at every page. They cannot change anything, and cannot download thread dumps, log files, heap dumps or the diagnostic bundle, or read cache values. The last four need BoxLang+ anyway. See [Roles](security.md#roles).
 :::
 
 ::: expandable "How do I lock the console to view only?"
-Set `console.readOnly` to `true` in `boxlang.json`. Nobody can then change settings, run tasks, clear caches or reset counters from the console. See [Console settings](console/settings.md#view-only).
+Set `console.readOnly` to `true` in `boxlang.json`. Nobody can then change settings, run tasks, clear caches or reset counters from the console. Free already cannot run tasks or clear caches. See [Console settings](console/settings.md#view-only).
 :::
 
 ::: expandable "Is a heap dump safe?"
-A heap dump holds everything in memory, including passwords and session data, and Lens cannot redact it. It is off by default. An admin must turn on `console.allowHeapDump`, confirm the dump, and download the file, which Lens deletes soon after. See [Heap dumps](security.md#heap-dumps).
+A heap dump needs BoxLang+ or a trial. It holds everything in memory, including passwords and session data, and Lens cannot redact it. It is off by default. An admin must turn on `console.allowHeapDump`, confirm the dump, and download the file, which Lens deletes soon after. See [Heap dumps](security.md#heap-dumps).
 :::
 
 ::: expandable "What does the AI help send, and where?"
@@ -56,7 +56,7 @@ Copy prompt and the Ask ChatGPT and Ask Claude buttons send nothing from the ser
 :::
 
 ::: expandable "Does the AI help need bx-ai?"
-Only Explain with AI and Ask Lens use it, and only with BoxLang+ or a trial. `bx-ai` 3.4.0 ships inside Lens, so there is nothing to install. If you remove it, Lens still loads.
+Only Explain with AI and Ask Lens use it, and only with BoxLang+ or a trial. Copy prompt, Ask ChatGPT and Ask Claude are free. `bx-ai` 3.4.0 ships inside Lens, so there is nothing to install. If you remove it, Lens still loads.
 :::
 
 ::: expandable "Why are my errors and reports gone after a restart?"
@@ -64,7 +64,7 @@ Without BoxLang+ or a trial they are kept in memory only. With one of them they 
 :::
 
 ::: expandable "What is in the diagnostic bundle?"
-A zip with a thread dump, the environment, system, executor, task, datasource and cache data, and the Lens settings, with secrets hidden by name. No request data and no log files. See [Environment](console/environment.md#diagnostic-bundle).
+The diagnostic bundle needs BoxLang+ or a trial. It is a zip with a thread dump, the environment, system, executor, task, datasource and cache data, and the Lens settings, with secrets hidden by name. No request data and no log files. See [Environment](console/environment.md#diagnostic-bundle).
 :::
 
 ::: expandable "Does it work with APIs and JSON responses?"

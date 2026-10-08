@@ -29,6 +29,9 @@ Issues drive the color of the health strip and the issues chip: amber for warnin
 
 ## Slow request sample
 
+!!! note "BoxLang+"
+    The slow request sample needs BoxLang+ or a trial. On Free no sample is taken, so the Slow request issue has no location. See [Licensing](../licensing.md#free-and-boxlang).
+
 When a request runs longer than `thresholds.slowRequestMs`, a watchdog thread takes one stack sample of the request thread. It checks every 200 ms, so the sample comes shortly after the limit. The **Slow request** issue then says where the request was, for example `At 3412 ms it was in stall.bxm:5`, and links to that file and line. The first BoxLang frame in the stack is used. The sample is taken once per request and shows in the Request detail in the console as "Where it was at".
 
 Turn it off with `checks.slowSample: false`. It does nothing when `thresholds.slowRequestMs` is 0.

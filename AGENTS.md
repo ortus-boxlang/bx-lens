@@ -33,8 +33,8 @@ BX Lens is a BoxLang module with two surfaces: a request level debug bar (a smal
 - No external requests, ever. The console and the bar must not load scripts, styles, fonts, images or data from another origin, and the Content-Security-Policy stays strict. Alpine.js is vendored, fonts are system fonts, and an e2e test checks this.
 - Icons are Phosphor (MIT). Do not link them from a CDN. `tools/build-icons.py` builds `icons.svg` (ids `ph-*`) and `bar-icons.svg` (ids `bxlens-ph-*`, the bar's prefixed subset). Keep `ICONS-LICENSE.txt`.
 - Settings: every new setting goes in `ModuleConfig.bx` with a default, is read through `LensConfig` with a default, and is added to `docs/configuration.md`. A change to a name needs a line in the migration table there.
-- Licensing: detection must never break Lens. Gate a feature only through `Licensing.has(feature)`. Today `diskStore` and `fullHistory` need Plus or a trial (free keeps `LensService.FREE_HISTORY`, 25 requests, and errors and reports in memory) and every other feature returns true. Do not gate anything else or invent a split without a decision. Docs must say the split is the current state and may change.
-- Roles: `ConsoleAuth` gives `admin` or `viewer`. A viewer may only use GET routes. Routes that return files or secrets are admin only even for GET: list them in `ConsoleRouter.ADMIN_ONLY` (`threads/dump`, `heapdump`, `logfiles/download`, `bundle`, `cachevalue`). Every new route that changes state or hands out a file needs a decision on that list. `console.readOnly` refuses every non-GET except heap dump, a route ending in `/test` and `ai/`. Write an audit line for every change, download and denied attempt.
+- Licensing: detection must never break Lens. Gate a feature only through `Licensing.has(feature)`. The gated features are listed below and in `Licensing.PLUS_FEATURES`. Everything else is free. Do not gate anything else or invent a split without a decision. Docs must say the split is the current state and may change. To gate a new feature: add it to `Licensing.PLUS_FEATURES`, refuse it on the server with `plusOnly(...)` in `ConsoleRouter` (403 with a message that names BoxLang+; AI answers 409), lock it in the UI with `state.plus` (console) or `ui.plus` (bar) and a "BoxLang+" note or chip, add it to the table in `docs/licensing.md`, and add it to `e2e/tests/free.spec.ts`.
+- Roles: `ConsoleAuth` gives `admin` or `viewer`. A viewer may only use GET routes. Routes that return files or secrets are admin only even for GET: list them in `ConsoleRouter.ADMIN_ONLY` (`threads/dump`, `heapdump`, `logfiles/download`, `bundle`, `cachevalue`). Every new route that changes state or hands out a file needs a decision on that list, and on whether it is a Plus feature. `console.readOnly` refuses every non-GET except heap dump, a route ending in `/test` and `ai/`. Write an audit line for every change, download and denied attempt.
 - Stores are bounded and redacted: every in-memory store has a hard cap and drops the least recently seen entry (`QueryStats` 500, `ErrorStore` 200 groups and 5 samples, `Reports` 300 URLs, caches 100 keys, values 2 KB, logs 2000 lines). Store statement text and never parameter values. Redact before storing, not when showing. Anything a user can paste into a chat goes through `AiPrompts`.
 - No persistence beyond the Plus disk store: only `ErrorStore` and `Reports` write to `store.dir`, atomically (`Plain.writeAtomic`), and only when `LensService.diskStoreOn()` is true. Do not add other files or a database. Heap dump files are temporary and must be deleted.
 - A new console page needs: a collector id in the `LensService.activate` list (so `SettingsRegistry` gets its switch), an entry in `ConsoleRouter.tabs()`, a `panelOn()` check on its routes, a section in `console.html` and `console.js`, an entry in `docs/configuration.md` and `docs/console/`, and a Playwright test.
@@ -74,4 +74,16 @@ Relevant BoxLang development skills live under `.agents/skills` (restore with `n
 ## Bundled modules and gating
 
 - BoxLang AI (bx-ai 3.4.0) is nested in `modules/bxai` inside the built module. `build.gradle` downloads it (`downloadBxAi`) into `build/cache`. Do not add it to `box.json` dependencies.
-- Features gated by `Licensing.has()`: `diskStore`, `fullHistory` (25 requests free) and `ai` (server side calls). Everything else is open. Add a feature to that list and to `docs/licensing.md` together.
+- Features gated by `Licensing.has()` (`Licensing.PLUS_FEATURES`). Everything else is open.
+  - `cost`: request cost (CPU, allocation) and the slow request sample.
+  - `taskActions`: Run now, pause, resume, reload.
+  - `cacheActions`: read a cache value, evict, reap, clear.
+  - `logDownload`: download a log file.
+  - `bundle`: the diagnostic bundle.
+  - `heapDump`: heap dumps (still off until `console.allowHeapDump`).
+  - `barDesigner`: save or reset a bar layout.
+  - `ai`: Explain with AI and Ask Lens (server side calls). Copy prompt and the ChatGPT and Claude buttons stay free.
+  - `diskStore`: errors and reports saved, totals since first install, a longer minute series.
+  - `fullHistory`: more than `LensService.FREE_HISTORY` (25) requests in memory.
+- Planned, not built: ORM SQL will be free like normal queries, and global ORM statistics will need Plus.
+- The rule: add a feature to `Licensing.PLUS_FEATURES`, gate it on the server with `plusOnly`, gate it in the UI with `state.plus` or `ui.plus`, add it to `docs/licensing.md` and to `e2e/tests/free.spec.ts`.

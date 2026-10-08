@@ -58,8 +58,8 @@ The Reports page gives totals and trends for the whole server.
 | Block | Content |
 |---|---|
 | Totals | Requests, errors, average time, p95 and p99, and the number of slow requests (at or over `thresholds.slowRequestMs`). |
-| Since first install | Requests, errors, slow requests, queries and exceptions since Lens was first installed on this server, plus the number of runs. Shown only with the disk store. |
-| Requests per minute | A minute by minute series of requests and failed requests. |
+| Since first install | Requests, errors, slow requests, queries and exceptions since Lens was first installed on this server, plus the number of runs. Shown only with the disk store (BoxLang+). |
+| Requests per minute | A minute by minute series of requests and failed requests. 60 minutes on Free. |
 | Status codes | Counts for 1xx up to 5xx. |
 | Slowest, busiest and most failing URLs | The top ten for each, by longest time, hits and errors. |
 | Work done | Queries, outgoing HTTP calls and exceptions. |
@@ -72,7 +72,7 @@ Lens does not keep every duration. It counts requests in buckets: 5, 10, 25, 50,
 
 ### Memory and history
 
-The totals and the URL lists are in memory. A URL is `METHOD path` without the query string. Lens keeps up to 300 URLs and drops the one seen least recently. The minute series covers the last 60 minutes, or `store.retentionHours` with the disk store. With the disk store the totals since first install survive restarts and upgrades.
+The totals and the URL lists are in memory. A URL is `METHOD path` without the query string. Lens keeps up to 300 URLs and drops the one seen least recently. The minute series covers the last 60 minutes on Free, or `store.retentionHours` with the disk store (BoxLang+). With the disk store the totals since first install survive restarts and upgrades.
 
 **Reset the counters** clears the totals, the URL lists and the minute series of this run. It is for admins, is written to the audit log and is refused when `console.readOnly` is on.
 
@@ -80,6 +80,6 @@ Turn the page off with `collectors.reports.enabled` or `tabs.hide`.
 
 ## The disk store
 
-With BoxLang+ or a trial, Lens writes `errors.json` and `reports.json` to `store.dir` (default `lens-data` in the BoxLang home) every `store.flushSeconds`, and when the module stops. Each file is written to a temporary file and renamed, so a crash cannot leave half a file. Errors older than `store.retentionHours` are dropped. When `errors.json` would be bigger than `store.maxMB`, the older half of the groups is dropped. In a container, put `store.dir` on a mounted volume. See [Running Lens in production](../guides/production.md).
+The disk store needs BoxLang+ or a trial. On Free, both pages show a note that the data is kept in memory only. With a license, Lens writes `errors.json` and `reports.json` to `store.dir` (default `lens-data` in the BoxLang home) every `store.flushSeconds`, and when the module stops. Each file is written to a temporary file and renamed, so a crash cannot leave half a file. Errors older than `store.retentionHours` are dropped. When `errors.json` would be bigger than `store.maxMB`, the older half of the groups is dropped. In a container, put `store.dir` on a mounted volume. See [Running Lens in production](../guides/production.md).
 
 The files hold redacted data, but they are still data from your server. Give the folder the permissions you give to your logs.

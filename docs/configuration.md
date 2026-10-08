@@ -139,10 +139,10 @@ The console needs `enabled: true` and a password. See [Console](console/index.md
 | `sessionMinutes` | number | `30` | Idle timeout. A session also ends 12 hours after login. |
 | `maxLoginAttempts` | number | `5` | Wrong passwords per address before a lockout. |
 | `lockoutMinutes` | number | `5` | How long the address is locked out. |
-| `actions` | boolean | `true` | Allow pause, resume, run and reload of scheduled tasks. When false the buttons are disabled and the server refuses the calls. |
+| `actions` | boolean | `true` | Allow pause, resume, run and reload of scheduled tasks. These also need BoxLang+ or a trial. When false the buttons are disabled and the server refuses the calls. |
 | `readOnly` | boolean | `false` | View only. The console refuses every change: settings, task actions, the bar layout, cache clear, evict and reap, resets of the Queries, Errors and Reports counters, and Run GC. It does not block heap dumps, which have their own switch, and it does not block the connection test or the AI calls. It can only be set in `boxlang.json`. |
 | `overridesFile` | string | `""` | Where changes made on the Settings page are saved. Empty means `config/bxlens-settings.json` in the BoxLang home. See [Live settings](#live-settings). |
-| `allowHeapDump` | boolean | `false` | Offer a heap dump on the System page, to admins only. A heap dump holds everything in memory, including secrets, so read [Security](security.md#heap-dumps) first. Not in the declared schema. |
+| `allowHeapDump` | boolean | `false` | Offer a heap dump on the System page, to admins only. Heap dumps also need BoxLang+ or a trial. A heap dump holds everything in memory, including secrets, so read [Security](security.md#heap-dumps) first. Not in the declared schema. |
 | `runTimeoutSeconds` | number | `60` | How long Run now waits for a task before it reports that the task is still running. |
 | `maxStreams` | number | `10` | Most live (Server-Sent Events) streams at once. More get a 429 and the browser polls. |
 
@@ -186,7 +186,7 @@ See [Security](security.md#behind-a-proxy).
 |---|---|---|---|
 | `trackNonHtml` | boolean | `true` | Record JSON, SSE, file and redirect requests too. They show no bar. |
 | `header` | string | `"X-BxLens-Id"` | Response header that carries the stored request id. |
-| `maxRequests` | number | `50` | Size of the in-memory ring buffer. The oldest request is recycled when full. Without BoxLang+ or a trial the buffer is capped at 25. See [Licensing](licensing.md#free-and-boxlang). |
+| `maxRequests` | number | `50` | Size of the in-memory ring buffer. The oldest request is recycled when full. On Free the buffer is capped at 25. See [Licensing](licensing.md#free-and-boxlang). |
 
 ## `ui`
 
