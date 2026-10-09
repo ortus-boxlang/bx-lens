@@ -74,6 +74,8 @@ test.describe( 'roles and proxy headers', () => {
 		expect( byKey[ 'console.overridesFile' ].value ).toBe( 'admin only' );
 		expect( view.overridesFile ).toBe( '' );
 		await page.click( 'button:has-text("Log out")' );
+		// Wait for the login form so the sign in does not race the page change after the log out
+		await expect( page.locator( '#pw' ) ).toBeVisible();
 		await signIn( page, 'lens-demo' );
 		const admin = await page.evaluate( async () => await ( await fetch( '/~bxlens/index.bxm/api/settings', { credentials: 'same-origin' } ) ).json() );
 		expect( admin.settings.find( ( s: any ) => s.key === 'console.access' ).value ).not.toBe( 'admin only' );
