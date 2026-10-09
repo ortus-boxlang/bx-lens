@@ -20,10 +20,17 @@ test.describe( 'Free: what is open and what is locked', () => {
 	test( 'the console says Free and lists every gated feature as off', async ( { request } ) => {
 		const { state } = await session( request );
 		expect( state.license.state ).toBe( 'none' );
-		for ( const f of [ 'diskStore', 'fullHistory', 'ai', 'cost', 'taskActions', 'cacheActions', 'logDownload', 'bundle', 'heapDump', 'barDesigner' ] ) {
+		for ( const f of [ 'diskStore', 'fullHistory', 'ai', 'cost', 'taskActions', 'cacheActions', 'logDownload', 'bundle', 'heapDump', 'barDesigner', 'ormStats' ] ) {
 			expect( state.plus[ f ], f ).toBe( false );
 		}
 		expect( state.diskStore ).toBe( false );
+	} );
+
+	test( 'ORM statistics are locked', async ( { request } ) => {
+		await session( request );
+		const r = await request.get( `${ API }/orm` );
+		expect( r.status() ).toBe( 403 );
+		expect( ( await r.json() ).plus ).toBe( true );
 	} );
 
 	test( 'the free pages and reads still work', async ( { request } ) => {

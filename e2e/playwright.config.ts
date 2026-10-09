@@ -3,6 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const PORT = process.env.PORT || '8085';
 const FREE_PORT = process.env.FREE_PORT || '8090';
+const ORM_PORT = process.env.ORM_PORT || '8091';
 const chromium = process.env.LENS_CHROMIUM; // optional path to a Chromium build, for machines where `playwright install` is not possible
 
 export default defineConfig( {
@@ -42,6 +43,15 @@ export default defineConfig( {
 			reuseExistingServer: !process.env.CI,
 			stdout: 'pipe',
 			env: { PORT: FREE_PORT, RUN_DIR: join( __dirname, '..', 'harness', '.run-free' ), SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: 'none' },
+		},
+		// A third server with bx-orm, to prove ORM SQL and statistics
+		{
+			command: 'bash ../harness/start.sh',
+			url: `http://127.0.0.1:${ ORM_PORT }/index.bxm`,
+			timeout: 240_000,
+			reuseExistingServer: !process.env.CI,
+			stdout: 'pipe',
+			env: { PORT: ORM_PORT, RUN_DIR: join( __dirname, '..', 'harness', '.run-orm' ), SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: 'plus', WITH_ORM: '1' },
 		},
 	],
 

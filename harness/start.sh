@@ -44,6 +44,13 @@ if [ -n "${WITH_AI:-}" ]; then
 	sed -i "s|\"ai\": { \"enabled\": false|\"ai\": { \"enabled\": true|; s|@LENS_AI_PROVIDER@|${LENS_AI_PROVIDER:-ollama}|" "$RUN/home/config/boxlang.json"
 fi
 sed -i "s|@LENS_AI_PROVIDER@||" "$RUN/home/config/boxlang.json"
+# WITH_ORM=1 installs bx-orm (BX_ORM_VERSION, default 1.7.1) and turns the ORM entity in the demo app on
+if [ -n "${WITH_ORM:-}" ]; then
+	fetch "$DL/boxlang-modules/bx-orm/${BX_ORM_VERSION:-1.7.1}/bx-orm-${BX_ORM_VERSION:-1.7.1}.zip" "bx-orm-${BX_ORM_VERSION:-1.7.1}.zip"
+	mkdir -p "$RUN/home/modules/bxorm"
+	unzip -q -o "$CACHE/bx-orm-${BX_ORM_VERSION:-1.7.1}.zip" -d "$RUN/home/modules/bxorm"
+	export LENS_ORM=1
+fi
 mkdir -p "$RUN/home/modules/derby"
 unzip -q -o "$CACHE/bx-derby.zip" -d "$RUN/home/modules/derby"
 

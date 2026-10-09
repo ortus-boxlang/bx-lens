@@ -98,6 +98,7 @@ public final class SettingsRegistry {
 		add( "ai.model", "string", "Console", "AI model", false, "" );
 		add( "ai.apiKey", "secret", "Console", "AI API key", false, "" );
 		add( "ai.links", "bool", "Console", "AI: show copy and chat links", false, true );
+		add( "collectors.orm.statistics", "bool", "Collectors", "ORM: turn on Hibernate statistics", false, true );
 		add( "bar.access", "string", "Access", "Who sees the bar", false, "local" );
 		add( "bar.allowAllIPs", "bool", "Access", "Confirm bar.access all", false, false );
 		add( "history.maxRequests", "int", "Access", "Requests kept in memory", false, 50 );

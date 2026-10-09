@@ -1,0 +1,19 @@
+<bx:script>
+	request.pageTitle = "ORM";
+	// Needs WITH_ORM=1: bx-orm and the Book entity
+	if ( url.keyExists( "save" ) ) {
+		b = entityNew( "Book" );
+		b.setTitle( "Lens " & now().getTime() );
+		b.setAuthor( "Ada" );
+		entitySave( b );
+		ormFlush();
+	}
+	books = entityLoad( "Book" );
+	byAuthor = ormExecuteQuery( "from Book where author = :a", { a : "Ada" } );
+</bx:script>
+<bx:include template="/includes/header.bxm" />
+<bx:output>
+<h1>ORM</h1>
+<p>#books.len()# books loaded through bx-orm, #byAuthor.len()# by Ada. Lens shows the SQL with the ORM label.</p>
+</bx:output>
+<bx:include template="/includes/footer.bxm" />

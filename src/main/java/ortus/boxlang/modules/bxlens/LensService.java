@@ -27,6 +27,7 @@ import ortus.boxlang.modules.bxlens.interceptors.collectors.JvmCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.LifecycleCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.LogCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.ModulesCollector;
+import ortus.boxlang.modules.bxlens.interceptors.collectors.OrmCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.QueryCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.ScopesCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.TemplateCollector;
@@ -102,6 +103,7 @@ public final class LensService {
 	private final CacheData											caches				= new CacheData( this );
 	private final LogData											logs				= new LogData();
 	private final EnvironmentData									environment			= new EnvironmentData( this );
+	private final OrmData											orm					= new OrmData();
 	private final QueryStats										queryStats			= new QueryStats();
 	private final ErrorStore										errors				= new ErrorStore();
 	private final Reports											reports				= new Reports();
@@ -146,7 +148,8 @@ public final class LensService {
 		allBuiltIns.clear();
 		allBuiltIns.addAll( builtIns() );
 		List<String> ids = new ArrayList<>(
-		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "errors", "reports", "ask", "system",
+		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "errors", "reports", "ask", "orm",
+		        "system",
 		        "threads" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
@@ -694,7 +697,7 @@ public final class LensService {
 	private List<ILensCollector> builtIns() {
 		return List.of( new LifecycleCollector(), new TemplateCollector(), new FunctionCollector(), new QueryCollector(), new HttpCollector(),
 		    new ExceptionCollector(), new LogCollector(), new TransactionCollector(), new ScopesCollector(), new JvmCollector(), new CacheCollector(),
-		    new ModulesCollector(), new BifCollector() );
+		    new ModulesCollector(), new BifCollector(), new OrmCollector() );
 	}
 
 	private List<String> collectorIds() {
@@ -920,6 +923,10 @@ public final class LensService {
 		m.put( "state", r.thread.getState().name() );
 		m.put( "frames", frames );
 		return m;
+	}
+
+	public OrmData getOrm() {
+		return orm;
 	}
 
 	public EnvironmentData getEnvironment() {

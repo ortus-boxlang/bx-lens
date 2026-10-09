@@ -88,7 +88,7 @@ public final class Licensing {
 	 * </ul>
 	 */
 	public static final java.util.List<String> PLUS_FEATURES = java.util.List.of( "diskStore", "fullHistory", "ai", "cost", "taskActions", "cacheActions",
-	    "logDownload", "bundle", "heapDump", "barDesigner" );
+	    "logDownload", "bundle", "heapDump", "barDesigner", "ormStats" );
 
 	/**
 	 * Is a feature available? Plus and a trial get everything. Free keeps the bar and the live console, minus the features in {@link #PLUS_FEATURES}.

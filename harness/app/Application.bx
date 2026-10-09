@@ -13,6 +13,13 @@ class {
 	};
 	this.datasource = "demo";
 
+	// WITH_ORM=1 (harness/start.sh) installs bx-orm and sets LENS_ORM so the entity in ormmodels works
+	if ( getSystemSetting( "LENS_ORM", "" ) == "1" ) {
+		this.mappings[ "/ormmodels" ] = getDirectoryFromPath( getCurrentTemplatePath() ) & "ormmodels";
+		this.ormEnabled = true;
+		this.ormSettings = { "datasource" : "demo", "entityPaths" : [ "/ormmodels" ], "dbcreate" : "update", "dialect" : "DerbyTenSevenDialect", "saveMapping" : false };
+	}
+
 	function onApplicationStart() {
 		queryExecute( "CREATE TABLE customers ( id INT PRIMARY KEY, name VARCHAR(80), country VARCHAR(2) )" );
 		queryExecute( "CREATE TABLE orders ( id INT PRIMARY KEY, customer_id INT, total DECIMAL(10,2), status VARCHAR(20) )" );

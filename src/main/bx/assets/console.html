@@ -303,6 +303,31 @@
         </template>
       </section>
 
+      <!-- ORM -->
+      <section x-show="tab === 'orm'">
+        <h1 class="h1">ORM <small>Hibernate statistics of bx-orm, since each session factory started</small></h1>
+        <p class="sub">The SQL that bx-orm runs shows with the other queries, labelled ORM, in the bar, in each request and on the Queries page. These are the totals.</p>
+        <div class="msg plusnote" x-show="state && state.plus && !state.plus.ormStats" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> ORM statistics need a BoxLang+ license or trial. The ORM SQL itself is free.</div>
+        <template x-if="orml && state && state.plus.ormStats">
+          <div>
+            <p class="sub" x-show="!orml.installed">The bx-orm module is not installed.</p>
+            <p class="sub" x-show="orml.installed && !orml.factories.length">No ORM application has started yet. Load a page that uses an entity.</p>
+            <template x-for="f in orml.factories" :key="f.app + f.datasource">
+              <div class="card" style="margin-bottom:12px"><h3><span class="mono" x-text="f.app + ' / ' + f.datasource"></span><span x-text="'SQL capture: ' + f.mode"></span></h3>
+                <div class="tiles">
+                  <div class="card"><h3>Queries run</h3><div class="big" x-text="f.counts.queryExecutionCount"></div><div class="sub" x-text="'slowest ' + f.slowestMs + ' ms'"></div></div>
+                  <div class="card"><h3>Entities</h3><div class="big" x-text="f.counts.entityLoadCount"></div><div class="sub" x-text="'loaded, ' + f.counts.entityInsertCount + ' inserted, ' + f.counts.entityUpdateCount + ' updated, ' + f.counts.entityDeleteCount + ' deleted'"></div></div>
+                  <div class="card"><h3>Sessions</h3><div class="big" x-text="f.counts.sessionOpenCount"></div><div class="sub" x-text="f.counts.flushCount + ' flushes, ' + f.counts.transactionCount + ' transactions'"></div></div>
+                  <div class="card"><h3>Statements</h3><div class="big" x-text="f.counts.prepareStatementCount"></div><div class="sub" x-text="f.counts.connectCount + ' connections'"></div></div>
+                </div>
+                <dl class="kv" style="margin-top:10px"><dt>Second level cache</dt><dd x-text="f.counts.secondLevelCacheHitCount + ' hits, ' + f.counts.secondLevelCacheMissCount + ' misses, ' + f.counts.secondLevelCachePutCount + ' puts'"></dd><dt>Query cache</dt><dd x-text="f.counts.queryCacheHitCount + ' hits, ' + f.counts.queryCacheMissCount + ' misses, ' + f.counts.queryCachePutCount + ' puts'"></dd><dt>Collections</dt><dd x-text="f.counts.collectionLoadCount + ' loaded, ' + f.counts.collectionFetchCount + ' fetched'"></dd><dt x-show="f.slowestQuery">Slowest query</dt><dd class="mono" x-show="f.slowestQuery" x-text="f.slowestQuery"></dd><dt>Entities</dt><dd x-text="f.entities.join(', ')"></dd></dl>
+                <div class="scroll" x-show="f.queries.length" style="margin-top:10px"><table><thead><tr><th>HQL or criteria</th><th class="num">Runs</th><th class="num">Rows</th><th class="num">Avg ms</th><th class="num">Max ms</th><th class="num">Cache hits</th></tr></thead><tbody><template x-for="q in f.queries" :key="q.hql"><tr><td class="mono" style="word-break:break-all" x-text="q.hql"></td><td class="num" x-text="q.executionCount"></td><td class="num" x-text="q.executionRowCount"></td><td class="num" x-text="q.executionAvgTime"></td><td class="num" x-text="q.executionMaxTime"></td><td class="num" x-text="q.cacheHitCount"></td></tr></template></tbody></table></div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </section>
+
       <!-- Environment -->
       <section x-show="tab === 'environment'">
         <h1 class="h1">Environment <small>what this server is made of, secrets hidden</small></h1>

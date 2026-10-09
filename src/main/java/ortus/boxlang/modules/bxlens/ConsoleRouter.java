@@ -273,6 +273,11 @@ public final class ConsoleRouter {
 			logFiles( context, ex, route, s );
 		} else if ( route.equals( "modules" ) && method.equals( "GET" ) && panelOn( "modules" ) ) {
 			json( context, ex, 200, service.getEnvironment().modules() );
+		} else if ( route.equals( "orm" ) && method.equals( "GET" ) && panelOn( "orm" ) ) {
+			if ( plusOnly( context, ex, "ormStats", "ORM statistics" ) ) {
+				return;
+			}
+			json( context, ex, 200, service.getOrm().stats() );
 		} else if ( route.equals( "environment" ) && method.equals( "GET" ) && panelOn( "environment" ) ) {
 			json( context, ex, 200, service.getEnvironment().environment() );
 		} else if ( route.equals( "bundle" ) && method.equals( "GET" ) ) {
@@ -421,6 +426,7 @@ public final class ConsoleRouter {
 		    { "executors", "Executors", "lightning", "Runtime" },
 		    { "tasks", "Tasks", "clock-countdown", "Runtime" },
 		    { "datasources", "Datasources", "database", "Runtime" },
+		    { "orm", "ORM", "stack", "Runtime" },
 		    { "caches", "Caches", "package", "Runtime" },
 		    { "logfiles", "Logs", "file-text", "Runtime" },
 		    { "modules", "Modules", "plug", "Runtime" },

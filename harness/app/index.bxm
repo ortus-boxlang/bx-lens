@@ -17,6 +17,7 @@
 	<li><a href="/session.bxm">Session</a>: session scope snapshot.</li>
 	<li><a href="/transaction.bxm">Transaction</a>: a committed and a rolled back transaction.</li>
 	<li><a href="/query-error.bxm">Query error</a>: a statement that fails, so the Queries page counts a failure.</li>
+	<li><a href="/orm.bxm?save=1">ORM</a>: entities through bx-orm (start the harness with WITH_ORM=1). The SQL shows with an ORM label.</li>
 	<li><a href="/stall.bxm">Stall</a>: waits 3.4 seconds so the slow request sample shows where it was.</li>
 	<li><a href="/load.bxm">Executor load</a>: queues slow tasks on a small pool so its health report goes critical (see the console).</li>
 	<li><a href="/~bxlens/index.bxm">Console</a>: the standalone console. The harness password is lens-demo.</li>

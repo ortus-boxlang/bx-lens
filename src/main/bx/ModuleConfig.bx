@@ -180,6 +180,8 @@ class {
 				jvm          : { enabled : true },
 				cache        : { enabled : true },
 				modules      : { enabled : true },
+				// The SQL of bx-orm (Hibernate), shown like a normal query. Does nothing when bx-orm is not installed
+				orm          : { enabled : true, statistics : true },
 				// Time per built-in function, from postBIFInvocation. Every BIF call allocates an event while this is on, so it is off by default
 				bifs         : { enabled : false },
 				// Console pages. Turn one off and its page disappears

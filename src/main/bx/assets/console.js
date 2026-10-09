@@ -200,6 +200,8 @@
 				},
 				resetQueries: async function () { this.qs = await (await this.api("queries/reset", { method: "POST" })).json(); this.qpick = null; },
 				openRequest: function (id) { this.go("requests"); this.pick(id); },
+				orml: null,
+				loadOrm: async function () { var r = await this.api("orm"); this.orml = r.ok ? await r.json() : null; },
 				modl: null, modsel: "", modq: "",
 				loadModules: async function () { this.modl = await (await this.api("modules")).json(); if (!this.modsel && this.modl.modules.length) { this.modsel = this.modl.modules[0].name; } },
 				modRows: function () { var q = this.modq.toLowerCase(); return this.modl.modules.filter(function (m) { return !q || m.name.toLowerCase().indexOf(q) >= 0; }); },
@@ -299,6 +301,7 @@
 					if (this.tab === "queries") { this.loadQueries(); }
 					if (this.tab === "environment" && !this.envd) { this.loadEnv(); }
 					if (this.tab === "modules") { this.loadModules(); }
+					if (this.tab === "orm") { this.loadOrm(); this.ormTimer = setInterval(function () { if (self.tab === "orm" && !document.hidden) { self.loadOrm(); } }, 5000); } else { clearInterval(this.ormTimer); }
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
