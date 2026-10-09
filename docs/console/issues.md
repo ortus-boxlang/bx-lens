@@ -52,3 +52,5 @@ The note names the missing headers or the cookies. Add them in your web server o
 ## Unfinished requests
 
 A request that never ends (a hung or killed thread, a lost event) is finished by the watchdog after `request.maxMinutes`. It is kept as **unfinished** with the critical issue "Request never finished". Its open spans are marked interrupted.
+
+![An unfinished request in the console](../assets/screenshots/console-unfinished.png)

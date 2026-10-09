@@ -21,6 +21,8 @@ The Configuration page shows the settings BoxLang is running with, grouped by ar
 | Logging | loggers | admin only |
 | Modules | module settings and runtimes | admin only |
 
+![The Configuration page](../assets/screenshots/console-configuration.png)
+
 Each value has a **source**:
 
 | Source | Meaning |

@@ -19,6 +19,8 @@ export class Lens {
 
 	/** Open the panel on a tab. */
 	async open( name: string ) {
+		// The bar loads its markup after the page, so wait for it before pressing keys
+		await expect( this.bar ).toBeVisible();
 		if ( !( await this.panel.isVisible() ) ) {
 			await this.page.keyboard.press( 'Control+`' );
 			await expect( this.panel ).toBeVisible();
