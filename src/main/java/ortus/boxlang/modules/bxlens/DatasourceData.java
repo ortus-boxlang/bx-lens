@@ -253,6 +253,24 @@ public final class DatasourceData {
 		return m;
 	}
 
+	/**
+	 * Open a connection to a datasource for reading its metadata. The caller closes it.
+	 *
+	 * @return the connection, or null when there is no such datasource
+	 */
+	public Connection open( String id ) {
+		try {
+			for ( Map.Entry<Key, DataSource> e : BoxRuntime.getInstance().getDataSourceService().getAll().entrySet() ) {
+				if ( e.getKey().getName().equals( id ) ) {
+					return e.getValue().getConnection();
+				}
+			}
+		} catch ( RuntimeException e ) {
+			throw e;
+		}
+		return null;
+	}
+
 	private static double avg( double total, long count ) {
 		return count == 0 ? 0 : Math.round( total / count * 100.0 ) / 100.0;
 	}

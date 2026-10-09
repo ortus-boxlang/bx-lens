@@ -27,6 +27,7 @@
 			"console/issues.md",
 			"console/errors-and-reports.md",
 			"console/ask-lens-and-ai.md",
+			"console/ai.md",
 			"console/system-and-threads.md",
 			"console/bar-designer.md",
 			"console/settings.md"
@@ -52,7 +53,8 @@
 		"children": [
 			"guides/bifs.md",
 			"guides/extending.md",
-			"guides/production.md"
+			"guides/production.md",
+			"guides/ollama.md"
 		]
 	},
 	{
@@ -60,6 +62,7 @@
 		"children": [
 			"reference/events.md",
 			"reference/integrations.md",
+			"reference/ai-tools.md",
 			"reference/bar-files.md",
 			"design/api-spec.md"
 		]

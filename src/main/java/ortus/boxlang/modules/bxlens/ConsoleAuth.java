@@ -74,19 +74,22 @@ public final class ConsoleAuth {
 		volatile long	touched;
 	}
 
-	private static final long			WINDOW_MS		= 10 * 60_000L;
-	private static final long			ABSOLUTE_MAX_MS	= 12 * 3_600_000L;
-	private static final int			MAX_ATTEMPTS	= 5000;
-	private static final int			MAX_SESSIONS	= 200;
-	private static final SecureRandom	RANDOM			= new SecureRandom();
+	private static final long								WINDOW_MS		= 10 * 60_000L;
+	private static final long								ABSOLUTE_MAX_MS	= 12 * 3_600_000L;
+	private static final int								MAX_ATTEMPTS	= 5000;
+	private static final int								MAX_SESSIONS	= 200;
+	private static final SecureRandom						RANDOM			= new SecureRandom();
 
-	private final Map<String, Session>	sessions		= new ConcurrentHashMap<>();
-	private final Map<String, Attempts>	attempts		= new ConcurrentHashMap<>();
-	private final byte[]				passwordHash;
-	private final byte[]				viewerHash;
-	private final long					idleMs;
-	private final int					maxAttempts;
-	private final long					lockoutMs;
+	private final Map<String, Session>						sessions		= new ConcurrentHashMap<>();
+	private final Map<String, Attempts>						attempts		= new ConcurrentHashMap<>();
+	private final byte[]									passwordHash;
+	private final byte[]									viewerHash;
+	private final long										idleMs;
+	private final int										maxAttempts;
+	private final long										lockoutMs;
+	/** Told the id of every session that ends: logout, expiry, being pushed out. The ops agent forgets its conversation then. */
+	private volatile java.util.function.Consumer<String>	onEnd			= id -> {
+																			};
 
 	public ConsoleAuth( LensConfig config ) {
 		String pw = config.consolePassword();
@@ -218,6 +221,7 @@ public final class ConsoleAuth {
 		}
 		if ( now - s.lastSeen > idleMs || now - s.createdAt > ABSOLUTE_MAX_MS ) {
 			sessions.remove( sessionId );
+			ended( sessionId );
 			return null;
 		}
 		s.lastSeen = now;
@@ -239,9 +243,26 @@ public final class ConsoleAuth {
 		}
 		if ( now - s.lastSeen > idleMs || now - s.createdAt > ABSOLUTE_MAX_MS ) {
 			sessions.remove( sessionId );
+			ended( sessionId );
 			return null;
 		}
 		return s;
+	}
+
+	/**
+	 * Be told when a session ends, for any reason.
+	 */
+	public void onEnd( java.util.function.Consumer<String> listener ) {
+		this.onEnd = listener == null ? id -> {
+		} : listener;
+	}
+
+	private void ended( String id ) {
+		try {
+			onEnd.accept( id );
+		} catch ( Throwable t ) {
+			// A listener never breaks a login
+		}
 	}
 
 	public int attemptCount() {
@@ -249,12 +270,16 @@ public final class ConsoleAuth {
 	}
 
 	private void dropOldestSession() {
-		sessions.values().stream().min( java.util.Comparator.comparingLong( x -> x.lastSeen ) ).ifPresent( x -> sessions.remove( x.id ) );
+		sessions.values().stream().min( java.util.Comparator.comparingLong( x -> x.lastSeen ) ).ifPresent( x -> {
+			sessions.remove( x.id );
+			ended( x.id );
+		} );
 	}
 
 	public void logout( String sessionId ) {
 		if ( sessionId != null ) {
 			sessions.remove( sessionId );
+			ended( sessionId );
 		}
 	}
 
@@ -274,7 +299,13 @@ public final class ConsoleAuth {
 	}
 
 	private void prune( long now ) {
-		sessions.values().removeIf( s -> now - s.lastSeen > idleMs || now - s.createdAt > ABSOLUTE_MAX_MS );
+		sessions.values().removeIf( s -> {
+			boolean old = now - s.lastSeen > idleMs || now - s.createdAt > ABSOLUTE_MAX_MS;
+			if ( old ) {
+				ended( s.id );
+			}
+			return old;
+		} );
 		attempts.entrySet().removeIf( e -> e.getValue().lockedUntil < now && now - e.getValue().touched > WINDOW_MS );
 		while ( attempts.size() > MAX_ATTEMPTS ) {
 			attempts.entrySet().stream().min( java.util.Comparator.comparingLong( e -> e.getValue().touched ) )

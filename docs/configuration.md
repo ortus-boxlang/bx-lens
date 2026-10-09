@@ -50,7 +50,23 @@ Lens is off by default. There are two surfaces and you switch them on independen
 	"collect": { "level": "light" },
 	"tabs": { "hide": [] },
 	"store": { "enabled": true, "dir": "", "retentionHours": 72, "maxMB": 50, "flushSeconds": 30 },
-	"ai": { "enabled": false, "provider": "", "model": "", "apiKey": "", "links": true },
+	"ai": {
+		"enabled": false,
+		"provider": "ollama",
+		"model": "llama3.2",
+		"baseUrl": "http://localhost:11434",
+		"embeddingModel": "nomic-embed-text",
+		"temperature": "0.2",
+		"timeoutSeconds": 120,
+		"maxToolCalls": 8,
+		"memoryMessages": 20,
+		"maxConcurrentChats": 3,
+		"actions": true,
+		"rag": true,
+		"apiKey": "",
+		"apiKeyEnv": "",
+		"links": true
+	},
 	"server": { "name": "", "address": "", "id": "" },
 	"checks": { "securityHeaders": true, "slowSample": true },
 	"dev": { "reloadAssets": false, "license": "" },
@@ -262,14 +278,24 @@ The disk store keeps errors and reports across restarts. It needs BoxLang+ or a 
 
 ## `ai`
 
-Optional help from a language model. Off by default. See [Ask Lens and AI help](console/ask-lens-and-ai.md) and the [data flow](security.md#ai-data-flow).
+Optional help from a language model: the [ops assistant](console/ai.md), Explain with AI and Ask Lens. Off by default. See [Ask Lens and AI help](console/ask-lens-and-ai.md), [Set up Ollama](guides/ollama.md) and the [data flow](security.md#ai-data-flow). Everything but `apiKey` and `links` can be changed live from the AI page.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | boolean | `false` | Let the server send a redacted prompt to a model through the `bx-ai` module. The module ships inside Lens, and the server calls also need BoxLang+ or a trial. See [Licensing](licensing.md#free-and-boxlang). |
-| `provider` | string | `""` | The bx-ai provider, for example `ollama`. Empty uses the bx-ai default. |
-| `model` | string | `""` | The model name. Empty uses the provider default. |
-| `apiKey` | string | `""` | The API key. Accepts a `bxsecret:` value. Leave it empty to use the key from the bx-ai settings. |
+| `enabled` | boolean | `false` | Let the server send prompts and tool results to a model through the `bx-ai` module. The module ships inside Lens, and the server calls also need BoxLang+ or a trial. See [Licensing](licensing.md#free-and-boxlang). |
+| `provider` | string | `"ollama"` | `ollama`, `openai`, `claude`, `gemini`, `mistral`, `groq`, `grok`, `deepseek`, `openrouter`, `openai-compatible`, `cohere` or `docker`. |
+| `model` | string | `"llama3.2"` | The model name. Empty uses `llama3.2` for Ollama and the provider default otherwise. |
+| `baseUrl` | string | `"http://localhost:11434"` | The address of the model server. `http` or `https`, no user name or password in it. Empty uses the local Ollama address for Ollama and the provider default otherwise. |
+| `embeddingModel` | string | `"nomic-embed-text"` | The model that turns documentation sections into vectors for `searchDocs`. |
+| `temperature` | string | `"0.2"` | 0 to 2. |
+| `timeoutSeconds` | number | `120` | Seconds an answer may take (10 to 600). The time a person takes to approve an action is added. |
+| `maxToolCalls` | number | `8` | Tool calls allowed in one answer (1 to 20). |
+| `memoryMessages` | number | `20` | Messages one console session remembers (2 to 100). In memory only, gone at logout, timeout or reset. |
+| `maxConcurrentChats` | number | `3` | Chats that may run at once on this server (1 to 20). The next one gets 429. |
+| `actions` | boolean | `true` | Let the assistant propose actions. Each one still needs an Approve click. |
+| `rag` | boolean | `true` | Let the assistant search the bundled documentation. |
+| `apiKey` | string | `""` | The API key as a `bxsecret:` value. This is the one setting the console can never change. Leave it empty for a local model. |
+| `apiKeyEnv` | string | `""` | The **name** of an environment variable that holds the key. It wins over `apiKey`. The console refuses anything that is not a variable name. |
 | `links` | boolean | `true` | Show Copy prompt and the Ask ChatGPT and Ask Claude buttons. They send nothing from the server. |
 
 ## `editor`
@@ -367,7 +393,7 @@ Which settings are live is fixed in the code (`SettingsRegistry`). Nothing else 
 | `collectors.<id>.enabled` for every collector, `collectors.queries.includeParams`, `collectors.queries.captureCaller` | `access.*` |
 | `thresholds.*` | `bar.access`, `bar.allowAllIPs` |
 | `checks.*` | `history.maxRequests`, `history.header` |
-| `ui.*`, `limits.*`, `editor.*` | `store.*`, `ai.*` |
+| `ui.*`, `limits.*`, `editor.*`, `ai.*` (except `ai.apiKey` and `ai.links`) | `store.*`, `ai.apiKey`, `ai.links` |
 | | `redact.*`, `contentTypes`, `excludePaths`, `dev.*`, the `max` numbers of the collectors |
 
 The locked settings that the page lists show their value and the label `boxlang.json only`. A password or API key shows only `set` or `not set`. A key that is not on the live list is refused by the server with an error. If `console.readOnly` is true, or the caller is a viewer, nothing can be changed. A value that is not valid, for example a number out of range, is refused and nothing is saved. An entry that is not valid in the saved file is ignored at the next start and a warning is logged.
@@ -383,6 +409,7 @@ Earlier builds had one top-level switch and one access rule for the bar. They ma
 | `access.allowPrivateNetworks: true` | add the word `private` to `bar.access` |
 | `access.allowedIPs: ["*"]` | `bar.access: "all"` plus `bar.allowAllIPs: true` |
 | `access.allowedHosts`, `access.requireHeader` | unchanged, now also apply to the console |
+| `ai.provider: ""` (use the bx-ai default) | the default is now `"ollama"` with `ai.model: "llama3.2"` at `ai.baseUrl: "http://localhost:11434"`. Set `provider` and `model` to keep another provider |
 | `collectors.orm.statistics` | removed. Lens no longer forces Hibernate statistics on. Set `generateStatistics` in the ORM application's `ormSettings`, or press Turn statistics on on the console ORM page |
 
 `checks.*` and `dev.*` were read with defaults but not declared in the schema. They are declared now, with the same names and defaults, so no change is needed. `console.allowHeapDump` is the one key that is still read without being declared.

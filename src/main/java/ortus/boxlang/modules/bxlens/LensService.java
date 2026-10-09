@@ -118,6 +118,7 @@ public final class LensService {
 	private final ErrorStore										errors				= new ErrorStore();
 	private final Reports											reports				= new Reports();
 	private final AiService											ai					= new AiService( this );
+	private final ortus.boxlang.modules.bxlens.ops.AgentService		agents				= new ortus.boxlang.modules.bxlens.ops.AgentService( this );
 	private final ortus.boxlang.modules.bxlens.util.ServerIdentity	identity			= new ortus.boxlang.modules.bxlens.util.ServerIdentity();
 	private volatile java.nio.file.Path								storeDir;
 	private volatile long											lastFlush;
@@ -160,7 +161,7 @@ public final class LensService {
 		allBuiltIns.addAll( builtIns() );
 		List<String> ids = new ArrayList<>(
 		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "errors", "reports", "ask", "orm",
-		        "system", "threads", "modules", "configuration" ) );
+		        "system", "threads", "modules", "configuration", "ai" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
 				ids.add( c.id() );
@@ -187,8 +188,9 @@ public final class LensService {
 		this.barGuard		= new AccessGuard( this.config, "bar.access", this.config.getBool( "bar.allowAllIPs", false ) );
 		this.consoleGuard	= new AccessGuard( this.config, "console.access", true );
 		this.auth			= new ConsoleAuth( this.config );
-		this.outcomes		= new TaskOutcomes();
-		this.licensing		= new Licensing( this.config.getString( "dev.license", "" ) );
+		this.auth.onEnd( this.agents::drop );
+		this.outcomes	= new TaskOutcomes();
+		this.licensing	= new Licensing( this.config.getString( "dev.license", "" ) );
 		Path layoutFile = null;
 		try {
 			layoutFile = runtime.getRuntimeHome().resolve( "config" ).resolve( "bxlens-layout.json" );
@@ -265,6 +267,7 @@ public final class LensService {
 		ormTotals.reset();
 		try {
 			ai.shutdown();
+			agents.shutdown();
 		} catch ( Throwable t ) {
 			// Nothing to stop
 		}
@@ -353,6 +356,16 @@ public final class LensService {
 	/** Replace how installed modules are found (tests). */
 	public void setIntegrations( Integrations integrations ) {
 		this.integrations = integrations;
+	}
+
+	/** Replace the license (tests). */
+	public void setLicensing( Licensing licensing ) {
+		this.licensing = licensing;
+	}
+
+	/** Replace the settings (tests). Call {@link #setConfig} with {@code LensConfig.defaults()} to put them back. */
+	public void setConfig( LensConfig config ) {
+		this.config = config;
 	}
 
 	public OrmTotals getOrmTotals() {
@@ -922,6 +935,8 @@ public final class LensService {
 		ui.put( "hiddenTabs", config.hiddenTabs );
 		ui.put( "plus", licensing.features() );
 		ui.put( "consoleUrl", consoleUrl );
+		// The Ask link of the bar opens the console with the assistant, so it needs a console the caller can reach and an assistant that works
+		ui.put( "agent", !consoleUrl.isEmpty() && ai.canCall() );
 		ui.put( "slowQueryMs", config.slowQueryMs );
 		ui.put( "slowRequestMs", config.slowRequestMs );
 		Map<String, Object> page = new LinkedHashMap<>();
@@ -1045,6 +1060,13 @@ public final class LensService {
 
 	public AiService getAi() {
 		return ai;
+	}
+
+	/**
+	 * The ops agent: conversations, approvals, the documentation index.
+	 */
+	public ortus.boxlang.modules.bxlens.ops.AgentService getAgents() {
+		return agents;
 	}
 
 	public ErrorStore getErrors() {

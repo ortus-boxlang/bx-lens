@@ -49,13 +49,21 @@
 				icon: icon,
 
 				init: async function () {
+					// Alpine calls init() by itself and x-init calls it again: set everything up once
+					if (this.started) { return; }
+					this.started = true;
 					var self = this;
 					await this.load();
 					var h = location.hash.replace("#", ""), deep = h.split("/");
 					h = deep[0];
 					if (this.state.tabs.some(function (t) { return t.id === h; })) { this.tab = h; }
 					if (h === "requests" && deep[1]) { this.pick(decodeURIComponent(deep[1])); }
-					window.addEventListener("hashchange", function () { var t = location.hash.replace("#", ""); if (t) { self.tab = t; self.onTab(); } });
+					if (h === "agent") { this.openAgentWhenReady(); }
+					window.addEventListener("hashchange", function () { var t = location.hash.replace("#", ""); if (t === "agent") { self.openAgent(); } else if (t) { self.tab = t; self.onTab(); } });
+					document.addEventListener("keydown", function (e) {
+						if (e.altKey && (e.key === "k" || e.key === "K")) { e.preventDefault(); self.toggleAgent(); }
+						else if (e.key === "Escape" && self.agent.open && self.tab !== "ask") { self.closeAgent(); }
+					});
 					setInterval(function () { self.now = Date.now(); }, 1000);
 					this.timer = setInterval(function () { if (self.live && !self.streamOk && !document.hidden) { self.refresh(); } }, 3000);
 					this.$watch("live", function (v) { if (v) { self.connect(); } else { self.disconnect(); } });
@@ -125,6 +133,7 @@
 					await this.refresh();
 					this.settings = await (await this.api("settings")).json();
 					this.loadAi();
+					this.loadAgent();
 					if (this.has("executors")) { this.setExecutors(await (await this.api("executors")).json()); }
 					if (this.has("tasks")) { this.tasks = await (await this.api("tasks")).json(); var a = this.allTasks(); if (a.length) { this.ksel = a[0].scheduler + "/" + a[0].name; } }
 					if (this.has("system")) { this.setSystem(await (await this.api("system")).json()); }
@@ -173,6 +182,164 @@
 						var r = await this.api("ai/ask", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ question: this.askQ }).toString() });
 						var j = await r.json(); if (r.ok) { this.aiOut.text = j.answer; } else { this.aiOut.error = j.error || "The AI call failed"; }
 					} finally { this.aiBusy = false; }
+				},
+				openAgentWhenReady: function () { var self = this; this.loadAgent().then(function () { self.openAgent(); }); },
+				// ---- the ops agent: a floating drawer on every page, and the full page of Ask Lens ----
+				agent: { st: null, open: false, msgs: [], busy: false, input: "", ctl: null },
+				agentExamples: ["Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "How many requests did we serve and what is the error rate?", "What is slow right now?"],
+				agentOn: function () { return !!(this.agent.st && this.agent.st.available); },
+				loadAgent: async function () { try { this.agent.st = await (await this.api("agent/status")).json(); } catch (e) { this.agent.st = null; } },
+				openAgent: function () {
+					if (!this.agentOn()) { return; }
+					this.agent.open = true; this.placeAgent();
+					var self = this; this.$nextTick(function () { var i = document.getElementById("agent-input"); if (i) { i.focus(); } self.scrollAgent(); });
+				},
+				closeAgent: function () { this.agent.open = false; },
+				toggleAgent: function () { if (!this.agent.st) { this.openAgentWhenReady(); return; } if (this.agent.open && this.tab !== "ask") { this.closeAgent(); } else { this.openAgent(); } },
+				// One chat element. On the Ask Lens page it sits in the page, everywhere else in the floating drawer
+				placeAgent: function () {
+					var el = document.getElementById("agent"), host = document.getElementById(this.tab === "ask" ? "agent-page" : "agent-float");
+					if (el && host && el.parentNode !== host) { host.appendChild(el); }
+				},
+				agentShown: function () { return this.agentOn() && (this.tab === "ask" || this.agent.open); },
+				scrollAgent: function () { var l = document.getElementById("agent-list"); if (l) { l.scrollTop = l.scrollHeight; } },
+				agentKey: function (e) {
+					if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); this.sendAgent(); }
+				},
+				agentLeft: function (p) { return Math.max(0, Math.round((p.expiresAt - this.now) / 1000)); },
+				sendAgent: async function (text) {
+					var q = (text !== undefined ? text : this.agent.input).trim();
+					if (!q || this.agent.busy) { return; }
+					this.agent.input = ""; this.agent.busy = true;
+					var self = this, m = { role: "assistant", parts: [], done: false };
+					this.agent.msgs.push({ role: "user", text: q });
+					this.agent.msgs.push(m);
+					// Work on the reactive copy: changes to the raw object would not reach the page
+					m = this.agent.msgs[this.agent.msgs.length - 1];
+					this.agent.ctl = new AbortController();
+					var last = function (type) { var p = m.parts[m.parts.length - 1]; return p && p.type === type ? p : null; };
+					try {
+						var r = await fetch(base() + "/api/agent/chat", { method: "POST", credentials: "same-origin", signal: this.agent.ctl.signal,
+							headers: { "X-Lens-CSRF": body().csrf, "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ message: q }).toString() });
+						if (r.status === 401) { location.reload(); return; }
+						if (!r.ok) { var j = await r.json().catch(function () { return {}; }); m.parts.push({ type: "error", text: j.error || "The assistant is not available." }); return; }
+						var reader = r.body.getReader(), dec = new TextDecoder(), buf = "";
+						for (;;) {
+							var chunk = await reader.read();
+							if (chunk.done) { break; }
+							buf += dec.decode(chunk.value, { stream: true });
+							var cut;
+							while ((cut = buf.indexOf("\n\n")) >= 0) {
+								var block = buf.slice(0, cut); buf = buf.slice(cut + 2);
+								var ev = "", data = "";
+								block.split("\n").forEach(function (line) { if (line.indexOf("event:") === 0) { ev = line.slice(6).trim(); } else if (line.indexOf("data:") === 0) { data += line.slice(5).trim(); } });
+								if (!ev || !data) { continue; }
+								var d; try { d = JSON.parse(data); } catch (e) { continue; }
+								if (ev === "token") { var t = last("text"); if (t) { t.text += d.text; } else { m.parts.push({ type: "text", text: d.text }); } }
+								else if (ev === "tool_call") { m.parts.push({ type: "tool", name: d.name, args: d.args, readOnly: d.readOnly, ok: null, summary: "", open: false }); }
+								else if (ev === "tool_result") { for (var i = m.parts.length - 1; i >= 0; i--) { var p = m.parts[i]; if (p.type === "tool" && p.name === d.name && p.ok === null) { p.ok = d.ok; p.summary = d.summary; break; } } }
+								else if (ev === "approval_request") { m.parts.push({ type: "approval", id: d.id, tool: d.tool, args: d.args, summary: d.summary, expiresAt: d.expiresAt, state: "pending", error: "" }); }
+								else if (ev === "error") { m.parts.push({ type: "error", text: d.message }); }
+								else if (ev === "done") { m.done = true; }
+								this.$nextTick(function () { self.scrollAgent(); });
+							}
+						}
+					} catch (e) {
+						if (e.name !== "AbortError") { m.parts.push({ type: "error", text: "The connection to the server was lost." }); }
+					} finally {
+						m.done = true; this.agent.busy = false; this.agent.ctl = null;
+						// A card nobody answered is no longer waiting
+						m.parts.forEach(function (p) { if (p.type === "approval" && p.state === "pending") { p.state = "closed"; } });
+						this.$nextTick(function () { self.scrollAgent(); });
+						this.loadAgent();
+					}
+				},
+				decideAgent: async function (p, approve) {
+					if (p.state !== "pending") { return; }
+					p.state = "sending";
+					var r = await this.api("agent/approve", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ id: p.id, approve: approve ? "true" : "false" }).toString() });
+					var j = await r.json().catch(function () { return {}; });
+					if (r.ok) { p.state = approve ? "approved" : "denied"; } else { p.state = r.status === 410 ? "expired" : "closed"; p.error = j.error || ""; }
+				},
+				stopAgent: function () { if (this.agent.ctl) { this.agent.ctl.abort(); } },
+				resetAgent: async function () {
+					this.stopAgent();
+					try { await this.api("agent/reset", { method: "POST" }); } catch (e) { /* the page keeps what it has */ }
+					this.agent.msgs = []; this.agent.busy = false; this.toast("Conversation cleared");
+				},
+				agentRag: function () { var s = this.agent.st; return s && s.rag ? (s.rag.mode === "embeddings" ? "docs: embeddings" : s.rag.mode === "keywords" ? "docs: keywords" : s.rag.mode === "off" ? "docs: off" : "docs: on first use") : ""; },
+				toolLabel: function (p) {
+					var a = p.args || {}, keys = Object.keys(a);
+					return keys.length ? keys.map(function (k) { return k + "=" + a[k]; }).join(", ") : "no arguments";
+				},
+				// A small safe Markdown: code blocks, lists, bold, inline code. It builds DOM nodes with textContent, never HTML
+				mdTo: function (el, text) {
+					while (el.firstChild) { el.removeChild(el.firstChild); }
+					var inline = function (parent, s) {
+						var i = 0, buf = "";
+						var flush = function () { if (buf) { parent.appendChild(document.createTextNode(buf)); buf = ""; } };
+						while (i < s.length) {
+							if (s.startsWith("**", i) && s.indexOf("**", i + 2) > i + 2) { flush(); var b = document.createElement("strong"); b.textContent = s.slice(i + 2, s.indexOf("**", i + 2)); parent.appendChild(b); i = s.indexOf("**", i + 2) + 2; }
+							else if (s[i] === "`" && s.indexOf("`", i + 1) > i + 1) { flush(); var c = document.createElement("code"); c.textContent = s.slice(i + 1, s.indexOf("`", i + 1)); parent.appendChild(c); i = s.indexOf("`", i + 1) + 1; }
+							else { buf += s[i]; i++; }
+						}
+						flush();
+					};
+					var bulletOf = function (t) {
+						if ((t[0] === "-" || t[0] === "*") && t[1] === " ") { return { ordered: false, text: t.slice(2).trim() }; }
+						var n = 0; while (n < t.length && t[n] >= "0" && t[n] <= "9") { n++; }
+						return n > 0 && (t[n] === "." || t[n] === ")") && t[n + 1] === " " ? { ordered: true, text: t.slice(n + 2).trim() } : null;
+					};
+					var headOf = function (t) { var n = 0; while (t[n] === "#") { n++; } return n > 0 && n <= 6 && t[n] === " " ? t.slice(n + 1) : null; };
+					var lines = String(text || "").split("\n"), i = 0, list = null, para = null;
+					var endPara = function () { para = null; };
+					var endList = function () { list = null; };
+					while (i < lines.length) {
+						var line = lines[i];
+						if (line.trim().indexOf("```") === 0) {
+							endPara(); endList();
+							var code = []; i++;
+							while (i < lines.length && lines[i].trim().indexOf("```") !== 0) { code.push(lines[i]); i++; }
+							var pre = document.createElement("pre"), cd = document.createElement("code"); cd.textContent = code.join("\n"); pre.appendChild(cd); el.appendChild(pre); i++; continue;
+						}
+						var t = line.trim(), bullet = bulletOf(t);
+						if (bullet) {
+							endPara();
+							if (!list || list.ordered !== bullet.ordered) { list = { ordered: bullet.ordered, node: document.createElement(bullet.ordered ? "ol" : "ul") }; el.appendChild(list.node); }
+							var li = document.createElement("li"); inline(li, bullet.text); list.node.appendChild(li);
+						} else if (!t) { endPara(); endList(); }
+						else {
+							endList();
+							var h = headOf(t);
+							if (h !== null) { endPara(); var hd = document.createElement("strong"); hd.className = "md-h"; inline(hd, h); el.appendChild(hd); }
+							else { if (!para) { para = document.createElement("p"); el.appendChild(para); } else { para.appendChild(document.createElement("br")); } inline(para, t); }
+						}
+						i++;
+					}
+				},
+				// ---- the AI page ----
+				aic: null, aiForm: {}, aiSaving: false, aiTesting: false, aiTestOut: null, aiError: "",
+				loadAiConfig: async function () {
+					try { this.aic = await (await this.api("ai/config")).json(); this.aiForm = Object.assign({}, this.aic.values); } catch (e) { this.aic = null; }
+				},
+				aiDirty: function () { var self = this; return this.aic ? Object.keys(this.aiForm).filter(function (k) { return String(self.aiForm[k]) !== String(self.aic.values[k]); }) : []; },
+				saveAiConfig: async function () {
+					var self = this, changes = {};
+					this.aiDirty().forEach(function (k) { changes[k] = self.aiForm[k]; });
+					this.aiSaving = true; this.aiError = "";
+					try {
+						var r = await this.api("ai/config", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ changes: JSON.stringify(changes) }).toString() });
+						var j = await r.json();
+						if (r.ok) { this.aic = j; this.aiForm = Object.assign({}, j.values); this.toast("AI settings applied"); await this.loadAgent(); } else { this.aiError = j.error || "Could not save"; }
+					} finally { this.aiSaving = false; }
+				},
+				testAi: async function () {
+					this.aiTesting = true; this.aiTestOut = null;
+					try {
+						var r = await this.api("ai/test", { method: "POST" });
+						var j = await r.json(); this.aiTestOut = r.ok ? j : { ok: false, message: j.error || "The test failed" };
+						await this.loadAiConfig();
+					} finally { this.aiTesting = false; }
 				},
 				errl: null, esel: "", egroup: null, esample: 0, rep: null, repTimer: null,
 				ago: function (t) { var sec = Math.max(0, Math.round((Date.now() - t) / 1000)); return sec < 5 ? "just now" : this.dur(sec) + " ago"; },
@@ -332,6 +499,9 @@
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
+					if (this.tab === "ai") { this.loadAiConfig(); }
+					if (this.tab === "ask") { this.loadAgent(); }
+					this.$nextTick(function () { self.placeAgent(); });
 					if (this.tab === "threads") {
 						this.loadThreads();
 						this.threadTimer = setInterval(function () { if (self.live && self.tab === "threads" && !document.hidden) { self.loadThreads(); } }, 5000);

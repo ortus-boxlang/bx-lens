@@ -27,13 +27,20 @@ export default defineConfig( {
 	projects: [ { name: 'chromium', use: { ...devices[ 'Desktop Chrome' ], viewport: { width: 1280, height: 760 } } } ],
 	// Starts the demo harness: MiniServer, the freshly built module and a Derby in-memory database
 	webServer: [
+		// A stand-in for a local Ollama (harness/mock-ai.py): deterministic tool calls and embeddings, so the AI specs need no model
+		{
+			command: 'python3 ../harness/mock-ai.py',
+			url: 'http://127.0.0.1:11434/api/tags',
+			timeout: 30_000,
+			reuseExistingServer: !process.env.CI,
+		},
 		{
 			command: 'bash ../harness/start.sh',
 			url: `http://127.0.0.1:${ PORT }/index.bxm`,
 			timeout: 240_000,
 			reuseExistingServer: !process.env.CI,
 			stdout: 'pipe',
-			env: { PORT, SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: process.env.LENS_LICENSE ?? 'plus' },
+			env: { PORT, SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: process.env.LENS_LICENSE ?? 'plus', LENS_TEST_API_KEY: 'sk-live-0123456789supersecret' },
 		},
 		// A second server without a license, to prove what stays free and what is locked
 		{

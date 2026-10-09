@@ -71,7 +71,7 @@ The **bar** is a snapshot of one request. The **console** holds everything that 
 
 Every tracked request has an id (`X-BxLens-Id`, `lensRequestId()`). The ORM is an opt in [integration](docs/reference/integrations.md): with bx-orm 1.7.2 or later installed and `collectors.orm.enabled` on, its SQL shows with the other queries, labelled ORM, and **BoxLang+** adds the console ORM page. Issues, History, Modules, Cache detail and the JVM detail are in the console, not on the bar.
 
-The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, ORM, Caches, Logs, Modules, Environment, Configuration, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
+The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, ORM, Caches, Logs, Modules, Environment, Configuration, System, Threads, Bar designer, AI and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
 
 ## What the console adds
 

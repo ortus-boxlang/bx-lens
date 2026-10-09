@@ -77,15 +77,34 @@ class {
 				flushSeconds   : 30
 			},
 
-			// Optional help from a language model through the bx-ai module. Off by default: when on, a redacted prompt leaves this server.
-			// Use a local provider to keep it inside your network. apiKey takes a bxsecret: value. Leave provider and apiKey empty to use the bx-ai settings
+			// Optional help from a language model through the bx-ai module (it ships inside Lens). Off by default: when on, redacted prompts and
+			// tool results leave this server for the provider. The default is a model on this machine (Ollama), which keeps everything inside your
+			// network: ollama pull llama3.2 and ollama pull nomic-embed-text. The ops agent, Explain with AI and Ask Lens are BoxLang+ features.
+			// apiKey takes a bxsecret: value. apiKeyEnv names an environment variable that holds the key. A key is never typed into the console
 			ai : {
-				enabled  : false,
-				provider : "",
-				model    : "",
-				apiKey   : "",
+				enabled           : false,
+				// ollama (default), openai, claude, gemini, mistral, groq, grok, deepseek, openrouter, openai-compatible, cohere or docker
+				provider          : "ollama",
+				model             : "llama3.2",
+				baseUrl           : "http://localhost:11434",
+				embeddingModel    : "nomic-embed-text",
+				temperature       : "0.2",
+				// Seconds an answer may take. The time a person takes to approve an action does not count
+				timeoutSeconds    : 120,
+				// Tool calls allowed in one answer
+				maxToolCalls      : 8,
+				// Messages the conversation of one console session remembers. The memory is in the JVM and gone at logout or timeout
+				memoryMessages    : 20,
+				// Chats that may run at once on this server
+				maxConcurrentChats : 3,
+				// Let the agent propose actions (run GC, tasks, caches, integrations, settings). Each one needs an Approve click
+				actions           : true,
+				// Let the agent search the Lens documentation (embeddings when the model is there, keywords if not)
+				rag               : true,
+				apiKey            : "",
+				apiKeyEnv         : "",
 				// Show "copy prompt" and the open-in-chat links on errors, deadlocks and queries. These send nothing from the server
-				links    : true
+				links             : true
 			},
 
 			// Which server this is. Every request, error, report, statistic and audit line carries it, so the data of many servers can be told
@@ -223,6 +242,7 @@ class {
 				errors       : { enabled : true },
 				reports      : { enabled : true },
 				ask          : { enabled : true },
+				ai           : { enabled : true },
 				system       : { enabled : true },
 				threads      : { enabled : true }
 			}
@@ -244,6 +264,7 @@ class {
 	 * Activate: parse the settings, register the collectors.
 	 */
 	function onLoad() {
+		LensService.getInstance().getAgents().invocationPath( moduleRecord.invocationPath );
 		LensService.getInstance().activate(
 			boxRuntime,
 			settings,

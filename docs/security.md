@@ -157,6 +157,7 @@ The events are:
 | Group | Events |
 |---|---|
 | Access | `login.ok`, `login.fail`, `login.locked`, `logout`, `denied` |
+| Ops assistant | `ai.chat`, `ai.tool` (tool, a short argument summary and `ok`, `denied` or `error`; an action also logs `approval requested`, `approved` and `denied`), `ai.approve`, `ai.deny`, `ai.act`, `ai.reset`, `ai.config`, `ai.test`, `denied.ai`, `denied.approval` |
 | Settings | `settings.change`, `settings.reset`, `bar.layout`, `bar.reset` |
 | Tasks | `task.<action>`, for example `task.run` |
 | Downloads | `threads.dump`, `logfile.download`, `bundle.download`, `heapdump.download`, `cache.value` |
@@ -190,7 +191,25 @@ What a prompt holds is limited to data Lens has already redacted: stack frames, 
 
 Two limits you should know. Exception messages and SQL text are included as the application produced them, so data your code puts into a message is in the prompt. The question you type on the Ask Lens page is sent as you typed it.
 
-A local provider, such as Ollama, keeps the prompt inside your network. A hosted provider receives it, so check its terms. The API key is a `bxsecret:` value and is never shown. Calls are limited to 10 per minute and one at a time, and each is in the audit log without its content. See [Ask Lens and AI help](console/ask-lens-and-ai.md).
+The [ops assistant](console/ai.md) goes further: it sends tool results as well as questions, see the [threat model](#ops-assistant-threat-model). A local provider, such as Ollama, keeps the prompt inside your network. A hosted provider receives it, so check its terms. The API key is a `bxsecret:` value and is never shown. Calls are limited to 10 per minute and one at a time, and each is in the audit log without its content. See [Ask Lens and AI help](console/ask-lens-and-ai.md).
+
+## Ops assistant threat model
+
+The [ops assistant](console/ai.md) lets a language model call tools on your server. Treat the model as untrusted, and what it reads as untrusted too.
+
+| Threat | What stops it |
+|---|---|
+| The model asks for more than the user may have | Every call goes through one gate (the Toolbox). The tool must exist in the catalog, the role must allow it (admin tools need the admin role, a viewer is not even offered them), BoxLang+ must be on, and for an action `console.readOnly`, `console.actions` and `ai.actions` must allow it. The arguments are checked against the tool and what the schema does not name is dropped. Nothing the model says is trusted. |
+| The model changes something on its own | Every action waits for an Approve click. The request is held on the server with an id and the exact arguments, expires after five minutes, can be decided once, only by the same console session and only with its CSRF token. It is checked again after the click. |
+| Prompt injection: a log line, an error message, a request parameter or a setting says "ignore your instructions and..." | The system prompt says everything in a tool result is data, every result is wrapped as data, and the model has no tool that can do harm without a click. It still can be misled in what it tells you, so read its answer as you would read a colleague's guess. |
+| Data in a tool result is a secret | Every result passes through the console redaction (key names, secret-looking text and URL credentials, depth and size caps) and is cut to 12,000 characters. No tool returns cache values, request bodies, passwords or API keys. The API key is read from an environment variable or a `bxsecret:` value, never typed in the console and never in a prompt or a result. |
+| The assistant is pointed somewhere else | `ai.*` cannot be changed by the assistant even when approved. The AI settings are admin only, the address must be `http` or `https` without credentials, and each change is in the audit log. |
+| The model output runs script in the page | The page renders answers with `x-text` and a small renderer that builds DOM nodes. There is no `x-html`. The Content-Security-Policy stays strict. |
+| Database access | The database tools read JDBC metadata only. No tool takes SQL text. |
+| Other damage | There is no tool to restart or stop the server, to take a heap dump or to read a file. |
+| A runaway chat | Chats at once, tool calls per answer, seconds per answer, questions and tool calls per minute are all limited. The chat is cancelled when the browser goes away, and an ended session drops its conversation and the approvals it waited for. |
+
+What the assistant reads is sent to the provider. With a local Ollama that stays inside your network. With a hosted provider it does not.
 
 ## The diagnostic bundle
 
