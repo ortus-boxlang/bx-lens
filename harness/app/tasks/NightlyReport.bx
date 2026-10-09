@@ -1,0 +1,10 @@
+/**
+ * Harness task: builds a report. Scheduled for 02:00 so it has never run until someone clicks Run now.
+ */
+class {
+
+	function run() {
+		return { rows : 1250, file : "nightly-report.csv" };
+	}
+
+}

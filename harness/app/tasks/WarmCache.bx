@@ -1,0 +1,11 @@
+/**
+ * Harness task: takes a moment and returns a struct.
+ */
+class {
+
+	function run() {
+		sleep( 400 );
+		return { keys : 812, region : "default" };
+	}
+
+}

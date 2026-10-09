@@ -1,0 +1,10 @@
+/**
+ * Harness task: exports orders on weekdays at 18:00.
+ */
+class {
+
+	function run() {
+		return "export-orders.csv written";
+	}
+
+}

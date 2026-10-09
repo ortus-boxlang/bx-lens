@@ -1,0 +1,80 @@
+[
+	"index.md",
+	{
+		"title": "Start Here",
+		"children": [
+			"getting-started.md",
+			"configuration.md",
+			"ui.md",
+			"security.md",
+			"licensing.md"
+		]
+	},
+	{
+		"title": "Console",
+		"children": [
+			"console/index.md",
+			"console/executors.md",
+			"console/tasks.md",
+			"console/datasources.md",
+			"console/caches.md",
+			"console/logs.md",
+			"console/environment.md",
+			"console/configuration.md",
+			"console/modules.md",
+			"console/in-flight-and-queries.md",
+			"console/issues.md",
+			"console/errors-and-reports.md",
+			"console/ask-lens-and-ai.md",
+			"console/system-and-threads.md",
+			"console/bar-designer.md",
+			"console/settings.md"
+		]
+	},
+	{
+		"title": "Panels",
+		"children": [
+			"panels/index.md",
+			"panels/timeline.md",
+			"panels/queries.md",
+			"panels/exceptions.md",
+			"panels/http.md",
+			"panels/messages-and-timers.md",
+			"panels/request-and-scopes.md",
+			"panels/bifs.md",
+			"panels/runtime.md",
+			"panels/orm.md"
+		]
+	},
+	{
+		"title": "Guides",
+		"children": [
+			"guides/bifs.md",
+			"guides/extending.md",
+			"guides/production.md"
+		]
+	},
+	{
+		"title": "Reference",
+		"children": [
+			"reference/events.md",
+			"design/api-spec.md"
+		]
+	},
+	{
+		"title": "Help",
+		"children": [
+			"troubleshooting.md",
+			"faq.md"
+		]
+	},
+	{
+		"title": "Project",
+		"children": [
+			"project/roadmap.md",
+			"project/contributing.md",
+			"project/demo-script.md",
+			"project/changelog.md"
+		]
+	}
+]

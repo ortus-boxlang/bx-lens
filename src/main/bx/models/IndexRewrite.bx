@@ -1,0 +1,20 @@
+/**
+ * [BoxLang]
+ *
+ * Copyright [2026] [Ortus Solutions, Corp]
+ */
+/**
+ * Lets /~bxlens/ (a trailing slash, no file name) open the console. Core has no default document for module mappings, so this rewrites exactly
+ * /~bxlens and /~bxlens/ to /~bxlens/index.bxm before the template lookup. Nothing else in the public folder becomes reachable.
+ * On MiniServer the pass predicate must also let the path through, see docs/guides/production.md.
+ */
+class {
+
+	function onWebExecutorRequest( data ) {
+		var uri = data.requestString;
+		if ( uri == "/~bxlens" || uri == "/~bxlens/" ) {
+			data.updatedRequest.requestString = "/~bxlens/index.bxm";
+		}
+	}
+
+}

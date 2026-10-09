@@ -11,3 +11,9 @@ updates:
     directory: "/"                  # Adjust if build.gradle is in a subfolder
     schedule:
       interval: "monthly"
+
+  # Playwright and its test tooling
+  - package-ecosystem: "npm"
+    directory: "/e2e"
+    schedule:
+      interval: "monthly"

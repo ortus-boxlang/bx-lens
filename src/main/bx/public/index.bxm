@@ -1,0 +1,4 @@
+<bx:script>
+	// The BX Lens console. Everything is handled in Java, see ConsoleRouter. Nothing else belongs in this file.
+	lensConsole();
+</bx:script>

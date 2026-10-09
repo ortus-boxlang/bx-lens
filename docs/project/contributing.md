@@ -1,0 +1,128 @@
+---
+title: Development
+order: 2
+description: Build, run the harness, test and contribute to BX Lens.
+icon: lucide:git-pull-request
+---
+
+# Development
+
+Read `CONTRIBUTING.md` in the repository first. BX Lens lives in a private Ortus repository (`ortus-solutions-private/bx-lens`), so access is limited to Ortus staff and partners. Bugs and requests go in the [BLMODULES Jira project](https://ortussolutions.atlassian.net/browse/BLMODULES). Support questions go through [Ortus Solutions support](https://www.ortussolutions.com/services/support).
+
+Requirements: Java 21 and BoxLang 1.19 or newer. The module is built against 1.19.0-snapshot.
+
+## Build and test
+
+Use the Gradle wrapper from the repository root.
+
+```bash
+./gradlew shadowJar test   # build the module and run the unit tests
+./gradlew spotlessCheck    # check formatting
+./gradlew spotlessApply    # fix formatting
+```
+
+Java code follows the Ortus Java formatter. Run `spotlessApply` before you commit.
+
+## The harness
+
+The `harness/` folder holds a demo shop on MiniServer with a Derby in-memory database. It produces every kind of data Lens can show, and it has the bar and the console both on.
+
+```bash
+harness/start.sh
+```
+
+It builds the module, downloads the runtime jars into `harness/.cache`, assembles a BoxLang home in `harness/.run` and serves the app on port 8085.
+
+- The bar is on for loopback.
+- The console is at `http://localhost:8085/~bxlens/index.bxm` and the password is `lens-demo`.
+- `harness/home/config/boxlang.json` holds the Lens settings. It sets the slow query limit to 15 ms and the slow request limit to 3000 ms, turns on the `functions` and `logs` collectors, captures the session and request scopes, and adds a two-thread `demo-pool` executor.
+- `harness/home/config/tasks.json` defines five scheduled tasks in two schedulers (`bxschedule` and `reports`). One of them is paused, and `sync-prices` fails on purpose, so the Tasks page has something to show.
+
+| Variable | Effect |
+|---|---|
+| `PORT` | Port to listen on. Default `8085`. |
+| `SKIP_BUILD=1` | Reuse `build/modules/bx-lens` instead of rebuilding. |
+| `DEV=1` | Serve the UI files from `src/main/bx/assets` so edits show on refresh. Works with `dev.reloadAssets`. |
+| `BOXLANG_VERSION` | BoxLang version to download. Default is the version in `gradle.properties` plus `-snapshot`. |
+| `LENS_LICENSE` | Force a license state in the console: `trial`, `plus`, `expired` or `none`. Empty detects the real state. Sets `dev.license`. |
+
+### Harness pages
+
+| Page | What it shows |
+|---|---|
+| `/` | Index of the scenarios. |
+| `/orders.bxm` | A healthy page: one query, a cache hit, a timer and messages. |
+| `/n-plus-one.bxm` | One query per order, flagged as N+1. |
+| `/slow.bxm` | A heavy cross join, flagged as a slow query. |
+| `/caught-exception.bxm` | An error handled in code and recorded with `lensException()`. Opens Issues. |
+| `/error.bxm` | An uncaught error. Core's error page has no bar, and History records it. |
+| `/http.bxm` | Two outgoing HTTP calls, one succeeds and one returns 404. |
+| `/cache.bxm` | Hits and misses against the default cache. |
+| `/timers.bxm` | `lensStart`, `lensStop`, `lensMeasure`, `lensAddMeasure`, `lensMessage` and `lensDump`. |
+| `/functions.bxm` | Nested user function calls. |
+| `/forms.bxm` | A POST with a password field, to show redaction. |
+| `/session.bxm` | Session scope snapshot with a masked token. |
+| `/transaction.bxm` | A committed and a rolled back transaction. |
+| `/extend.bxm` | A custom panel from app code, plus a panel from the `demoLens` module. |
+| `/xss.bxm` | Markup sent to Lens, shown as text. |
+| `/api/orders.json.bxm`, `/events.bxm` | JSON and SSE endpoints, recorded in History without a bar. |
+| `/load.bxm` | Queues eight six-second tasks on the two-thread `demo-pool`, so the console Executors page shows saturation. |
+| `/stall.bxm` | Holds the request for 3.4 seconds, past the slow limit, so the slow request sample names the line. |
+
+See the [demo script](demo-script.md) for a guided walk through.
+
+## End to end tests
+
+Playwright drives the harness from a real browser.
+
+```bash
+cd e2e
+npm ci
+npx playwright install chromium
+npm run e2e
+```
+
+Set `LENS_CHROMIUM` to the path of a local Chromium to use it instead of the downloaded one.
+
+The Playwright config starts the harness itself (`bash ../harness/start.sh` with `SKIP_BUILD=1`, so run `./gradlew shadowJar` first or set `SKIP_BUILD=` to build). It reuses a harness that is already running on the port, except in CI. Tests run one at a time because they share one server. `PORT` changes the port.
+
+The suite covers the bar, panels, problems, History, extension panels, the timeline, security, request cost, the console (login, roles, requests, executors, tasks, datasources, caches, logs, environment, queries, errors and reports, settings, system, heap dump, threads, live stream, AI help), the bar designer and the bar-to-console links.
+
+## Documentation screenshots
+
+The screenshots in `docs/assets/screenshots/` are generated by a spec. Regenerate them with:
+
+```bash
+cd e2e
+npx playwright test screens.spec.ts
+```
+
+Keep the file names stable, because the docs reference them. The console pages use `console-login`, `console-login-error`, `console-overview`, `console-requests`, `console-executors`, `console-tasks`, `console-task-run`, `console-system`, `console-threads`, `console-designer`, `console-settings`, `console-settings-edit`, `console-system-heap`, `console-datasources`, `console-caches`, `console-logs`, `console-environment`, `console-queries`, `console-errors`, `console-reports`, `console-inflight`, `console-ask`, `console-modules`, `bar-bifs`, `bar-menu` and `license-trial`. The screenshots for the newest console pages are referenced in the docs before the files exist and are generated later.
+
+## Continuous integration
+
+`.github/workflows/tests.yml` runs the unit tests and an `e2e` job. The `e2e` job builds the module, installs Chromium, runs the suite and uploads two artifacts: `playwright-report` and `lens-screenshots`.
+
+## Icons
+
+The console and the bar use Phosphor icons (MIT, notice in `src/main/bx/assets/ICONS-LICENSE.txt`). Do not link icons from a CDN. To add one, add its name to the list in `tools/build-icons.py` and run the script as its header describes. It rebuilds `src/main/bx/assets/icons.svg`, a sprite that is inlined into the pages.
+
+## Documentation site
+
+The docs are a [bx-sites](https://github.com/ortus-boxlang/bx-sites) project. The config is `bxsites.yaml` at the repository root and the pages live in `docs/`.
+
+```bash
+install-bx-module bx-sites
+bxSites serve    # live preview
+bxSites build    # writes site/
+```
+
+Do not commit `site/` or other build output.
+
+## Pull requests
+
+- Add tests for features and fixes.
+- Keep collectors free of shared state. Use the per-request slot.
+- Collectors must never throw into a request.
+- Update the [Changelog](changelog.md).
+- New Java files carry the four line BoxLang+ header (`[BoxLang]` and `Copyright [2026] [Ortus Solutions, Corp]`), never an Apache header.

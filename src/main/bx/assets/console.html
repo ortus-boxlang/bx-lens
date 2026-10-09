@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>BX Lens Console</title>
+<link rel="stylesheet" href="{{base}}/assets/console.css">
+<script defer src="{{base}}/assets/console.js"></script>
+<script defer src="{{base}}/assets/alpine.min.js"></script>
+</head>
+<body data-base="{{base}}" data-csrf="{{csrf}}">
+<!--ICONS-->
+<div class="shell" x-data="lensApp()" x-init="init()" x-cloak>
+  <header class="top">
+    <span class="mark" aria-hidden="true"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#bx-mark"/></svg></span><b>BxLens</b>
+    <span class="hostinfo" x-show="state" x-text="state ? state.host + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
+    <span class="spacer"></span>
+    <span class="chipx hid" x-show="state" x-text="state ? state.role : ''" style="margin-right:6px"></span>
+    <span class="lic" :class="licenseClass()" x-show="state" x-text="state ? state.license.label : ''"></span>
+    <button class="live" :class="live ? '' : 'off'" @click="live = !live" :aria-pressed="live" title="Refresh every 3 seconds"><i></i><span x-text="live ? 'live 3s' : 'paused'"></span></button>
+    <button class="btn" @click="logout()"><svg class="ic"><use href="#ph-sign-out"/></svg>Log out</button>
+  </header>
+  <div class="banner" x-show="showBanner()"><span x-text="bannerText()"></span> <a class="link" :href="state ? state.license.plansUrl : '#'" target="_blank" rel="noopener noreferrer">Get a license</a></div>
+  <div class="app">
+    <nav class="side" aria-label="Console">
+      <template x-for="g in groups()" :key="g.name">
+        <div style="display:contents">
+          <h4 x-text="g.name"></h4>
+          <template x-for="t in g.tabs" :key="t.id">
+            <button class="nav" :aria-current="tab === t.id ? 'page' : null" @click="go(t.id)">
+              <svg class="ic"><use :href="icon(t.icon)"/></svg><span x-text="t.label"></span>
+              <span class="badge" :class="badge(t.id).c" x-show="badge(t.id).n > 0" x-text="badge(t.id).n"></span>
+            </button>
+          </template>
+        </div>
+      </template>
+    </nav>
+    <main class="main">
+
+      <!-- Overview -->
+      <section x-show="tab === 'overview'">
+        <h1 class="h1">Overview <small>this server only, last <span x-text="overview && overview.windowMinutes ? overview.windowMinutes + ' minutes' : 'requests in memory'"></span></small></h1>
+        <template x-if="overview">
+          <div>
+            <div class="tiles">
+              <div class="card"><h3>Requests</h3><div class="big" x-text="overview.requests"></div><div class="sub" x-text="overview.perSecond + ' / s'"></div>
+                <svg viewBox="0 0 240 46" width="100%" height="46" role="img" aria-label="Requests over the last 5 minutes"><path :d="spark()" fill="none" stroke="var(--cyan)" stroke-width="1.6"/></svg></div>
+              <div class="card"><h3>Errors</h3><div class="big" :style="overview.errors ? 'color:var(--crit)' : ''"><span x-text="overview.errorRate"></span><small>%</small></div><div class="sub" x-text="overview.errors + ' of ' + overview.requests + ' returned 5xx'"></div></div>
+              <div class="card"><h3>p95 time</h3><div class="big"><span x-text="Math.round(overview.p95Ms)"></span><small>ms</small></div><div class="sub" x-text="'median ' + Math.round(overview.medianMs) + ' ms'"></div></div>
+              <div class="card"><h3>Queries</h3><div class="big" x-text="overview.queriesPerRequest"></div><div class="sub">per request</div></div>
+            </div>
+            <div class="grid2">
+              <div class="card"><h3>Needs attention</h3>
+                <div class="empty" x-show="!attn().length">Nothing needs attention.</div>
+                <div class="attn"><template x-for="a in attn()" :key="a.text"><button @click="go(a.go)"><span class="sev" :class="a.severity" x-text="a.severity"></span><span x-text="a.text"></span></button></template></div></div>
+              <div class="card"><h3>Slowest routes <span>p95</span></h3>
+                <div class="empty" x-show="!overview.slowest.length">No requests yet.</div>
+                <div class="scroll" x-show="overview.slowest.length"><table><thead><tr><th>Route</th><th class="num">p95</th><th class="num">Calls</th><th class="num">Errors</th></tr></thead><tbody>
+                  <template x-for="r in overview.slowest" :key="r.route"><tr><td class="mono" x-text="r.route"></td><td class="num" x-text="fmt(r.p95Ms)"></td><td class="num" x-text="r.calls"></td><td class="num" :style="r.errors ? 'color:var(--crit)' : ''" x-text="r.errors"></td></tr></template></tbody></table></div></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Requests -->
+      <section x-show="tab === 'requests'">
+        <h1 class="h1">Requests <small>in memory, newest first, recycled at <span x-text="capacity"></span></small></h1>
+        <div class="msg warn" style="margin:0 0 10px" x-show="state && state.insecure">This console is served over plain HTTP. The password and everything on screen can be read on the network. Use HTTPS (<span class="mono">console.requireHttps</span>).</div>
+        <div class="msg warn" style="margin:0 0 10px" x-show="state && state.collectLevel === 'light'">Collect level is light: no bindings, scopes, headers or stack traces are recorded.</div>
+        <div class="tools">
+          <div class="seg"><template x-for="f in [['all','All'],['err','Errors'],['slow','Slow'],['json','JSON']]" :key="f[0]"><button :class="rf === f[0] ? 'on' : ''" @click="rf = f[0]" x-text="f[1]"></button></template></div>
+          <input type="search" placeholder="Filter by URL" aria-label="Filter requests" x-model="rq">
+        </div>
+        <div class="split">
+          <div class="card scroll" style="padding:0"><table><thead><tr><th>Time</th><th>Method</th><th>URL</th><th class="num">Status</th><th class="num">Time</th><th class="num">SQL</th><th class="num">Issues</th></tr></thead><tbody>
+            <template x-for="r in filtered()" :key="r.id"><tr class="row" :class="rsel === r.id ? 'sel' : ''" tabindex="0" @click="pick(r.id)" @keydown.enter="pick(r.id)">
+              <td class="mono" x-text="time(r.at)"></td><td x-text="r.method"></td><td class="mono" x-text="r.url"></td>
+              <td class="num"><span class="pill" :class="r.state === 'unfinished' ? 'crit' : statusClass(r.status)" x-text="r.state === 'unfinished' ? 'unfinished' : r.status"></span></td><td class="num" x-text="fmt(r.ms)"></td><td class="num" x-text="r.queries"></td>
+              <td class="num" :style="r.issues ? 'color:var(--warn)' : ''" x-text="r.issues"></td></tr></template>
+            <tr x-show="!filtered().length"><td colspan="7" class="empty">No requests match.</td></tr></tbody></table></div>
+          <div class="card">
+            <div class="empty" x-show="!detail && !detailErr">Pick a request.</div>
+            <div class="empty" x-show="detailErr" x-text="detailErr"></div>
+            <template x-if="detail">
+              <div>
+                <h3><span class="mono" style="color:var(--ink)" x-text="detail.request.method + ' ' + detail.request.uri"></span><span x-text="time(Date.parse(detail.request.startedAt))"></span></h3>
+                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.state === 'unfinished' ? 'unfinished' : detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-show="detail.cost && detail.cost.cpuMs !== null" x-text="'cpu ' + fmt(detail.cost ? detail.cost.cpuMs : 0)"></span><span class="pill" x-show="detail.cost && detail.cost.allocBytes !== null" x-text="'alloc ' + bytes(detail.cost ? detail.cost.allocBytes : 0)"></span><span class="pill" x-text="detail.request.remoteAddr"></span><span class="pill mono" title="Request id" x-text="'id ' + detail.request.id"></span></div>
+                <div class="tools"><button class="btn mini" @click="copyJson()"><svg class="ic"><use href="#ph-copy"/></svg>Copy JSON</button><button class="btn mini" @click="downloadJson()"><svg class="ic"><use href="#ph-download-simple"/></svg>Download JSON</button><button class="btn mini" @click="copyCurl()"><svg class="ic"><use href="#ph-terminal-window"/></svg>Copy as cURL</button></div>
+                <template x-for="i in detail.issues" :key="i.title + i.message"><div class="issue" :class="i.severity === 'crit' ? 'crit' : (i.severity === 'info' ? 'note' : '')"><b x-text="i.severity === 'crit' ? 'Error' : (i.severity === 'info' ? 'Note' : 'Warn')"></b><span x-text="i.title + ': ' + i.message"></span></div></template>
+                <template x-if="detail.slowSample"><div><h3 style="margin-top:8px">Where it was at <span x-text="detail.slowSample.atMs + ' ms'"></span></h3><ul class="frames" style="max-height:160px"><template x-for="(f, i) in detail.slowSample.frames" :key="i"><li :class="f.bx ? 'bx' : ''" x-text="f.text"></li></template></ul></div></template>
+                <h3 style="margin-top:8px">Timeline</h3>
+                <div class="wf" :style="'height:' + wfHeight() + 'px'" role="img" aria-label="Request timeline"><template x-for="b in bars()" :key="b.key"><div :class="b.type" :style="'left:' + b.left + '%;width:' + b.width + '%;top:' + b.top + 'px'" :title="b.label" x-text="b.label"></div></template></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+
+      <!-- Executors -->
+      <section x-show="tab === 'executors'">
+        <h1 class="h1">Executors <small>live health reports from the runtime</small></h1>
+        <template x-for="e in execIssues()" :key="e.name"><div class="issue" :class="e.healthStatus === 'critical' ? 'crit' : ''"><b x-text="e.healthStatus === 'critical' ? 'Critical' : 'Degraded'"></b><span><span class="mono" x-text="e.name"></span>: <span x-text="e.healthReport.summary"></span></span></div></template>
+        <div class="split">
+          <div class="card scroll" style="padding:0"><table><thead><tr><th>Executor</th><th>Health</th><th>Type</th><th>Threads</th><th class="num">Queue</th><th class="num">Done</th></tr></thead><tbody>
+            <template x-for="e in executors" :key="e.name"><tr class="row" :class="esel === e.name ? 'sel' : ''" tabindex="0" @click="esel = e.name" @keydown.enter="esel = e.name">
+              <td><span class="dot" :class="e.healthStatus"></span><span x-text="e.name"></span></td><td><span class="pill" :class="e.healthStatus" x-text="e.healthStatus"></span></td><td x-text="e.kind"></td>
+              <td><div class="bar" :class="execBarClass(e)"><div :style="'width:' + execBarPct(e) + '%'"></div></div></td><td class="num" x-text="e.queueSize"></td><td class="num" x-text="e.completedTaskCount"></td></tr></template>
+            <tr x-show="!executors.length"><td colspan="6" class="empty">No executors.</td></tr></tbody></table></div>
+          <div class="card">
+            <template x-if="exec()">
+              <div>
+                <h3><span class="mono" style="color:var(--ink)" x-text="exec().name"></span><span><span class="pill" :class="exec().healthStatus" x-text="exec().healthStatus"></span> <span x-text="exec().className"></span></span></h3>
+                <template x-for="m in meters(exec())" :key="m.key"><div class="meter"><div class="mtop"><span x-text="m.label"></span><span x-text="m.v.toFixed(1) + '%'"></span></div>
+                  <div class="track"><div class="fill" :class="m.cls" :style="'width:' + Math.min(100, m.v) + '%'"></div><i class="tick" :style="'left:' + m.d + '%'" :title="'degraded at ' + m.d + '%'"></i><i class="tick" :style="'left:' + m.c + '%'" :title="'critical at ' + m.c + '%'"></i></div></div></template>
+                <h3 style="margin-top:6px">Last 60 s <span><b style="color:var(--cyan)">active</b> &middot; <b style="color:var(--warn)">queued</b></span></h3>
+                <svg viewBox="0 0 300 70" width="100%" height="70" role="img" aria-label="Active threads and queue size, last 60 seconds"><line x1="0" x2="300" y1="66" y2="66" stroke="var(--line)"/>
+                  <path :d="line(hist[exec().name].q, qmax(exec()), 300, 70)" fill="none" stroke="var(--warn)" stroke-width="1.5"/>
+                  <path :d="line(hist[exec().name].a, Math.max(4, exec().maximumPoolSize || 4), 300, 70)" fill="none" stroke="var(--cyan)" stroke-width="1.8"/></svg>
+                <dl class="kv" style="margin-top:10px">
+                  <dt>Pool</dt><dd x-text="exec().poolSize + ' now, core ' + exec().corePoolSize + ', max ' + (exec().maximumPoolSize || 'n/a') + ', largest ever ' + exec().largestPoolSize"></dd>
+                  <dt>Tasks</dt><dd x-text="exec().taskCount + ' total, ' + exec().completedTaskCount + ' done, ' + exec().taskSubmissionCount + ' submitted'"></dd>
+                  <dt>Rate</dt><dd x-text="exec().averageTasksPerSecond.toFixed(2) + ' tasks/s, ' + exec().averageTasksPerMinute.toFixed(1) + '/min'"></dd>
+                  <dt>Queue</dt><dd x-text="exec().queueType === 'N/A' ? 'none' : exec().queueSize + ' of ' + qcap(exec()) + ' (' + exec().queueType + ')'"></dd>
+                  <dt>Activity</dt><dd x-text="'last ' + dur(exec().lastActivitySecondsAgo) + ' ago, up ' + dur(exec().uptimeSeconds)"></dd></dl>
+                <div class="rep" :class="exec().healthStatus"><h4>Health report</h4><div x-text="exec().healthReport.summary"></div>
+                  <template x-if="exec().healthReport.issues.length"><div><h4>Issues</h4><ul class="ul"><template x-for="x in exec().healthReport.issues" :key="x"><li x-text="x"></li></template></ul></div></template>
+                  <template x-if="exec().healthReport.recommendations.length"><div><h4>Recommendations</h4><ul class="ul"><template x-for="x in exec().healthReport.recommendations" :key="x"><li x-text="x"></li></template></ul></div></template>
+                  <template x-if="exec().healthReport.alerts.length"><div><h4>Alerts</h4><ul class="ul"><template x-for="x in exec().healthReport.alerts" :key="x.metric"><li><span class="pill" :class="x.level === 'critical' ? 'critical' : 'degraded'" x-text="x.level"></span> <span x-text="x.metric + ' = ' + x.value"></span></li></template></ul></div></template>
+                  <template x-if="exec().healthReport.insights.length"><div><h4>Insights</h4><ul class="ul"><template x-for="x in exec().healthReport.insights" :key="x"><li x-text="x"></li></template></ul></div></template></div>
+                <h3 style="margin-top:12px">Scheduled tasks on this executor <span x-text="exec().tasks.length"></span></h3>
+                <div class="empty" x-show="!exec().tasks.length">None.</div>
+                <div class="scroll" x-show="exec().tasks.length"><table><tbody><template x-for="t in exec().tasks" :key="t.scheduler + t.name"><tr class="row" @click="go('tasks'); ksel = t.scheduler + '/' + t.name"><td x-text="t.name"></td><td class="dim" x-text="t.scheduler + ' / ' + t.group"></td><td><span class="pill" :class="t.status" x-text="statusLabel(t.status)"></span></td></tr></template></tbody></table></div>
+              </div>
+            </template>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tasks -->
+      <section x-show="tab === 'tasks'">
+        <h1 class="h1">Scheduled tasks <small>from <span class="mono" x-text="tasks ? tasks.tasksFile : ''"></span></small></h1>
+        <template x-if="tasks && tasks.locked"><div class="msg plusnote" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> Run now, pause, resume and reload need a BoxLang+ license or trial. You can see every task and its history.</div></template>
+        <template x-if="tasks">
+          <div>
+            <div class="tools">
+              <div class="seg"><template x-for="f in [['all','All'],['scheduled','Scheduled'],['paused','Paused'],['failing','Failing'],['never','Not run yet']]" :key="f[0]"><button :class="kf === f[0] ? 'on' : ''" @click="kf = f[0]" x-text="f[1] + ' ' + kcount(f[0])"></button></template></div>
+              <input type="search" placeholder="Filter by task, group or scheduler" aria-label="Filter tasks" x-model="kq">
+              <span class="spacer"></span>
+              <button class="btn warnb" :disabled="!tasks.actions" @click="confirm = '*'"><svg class="ic"><use href="#ph-arrows-clockwise"/></svg>Reload all from tasks.json</button>
+            </div>
+            <div class="confirm" x-show="confirm"><span x-text="confirm === '*' ? 'Re-read tasks.json and restart every scheduler? Running tasks finish first.' : 'Re-read tasks.json and restart ' + confirm + '? Running tasks finish first.'"></span>
+              <button class="btn mini primary" @click="confirm === '*' ? reloadAll() : (schedAct({ name: confirm }, 'reload'), confirm = '')">Reload</button><button class="btn mini" @click="confirm = ''">Cancel</button></div>
+            <p class="sections"><span x-text="tasks.schedulers.length"></span> scheduler(s) &middot; reloadOnChange is <span x-text="tasks.reloadOnChange ? 'on' : 'off'"></span> &middot; this server only</p>
+            <div class="split wide">
+              <div class="stack">
+                <template x-for="s in tasks.schedulers" :key="s.name">
+                  <div class="card" style="padding:0">
+                    <div class="rowbar" style="padding:10px 12px 0"><div><b x-text="s.name"></b> <span class="dim mono" x-text="'executor ' + s.executor + ' · ' + s.timezone + (s.started ? '' : ' · not started')"></span></div>
+                      <div><button class="btn mini" :disabled="!tasks.actions" @click="schedAct(s, 'pauseall')"><svg class="ic"><use href="#ph-pause"/></svg>Pause all</button> <button class="btn mini" :disabled="!tasks.actions" @click="schedAct(s, 'resumeall')"><svg class="ic"><use href="#ph-play"/></svg>Resume all</button> <button class="btn mini" :disabled="!tasks.actions" @click="confirm = s.name"><svg class="ic"><use href="#ph-arrows-clockwise"/></svg>Reload</button></div></div>
+                    <div class="scroll"><table><thead><tr><th>Status</th><th>Task</th><th>Schedule</th><th class="num">Next run</th><th class="num">Last</th><th class="num">Runs</th><th class="num">Fail</th><th></th></tr></thead><tbody>
+                      <template x-for="t in ktasks(s)" :key="t.name"><tr class="row" :class="ksel === t.scheduler + '/' + t.name ? 'sel' : ''" tabindex="0" @click="ksel = t.scheduler + '/' + t.name; runResult = null" @keydown.enter="ksel = t.scheduler + '/' + t.name">
+                        <td><span class="pill" :class="t.status" x-text="statusLabel(t.status)"></span></td><td><span x-text="t.name"></span><div class="dim" style="font-size:11px" x-text="t.group"></div></td><td class="mono" x-text="t.schedule"></td>
+                        <td class="num" x-text="next(t)"></td><td class="num"><span x-text="ago(t.lastRun)"></span><div class="dim" style="font-size:11px" x-show="t.lastRun" x-text="t.lastMs + ' ms'"></div></td><td class="num" x-text="t.totalRuns"></td><td class="num" :style="t.totalFailures ? 'color:var(--crit)' : ''" x-text="t.totalFailures"></td>
+                        <td class="num" @click.stop><button class="btn mini" :disabled="!tasks.actions" @click="pauseResume(t)" x-text="t.status === 'paused' ? 'Resume' : 'Pause'"></button> <button class="btn mini" :disabled="!tasks.actions || running === t.scheduler + '/' + t.name" @click="runNow(t)"><svg class="ic"><use href="#ph-play"/></svg><span x-text="running === t.scheduler + '/' + t.name ? 'Running' : 'Run now'"></span></button></td></tr></template>
+                      <tr x-show="!ktasks(s).length"><td colspan="8" class="empty">No tasks match.</td></tr></tbody></table></div>
+                  </div>
+                </template>
+                <div class="card empty" x-show="!tasks.schedulers.length">No schedulers are registered.</div>
+              </div>
+              <div class="card">
+                <div class="empty" x-show="!ktask()">Pick a task.</div>
+                <template x-if="ktask()">
+                  <div>
+                    <h3><span class="mono" style="color:var(--ink)" x-text="ktask().name"></span><span class="pill" :class="ktask().status" x-text="statusLabel(ktask().status)"></span></h3>
+                    <div class="tiles3" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px"><div><div class="big" style="font-size:20px" x-text="ktask().totalRuns"></div><div class="sub">runs</div></div><div><div class="big" style="font-size:20px;color:var(--ok)" x-text="ktask().totalSuccess"></div><div class="sub">success</div></div><div><div class="big" style="font-size:20px" :style="ktask().totalFailures ? 'color:var(--crit)' : ''" x-text="ktask().totalFailures"></div><div class="sub">failures</div></div></div>
+                    <div class="tools"><button class="btn primary" :disabled="!tasks.actions || !!running" @click="runNow(ktask())"><svg class="ic"><use href="#ph-play"/></svg>Run now</button><span class="sub">Runs the task once and shows the result. Other tasks are not affected.</span></div>
+                    <template x-if="runResult && runResult.task === ktask().name">
+                      <div style="margin-bottom:10px"><h3>Run result <span x-text="runResult.ms + ' ms'"></span></h3>
+                        <div x-show="runResult.error"><div class="errbox" x-text="runResult.error"></div><details class="stack"><summary>Stack trace</summary><div class="errbox" x-text="runResult.stack"></div></details></div>
+                        <div class="okbox" x-show="!runResult.error" x-text="runResult.timedOut ? runResult.message : (runResult.result === null || runResult.result === undefined ? 'Finished. The task returned nothing.' : JSON.stringify(runResult.result, null, 2))"></div></div>
+                    </template>
+                    <dl class="kv"><dt>Scheduler</dt><dd x-text="ktask().scheduler"></dd><dt>Executor</dt><dd x-text="ktask().executor"></dd><dt>Group</dt><dd x-text="ktask().group || 'none'"></dd><dt>Schedule</dt><dd x-text="ktask().schedule"></dd>
+                      <dt>Last run</dt><dd x-text="ktask().lastRun ? ago(ktask().lastRun) + ' took ' + ktask().lastMs + ' ms' : 'never'"></dd><dt>Next run</dt><dd x-text="next(ktask())"></dd>
+                      <dt>Last result</dt><dd x-text="ktask().lastResult === null || ktask().lastResult === undefined ? 'none' : JSON.stringify(ktask().lastResult)"></dd><dt>Host</dt><dd x-text="ktask().host + ' · ' + ktask().ip"></dd></dl>
+                    <template x-if="ktask().outcome && !ktask().outcome.ok && !(runResult && runResult.task === ktask().name && runResult.error)"><div><h3 style="margin-top:12px">Last error</h3><div class="errbox" x-text="ktask().outcome.message"></div><details class="stack"><summary>Stack trace</summary><div class="errbox" x-text="ktask().outcome.stack"></div></details></div></template>
+                    <template x-if="ktask().schedulingError"><div><h3 style="margin-top:12px">Scheduling error</h3><div class="errbox" x-text="ktask().schedulingError"></div></div></template>
+                    <template x-if="ktask().definition"><div><h3 style="margin-top:12px">Definition <span>from tasks.json</span></h3><dl class="kv"><template x-for="r in defRows(ktask())" :key="r.k"><div style="display:contents"><dt x-text="r.k"></dt><dd x-text="r.v"></dd></div></template></dl></div></template>
+                    <p class="sub" x-show="!ktask().persisted">Registered in code, not stored in tasks.json.</p>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Datasources -->
+      <section x-show="tab === 'datasources'">
+        <h1 class="h1">Datasources <small>connection pools, live</small></h1>
+        <template x-if="dsl">
+          <div>
+            <p class="sub" x-show="!dsl.datasources.length">No datasource has been registered yet.</p>
+            <div class="grid2">
+              <template x-for="d in dsl.datasources" :key="d.id">
+                <div class="card"><h3><span class="mono" x-text="d.name"></span><span><span class="chipx" :class="dsClass(d)" x-text="d.state"></span></span></h3>
+                  <p class="sub"><span x-text="d.driver"></span><span x-show="d.application"> · app <span x-text="d.application"></span></span><span x-show="d.onTheFly"> · on the fly</span><span x-show="d.url"> · <span class="mono" x-text="d.url"></span></span></p>
+                  <template x-if="d.pooling">
+                    <div>
+                      <div class="rowbar" style="margin:6px 0 3px"><span class="mono">connections</span><span class="mute mono" x-text="d.pool.active + ' active, ' + d.pool.idle + ' idle, ' + d.pool.total + ' of ' + d.pool.max"></span></div>
+                      <div class="bar" :class="d.pool.utilization >= 90 ? 'crit' : d.pool.utilization >= 70 ? 'warn' : ''"><div :style="'width:' + Math.min(100, d.pool.utilization) + '%'"></div></div>
+                      <p class="sub" x-show="d.pool.pending > 0"><b x-text="d.pool.pending"></b> thread(s) waiting for a connection</p>
+                      <dl class="kv" x-show="d.metrics" style="margin-top:8px">
+                        <dt>Wait for a connection</dt><dd x-text="d.metrics ? d.metrics.acquireAvgMs + ' ms avg, ' + d.metrics.acquireMaxMs + ' ms max, ' + d.metrics.acquired + ' times' : ''"></dd>
+                        <dt>Connection held</dt><dd x-text="d.metrics ? d.metrics.usageAvgMs + ' ms avg, ' + d.metrics.usageMaxMs + ' ms max' : ''"></dd>
+                        <dt>Opening a connection</dt><dd x-text="d.metrics ? d.metrics.createAvgMs + ' ms avg, ' + d.metrics.created + ' opened' : ''"></dd>
+                        <dt>Timeouts</dt><dd x-text="d.metrics ? d.metrics.timeouts : ''"></dd>
+                      </dl>
+                      <p class="sub" x-show="!d.metrics">Timings are not collected: this pool already has its own metrics tracker.</p>
+                      <details style="margin-top:8px"><summary class="sub">Pool settings</summary>
+                        <dl class="kv"><dt>Min idle / max</dt><dd x-text="d.pool.min + ' / ' + d.pool.max"></dd><dt>Connection timeout</dt><dd x-text="d.config.connectionTimeoutMs + ' ms'"></dd><dt>Idle timeout</dt><dd x-text="d.config.idleTimeoutMs + ' ms'"></dd><dt>Max lifetime</dt><dd x-text="d.config.maxLifetimeMs + ' ms'"></dd><dt>Keepalive</dt><dd x-text="d.config.keepaliveMs + ' ms'"></dd><dt>Leak detection</dt><dd x-text="d.config.leakDetectionMs > 0 ? d.config.leakDetectionMs + ' ms' : 'off'"></dd><dt>Auto commit</dt><dd x-text="d.config.autoCommit"></dd><dt>Read only</dt><dd x-text="d.config.readOnly"></dd><dt>Isolation</dt><dd x-text="d.config.isolation"></dd><dt>User</dt><dd x-text="d.user"></dd></dl></details>
+                    </div>
+                  </template>
+                  <p class="sub" x-show="!d.pooling">The pool has not started yet. It starts on the first query.</p>
+                  <div class="tools" style="margin-top:10px"><button class="btn" :disabled="!d.pooling || !state || state.role === 'viewer' || dsBusy === d.id" @click="testDs(d)"><svg class="ic"><use href="#ph-pulse"/></svg>Test connection</button>
+                    <span class="sub" :style="dsRes[d.id] && !dsRes[d.id].ok ? 'color:var(--crit)' : ''" x-show="dsRes[d.id]" x-text="dsRes[d.id] ? dsRes[d.id].message + (dsRes[d.id].ok ? ' (open ' + dsRes[d.id].openMs + ' ms, validate ' + dsRes[d.id].validateMs + ' ms)' : '') : ''"></span></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Caches -->
+      <section x-show="tab === 'caches'">
+        <h1 class="h1">Caches <small>BoxCache statistics and a capped look inside</small></h1>
+        <template x-if="cachel">
+          <div class="split">
+            <div>
+              <template x-for="c in cachel.caches" :key="c.name">
+                <div class="card" style="margin-bottom:10px;cursor:pointer" :class="csel === c.name ? 'sel' : ''" @click="pickCache(c.name)"><h3><span class="mono" x-text="c.name"></span><span><span class="chipx" :class="c.enabled ? 'on' : 'off'" x-text="c.enabled ? c.provider : 'disabled'"></span></span></h3>
+                  <div x-show="!c.error"><div class="rowbar" style="margin:4px 0 3px"><span class="mono">hit rate</span><span class="mute mono" x-text="c.hitRate + '% (' + c.hits + ' hits, ' + c.misses + ' misses)'"></span></div>
+                    <div class="bar"><div :style="'width:' + c.hitRate + '%'"></div></div>
+                    <dl class="kv" style="margin-top:8px"><dt>Objects</dt><dd x-text="c.objects"></dd><dt>Evictions</dt><dd x-text="c.evictions"></dd><dt>Expired</dt><dd x-text="c.expired"></dd><dt>Reaps</dt><dd x-text="c.reaps"></dd></dl></div>
+                  <p class="sub" x-show="c.error" x-text="c.error"></p>
+                </div>
+              </template>
+            </div>
+            <div class="card" x-show="csel"><h3><span class="mono" x-text="csel"></span><span x-text="ckeys ? (ckeys.truncated ? 'first ' + ckeys.limit + ' matches' : ckeys.keys.length + ' keys') : ''"></span></h3>
+              <div class="msg plusnote" x-show="state && state.plus && !state.plus.cacheActions" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> Reading a value, evict, reap and clear need a BoxLang+ license or trial.</div>
+              <div class="tools"><input type="text" placeholder="Filter keys" x-model="cfilter" @input.debounce.300ms="loadKeys()" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px">
+                <button class="btn" :disabled="!state || state.readOnly || !state.plus.cacheActions" @click="cacheAct('reap')">Reap expired</button>
+                <button class="btn crit" :disabled="!state || state.readOnly || !state.plus.cacheActions" @click="cconfirm = true">Clear all</button></div>
+              <div class="confirm" x-show="cconfirm"><span>Remove every object from this cache?</span><button class="btn mini primary" @click="cacheAct('clear'); cconfirm = false">Clear</button><button class="btn mini" @click="cconfirm = false">Cancel</button></div>
+              <div class="scroll" style="max-height:340px;margin-top:8px"><table><thead><tr><th>Key</th><th class="num">Hits</th><th class="num">Timeout</th><th></th></tr></thead><tbody>
+                <template x-for="k in (ckeys ? ckeys.keys : [])" :key="k.key"><tr><td class="mono" style="word-break:break-all" x-text="k.key"></td><td class="num" x-text="k.hits === undefined ? '' : k.hits"></td><td class="num" x-text="k.timeout === undefined ? '' : k.timeout"></td>
+                  <td class="num"><button class="btn mini" :disabled="!state || state.role === 'viewer' || !state.plus.cacheActions" @click="viewValue(k.key)">View</button> <button class="btn mini" :disabled="!state || state.readOnly || !state.plus.cacheActions" @click="cacheAct('evict', k.key)">Evict</button></td></tr></template></tbody></table></div>
+              <p class="sub" x-show="ckeys && ckeys.keys.length === 0">No keys match.</p>
+              <div x-show="cvalue" style="margin-top:10px"><h3 style="margin-bottom:4px"><span class="mono" x-text="cvalue ? cvalue.key : ''"></span><span x-text="cvalue && cvalue.found ? cvalue.type + (cvalue.truncated ? ', cut to 2 KB' : '') : ''"></span></h3>
+                <pre class="code" style="max-height:220px;overflow:auto;white-space:pre-wrap;word-break:break-all" x-text="cvalue ? (cvalue.found ? cvalue.value : 'Not found or expired') : ''"></pre></div>
+              <p class="sub" x-show="cmsg" x-text="cmsg"></p>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Logs -->
+      <section x-show="tab === 'logfiles'">
+        <h1 class="h1">Logs <small>every file in the BoxLang logs directory, with a live tail</small></h1>
+        <template x-if="logl">
+          <div class="split narrow">
+            <div class="card"><h3>Files <span class="mono" x-text="logl.dir"></span></h3>
+              <div class="scroll" style="max-height:520px"><table><tbody>
+                <template x-for="f in logl.files" :key="f.name"><tr class="row" :class="lfile === f.name ? 'sel' : ''" @click="pickLog(f.name)"><td class="mono" style="word-break:break-all" x-text="f.name"></td><td class="num mute" x-text="bytes(f.size)"></td></tr></template></tbody></table></div>
+              <p class="sub" x-show="!logl.files.length">No log files yet.</p></div>
+            <div class="card" x-show="lfile"><h3><span class="mono" x-text="lfile"></span><span x-text="llines.length + ' lines' + (lcut ? ' (older lines not shown)' : '')"></span></h3>
+              <div class="tools"><input type="text" placeholder="Search this file" x-model="lq" @input.debounce.400ms="readLog()" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px">
+                <select x-model="llevel" @change="readLog()" style="background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px"><option value="">All levels</option><option value="DEBUG">DEBUG and up</option><option value="INFO">INFO and up</option><option value="WARN">WARN and up</option><option value="ERROR">ERROR only</option></select>
+                <select x-model="lcount" @change="readLog()" style="background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px"><option value="200">200 lines</option><option value="500">500 lines</option><option value="1000">1000 lines</option><option value="2000">2000 lines</option></select>
+                <button class="btn" @click="llive = !llive; if (llive) { connect(); } else { disconnect(); connect(); }" x-text="llive ? 'Live: on' : 'Live: paused'"></button>
+                <a class="btn" :class="state && (state.role === 'viewer' || !state.plus.logDownload) ? 'disabled' : ''" :href="state && state.role !== 'viewer' && state.plus.logDownload ? logHref() : null" :title="state && !state.plus.logDownload ? 'BoxLang+ feature' : ''"><svg class="ic"><use href="#ph-download-simple"/></svg>Download<span class="chipx plus" x-show="state && !state.plus.logDownload" style="margin-left:6px">Plus</span></a></div>
+              <pre class="code logview" x-ref="logview"><template x-for="(l, i) in llines" :key="i"><div :class="lineClass(l)" x-text="l"></div></template></pre>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Modules -->
+      <section x-show="tab === 'modules'">
+        <h1 class="h1">Modules <small>everything loaded into this runtime, including modules nested inside other modules</small></h1>
+        <template x-if="modl">
+          <div class="split narrow">
+            <div class="card"><h3>Loaded <span x-text="modl.modules.length"></span></h3>
+              <div class="tools"><input type="text" placeholder="Filter modules" x-model="modq" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px"></div>
+              <div class="scroll" style="max-height:560px;margin-top:8px"><table><thead><tr><th>Module</th><th>Version</th><th>State</th></tr></thead><tbody>
+                <template x-for="m in modRows()" :key="m.name"><tr class="row" :class="modsel === m.name ? 'sel' : ''" @click="modsel = m.name"><td><span class="mono" x-text="m.name"></span><span class="chipx hid" style="margin-left:6px" x-show="m.parent" x-text="'in ' + m.parent"></span></td><td x-text="m.version"></td><td><span class="chipx" :class="m.activated ? 'on' : (m.enabled ? 'hid' : 'off')" x-text="m.activated ? 'active' : (m.enabled ? 'loaded' : 'disabled')"></span></td></tr></template></tbody></table></div></div>
+            <div class="card" x-show="modcur()"><h3><span class="mono" x-text="modcur() ? modcur().name : ''"></span><span x-text="modcur() ? modcur().version : ''"></span></h3>
+              <p x-text="modcur() ? modcur().description : ''"></p>
+              <dl class="kv" x-show="modcur()"><dt>Author</dt><dd x-text="modcur() ? modcur().author : ''"></dd><dt>Activated</dt><dd x-text="modcur() ? (modcur().activatedOn ? modcur().activatedOn + ' in ' + modcur().activationMs + ' ms' : 'no') : ''"></dd><dt>Path</dt><dd class="mono" x-text="modcur() ? modcur().path : ''"></dd><dt x-show="modcur() && modcur().publicMapping">Public mapping</dt><dd class="mono" x-show="modcur() && modcur().publicMapping" x-text="modcur() ? modcur().publicMapping : ''"></dd><dt x-show="modcur() && modcur().parent">Nested in</dt><dd x-show="modcur() && modcur().parent" x-text="modcur() ? modcur().parent : ''"></dd><dt x-show="modcur() && modcur().nested.length">Nested modules</dt><dd x-show="modcur() && modcur().nested.length" x-text="modcur() ? modcur().nested.join(', ') : ''"></dd><dt x-show="modcur() && modcur().dependencies.length">Depends on</dt><dd x-show="modcur() && modcur().dependencies.length" x-text="modcur() ? modcur().dependencies.join(', ') : ''"></dd></dl>
+              <template x-for="g in [['bifs', 'Functions'], ['components', 'Components'], ['memberMethods', 'Member methods'], ['interceptors', 'Interceptors'], ['interceptionPoints', 'Interception points']]" :key="g[0]"><div x-show="modcur() && modcur()[g[0]].length"><h3 style="margin-top:10px"><span x-text="g[1]"></span><span x-text="modcur() ? modcur()[g[0]].length : ''"></span></h3><div style="display:flex;flex-wrap:wrap;gap:4px"><template x-for="n in (modcur() ? modcur()[g[0]].slice(0, 80) : [])" :key="n"><span class="chipx hid mono" x-text="n"></span></template></div></div></template>
+              <div class="tools" style="margin-top:10px" x-show="modcur() && modcur().webURL"><span class="sub">Home: <span class="mono" x-text="modcur() ? modcur().webURL : ''"></span></span></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- ORM -->
+      <section x-show="tab === 'orm'">
+        <h1 class="h1">ORM <small>Hibernate statistics of bx-orm, since each session factory started</small></h1>
+        <p class="sub">The SQL that bx-orm runs shows with the other queries, labelled ORM, in the bar, in each request and on the Queries page. These are the totals.</p>
+        <div class="msg plusnote" x-show="state && state.plus && !state.plus.ormStats" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> ORM statistics need a BoxLang+ license or trial. The ORM SQL itself is free.</div>
+        <template x-if="orml && state && state.plus.ormStats">
+          <div>
+            <p class="sub" x-show="!orml.installed">The bx-orm module is not installed.</p>
+            <p class="sub" x-show="orml.installed && !orml.factories.length">No ORM application has started yet. Load a page that uses an entity.</p>
+            <template x-for="f in orml.factories" :key="f.app + f.datasource">
+              <div class="card" style="margin-bottom:12px"><h3><span class="mono" x-text="f.app + ' / ' + f.datasource"></span><span x-text="'SQL capture: ' + f.mode"></span></h3>
+                <div class="tiles">
+                  <div class="card"><h3>Queries run</h3><div class="big" x-text="f.counts.queryExecutionCount"></div><div class="sub" x-text="'slowest ' + f.slowestMs + ' ms'"></div></div>
+                  <div class="card"><h3>Entities</h3><div class="big" x-text="f.counts.entityLoadCount"></div><div class="sub" x-text="'loaded, ' + f.counts.entityInsertCount + ' inserted, ' + f.counts.entityUpdateCount + ' updated, ' + f.counts.entityDeleteCount + ' deleted'"></div></div>
+                  <div class="card"><h3>Sessions</h3><div class="big" x-text="f.counts.sessionOpenCount"></div><div class="sub" x-text="f.counts.flushCount + ' flushes, ' + f.counts.transactionCount + ' transactions'"></div></div>
+                  <div class="card"><h3>Statements</h3><div class="big" x-text="f.counts.prepareStatementCount"></div><div class="sub" x-text="f.counts.connectCount + ' connections'"></div></div>
+                </div>
+                <dl class="kv" style="margin-top:10px"><dt>Second level cache</dt><dd x-text="f.counts.secondLevelCacheHitCount + ' hits, ' + f.counts.secondLevelCacheMissCount + ' misses, ' + f.counts.secondLevelCachePutCount + ' puts'"></dd><dt>Query cache</dt><dd x-text="f.counts.queryCacheHitCount + ' hits, ' + f.counts.queryCacheMissCount + ' misses, ' + f.counts.queryCachePutCount + ' puts'"></dd><dt>Collections</dt><dd x-text="f.counts.collectionLoadCount + ' loaded, ' + f.counts.collectionFetchCount + ' fetched'"></dd><dt x-show="f.slowestQuery">Slowest query</dt><dd class="mono" x-show="f.slowestQuery" x-text="f.slowestQuery"></dd><dt>Entities</dt><dd x-text="f.entities.join(', ')"></dd></dl>
+                <div class="scroll" x-show="f.queries.length" style="margin-top:10px"><table><thead><tr><th>HQL or criteria</th><th class="num">Runs</th><th class="num">Rows</th><th class="num">Avg ms</th><th class="num">Max ms</th><th class="num">Cache hits</th></tr></thead><tbody><template x-for="q in f.queries" :key="q.hql"><tr><td class="mono" style="word-break:break-all" x-text="q.hql"></td><td class="num" x-text="q.executionCount"></td><td class="num" x-text="q.executionRowCount"></td><td class="num" x-text="q.executionAvgTime"></td><td class="num" x-text="q.executionMaxTime"></td><td class="num" x-text="q.cacheHitCount"></td></tr></template></tbody></table></div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </section>
+
+      <!-- Configuration -->
+      <section x-show="tab === 'configuration'">
+        <h1 class="h1">Configuration <small>the effective BoxLang settings by area, secrets hidden</small></h1>
+        <template x-if="cfgd">
+          <div>
+            <div class="tools" style="margin-bottom:10px"><input type="search" placeholder="Filter by key, value or area" x-model="cfgq" aria-label="Filter the configuration"><span class="sub" x-show="cfgd.adminOnlyHidden">Paths, security and logging settings are for the admin role.</span></div>
+            <template x-for="g in cfgGroups()" :key="g.name">
+              <div class="card" style="margin-bottom:12px"><h3 x-text="g.name"></h3>
+                <div class="scroll"><table><thead><tr><th>Key</th><th>Value</th><th>Source</th></tr></thead><tbody>
+                  <template x-for="e in g.entries" :key="e.key"><tr><td class="mono" x-text="e.key"></td><td class="mono" style="white-space:pre-wrap;word-break:break-all" x-text="cfgText(e.value)"></td><td><span class="chipx" :class="e.source === 'default' ? 'hid' : (e.source ? 'on' : '')" x-text="e.source || 'unknown'"></span></td></tr></template></tbody></table></div></div>
+            </template>
+            <div class="empty" x-show="!cfgGroups().length">Nothing matches.</div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Environment -->
+      <section x-show="tab === 'environment'">
+        <h1 class="h1">Environment <small>what this server is made of, secrets hidden</small></h1>
+        <template x-if="envd">
+          <div>
+            <div class="tools" style="margin-bottom:10px">
+              <template x-for="v in ['modules', 'jvm', 'env', 'props']" :key="v"><button class="btn" :class="envView === v ? 'primary' : ''" @click="envView = v" x-text="{modules: 'Modules', jvm: 'JVM arguments', env: 'Environment variables', props: 'System properties'}[v]"></button></template>
+              <span style="flex:1"></span>
+              <a class="btn" :class="state && (state.role === 'viewer' || !state.plus.bundle) ? 'disabled' : ''" :href="state && state.role !== 'viewer' && state.plus.bundle ? base + '/api/bundle' : null" :title="state && !state.plus.bundle ? 'BoxLang+ feature' : ''"><svg class="ic"><use href="#ph-download-simple"/></svg>Diagnostic bundle<span class="chipx plus" x-show="state && !state.plus.bundle" style="margin-left:6px">Plus</span></a></div>
+            <div class="card" x-show="envView === 'modules'"><h3>Modules <span x-text="envd.modules.length"></span></h3><div class="scroll"><table><thead><tr><th>Name</th><th>Version</th><th>State</th><th>Path</th></tr></thead><tbody><template x-for="m in envd.modules" :key="m.name"><tr><td class="mono" x-text="m.name"></td><td x-text="m.version"></td><td><span class="chipx" :class="m.activated ? 'on' : 'hid'" x-text="m.activated ? 'active' : (m.enabled ? 'loaded' : 'disabled')"></span></td><td class="mono mute" x-text="m.path"></td></tr></template></tbody></table></div></div>
+            <div class="card" x-show="envView === 'jvm'"><h3>JVM arguments</h3><pre class="code" x-text="envd.jvmArgs.join('\n')"></pre><dl class="kv" style="margin-top:10px"><template x-for="(v, k) in envd.info" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd x-text="v"></dd></div></template></dl></div>
+            <div class="card" x-show="envView === 'env' || envView === 'props'"><h3 x-text="envView === 'env' ? 'Environment variables' : 'System properties'"><span class="sub" x-text="'values of names that look secret are hidden'"></span></h3>
+              <div class="tools"><input type="text" placeholder="Filter by name" x-model="envq" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px"></div>
+              <div class="scroll" style="max-height:520px;margin-top:8px"><table><tbody><template x-for="r in envRows()" :key="r.name"><tr><td class="mono" style="white-space:nowrap" x-text="r.name"></td><td class="mono" style="word-break:break-all" :class="r.hidden ? 'mute' : ''" x-text="r.value"></td></tr></template></tbody></table></div></div>
+          </div>
+        </template>
+      </section>
+
+      <!-- In flight -->
+      <section x-show="tab === 'inflight'">
+        <h1 class="h1">In flight <small>requests running right now, longest first</small></h1>
+        <template x-if="inf">
+          <div class="split narrow">
+            <div class="card"><h3>Running <span x-text="inf.requests.length"></span></h3>
+              <p class="sub" x-show="!inf.requests.length">Nothing is running at the moment.</p>
+              <div class="scroll"><table><thead><tr><th>Request</th><th class="num">Elapsed</th><th>Thread</th><th class="num">Queries</th></tr></thead><tbody>
+                <template x-for="r in inf.requests" :key="r.id"><tr class="row" :class="isel === r.id ? 'sel' : ''" @click="pickInflight(r.id)"><td><span class="chipx hid" x-text="r.method"></span> <span class="mono" x-text="r.uri"></span></td><td class="num" :style="r.elapsedMs > 1000 ? 'color:var(--warn)' : ''" x-text="r.elapsedMs >= 1000 ? (r.elapsedMs / 1000).toFixed(1) + ' s' : r.elapsedMs + ' ms'"></td><td class="mono mute" x-text="r.thread + ' ' + r.threadState"></td><td class="num" x-text="r.queries"></td></tr></template></tbody></table></div></div>
+            <div class="card" x-show="isel"><h3>What it is doing <span class="mono" x-text="istack ? istack.state : ''"></span></h3>
+              <p class="sub" x-show="istack && istack.error" x-text="istack ? istack.error : ''"></p>
+              <pre class="code" style="max-height:480px;overflow:auto;white-space:pre-wrap;word-break:break-all"><template x-for="(f, i) in (istack && istack.frames ? istack.frames : [])" :key="i"><div :style="f.bx ? 'color:var(--cyan)' : 'color:var(--dim)'" x-text="f.text"></div></template></pre></div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Queries -->
+      <section x-show="tab === 'queries'">
+        <h1 class="h1">Queries <small>every statement seen since <span x-text="qs ? new Date(qs.since).toLocaleTimeString() : ''"></span>, in memory</small></h1>
+        <template x-if="qs">
+          <div>
+            <div class="tiles">
+              <div class="card"><h3>Executed</h3><div class="big" x-text="qs.executed"></div></div>
+              <div class="card"><h3>Statements</h3><div class="big" x-text="qs.statements.length"></div></div>
+              <div class="card"><h3>Failed</h3><div class="big" :style="qs.failed ? 'color:var(--crit)' : ''" x-text="qs.failed"></div></div>
+              <div class="card"><h3>Slow</h3><div class="big" :style="qs.slow ? 'color:var(--warn)' : ''" x-text="qs.slow"></div></div>
+              <div class="card"><h3>Average</h3><div class="big"><span x-text="qs.avgMs"></span><small>ms</small></div></div>
+            </div>
+            <div class="tools" style="margin:10px 0">
+              <template x-for="o in [['max', 'Slowest'], ['total', 'Longest in total'], ['count', 'Most executed'], ['fail', 'Failures']]" :key="o[0]"><button class="btn" :class="qsort === o[0] ? 'primary' : ''" @click="qsort = o[0]" x-text="o[1]"></button></template>
+              <input type="text" placeholder="Filter statements" x-model="qfilter" style="flex:1;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:5px;padding:5px 8px">
+              <button class="btn" :disabled="!state || state.readOnly" @click="resetQueries()">Reset</button></div>
+            <div class="split wide">
+              <div class="card"><div class="scroll" style="max-height:560px"><table><thead><tr><th>Statement</th><th class="num">Runs</th><th class="num">Avg</th><th class="num">Max</th><th class="num">Total</th><th class="num">Failed</th></tr></thead><tbody>
+                <template x-for="q in qrows()" :key="q.datasource + q.sql"><tr class="row" :class="qpick && qpick.sql === q.sql && qpick.datasource === q.datasource ? 'sel' : ''" @click="qpick = q"><td class="mono" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="q.sql"></td><td class="num" x-text="q.count"></td><td class="num" x-text="q.avgMs"></td><td class="num" :style="q.slow ? 'color:var(--warn)' : ''" x-text="q.maxMs"></td><td class="num" x-text="q.totalMs"></td><td class="num" :style="q.failures ? 'color:var(--crit)' : ''" x-text="q.failures"></td></tr></template></tbody></table></div>
+                <p class="sub" x-show="!qs.statements.length">No queries yet. Load a page that runs one.</p></div>
+              <div class="card" x-show="qpick"><h3>Statement <span x-text="qpick ? qpick.datasource : ''"></span></h3>
+                <pre class="code" style="white-space:pre-wrap;word-break:break-all;max-height:240px;overflow:auto" x-text="qpick ? qpick.sql : ''"></pre>
+                <dl class="kv" x-show="qpick"><dt>Runs</dt><dd x-text="qpick ? qpick.count : ''"></dd><dt>Failed</dt><dd x-text="qpick ? qpick.failures : ''"></dd><dt>Slow</dt><dd x-text="qpick ? qpick.slow : ''"></dd><dt>Min / avg / max</dt><dd x-text="qpick ? qpick.minMs + ' / ' + qpick.avgMs + ' / ' + qpick.maxMs + ' ms' : ''"></dd><dt>Total time</dt><dd x-text="qpick ? qpick.totalMs + ' ms' : ''"></dd><dt>Rows returned</dt><dd x-text="qpick ? qpick.rows : ''"></dd><dt>Called from</dt><dd class="mono" x-text="qpick && qpick.file ? qpick.file + ':' + qpick.line : 'unknown'"></dd><dt x-show="qpick && qpick.lastError">Last error</dt><dd x-show="qpick && qpick.lastError" x-text="qpick ? qpick.lastError : ''"></dd></dl>
+                <div class="tools"><button class="btn" x-show="qpick && qpick.slowestRequest" @click="openRequest(qpick.slowestRequest)">Open the slowest run</button><button class="btn" x-show="qpick && qpick.lastRequest" @click="openRequest(qpick.lastRequest)">Open the latest run</button></div>
+                <div class="tools" style="margin-top:8px" x-show="aiInfo"><button class="btn" @click="copyPrompt('query', qpick.sql, qpick.datasource)"><svg class="ic"><use href="#ph-copy"/></svg>Copy prompt</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('chatgpt', 'query', qpick.sql, qpick.datasource)">Ask ChatGPT</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('claude', 'query', qpick.sql, qpick.datasource)">Ask Claude</button><button class="btn primary" x-show="aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy" @click="explain('query', qpick.sql, qpick.datasource)"><svg class="ic"><use href="#ph-sparkle"/></svg>Explain with AI</button></div></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Errors -->
+      <section x-show="tab === 'errors'">
+        <h1 class="h1">Errors <small>requests that went wrong, grouped by cause</small></h1>
+        <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="state && !state.diskStore">Kept in memory only, so a restart clears them. BoxLang+ saves them to disk.</div>
+        <template x-if="errl">
+          <div class="split narrow">
+            <div class="card"><h3>Groups <span x-text="errl.groups.length + ' groups, ' + errl.occurrences + ' occurrences'"></span> <button class="btn mini" :disabled="!state || state.readOnly" @click="resetErrors()">Clear</button></h3>
+              <p class="sub" x-show="!errl.groups.length">No errors since the server started. Good.</p>
+              <div class="scroll" style="max-height:560px"><table><tbody>
+                <template x-for="g in errl.groups" :key="g.id"><tr class="row" :class="esel === g.id ? 'sel' : ''" @click="pickError(g.id)"><td><div class="mono" style="word-break:break-word" x-text="g.type"></div><div class="mute" style="font-size:12px" x-text="g.message"></div><div class="mute" style="font-size:11px" x-text="g.file ? g.file + ':' + g.line : ''"></div></td><td class="num"><div x-text="g.count + '×'"></div><div class="mute" style="font-size:11px" x-text="ago(g.lastSeen)"></div><span class="chipx hid" x-show="g.handled">handled</span></td></tr></template></tbody></table></div></div>
+            <div class="card" x-show="egroup"><h3><span class="mono" x-text="egroup ? egroup.type : ''"></span><span x-text="egroup ? egroup.count + ' occurrences, first ' + ago(egroup.firstSeen) : ''"></span></h3>
+              <p x-text="egroup ? egroup.message : ''"></p>
+              <p class="sub" x-show="egroup">Affected: <template x-for="(n, u) in (egroup ? egroup.urls : {})" :key="u"><span class="chipx hid" style="margin-right:4px" x-text="u + ' ×' + n"></span></template></p>
+              <div class="tools" x-show="egroup && egroup.samples.length > 1"><template x-for="(sm, i) in (egroup ? egroup.samples : [])" :key="i"><button class="btn mini" :class="esample === i ? 'primary' : ''" @click="esample = i" x-text="'Sample ' + (i + 1)"></button></template></div>
+              <template x-if="cur()">
+                <div>
+                  <dl class="kv"><dt>Request</dt><dd class="mono" x-text="cur().method + ' ' + cur().uri + (cur().query ? '?' + cur().query : '')"></dd><dt>Status</dt><dd x-text="cur().status + ' after ' + cur().ms + ' ms'"></dd><dt>From</dt><dd class="mono" x-text="cur().remoteAddr"></dd><dt>When</dt><dd x-text="new Date(cur().at).toLocaleString()"></dd><dt x-show="cur().template">Template</dt><dd class="mono" x-show="cur().template" x-text="cur().template"></dd><dt x-show="cur().sql">Statement</dt><dd class="mono" x-show="cur().sql" x-text="cur().sql"></dd></dl>
+                  <p x-show="cur().detail" class="sub" x-text="cur().detail"></p>
+                  <h3 style="margin-top:10px">Stack</h3>
+                  <pre class="code" style="max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all"><template x-for="(f, i) in (cur().frames || [])" :key="'b' + i"><div style="color:var(--cyan)" x-text="(f.file || '') + ':' + (f.line || '') + (f.name ? '  ' + f.name : '')"></div></template><template x-for="(j, i) in (cur().java || [])" :key="'j' + i"><div style="color:var(--dim)" x-text="j"></div></template></pre>
+                  <div x-show="cur().lastQueries && cur().lastQueries.length"><h3 style="margin-top:10px">Last queries</h3><pre class="code" style="white-space:pre-wrap;word-break:break-all"><template x-for="(q, i) in cur().lastQueries" :key="i"><div x-text="q"></div></template></pre></div>
+                  <div x-show="cur().messages && cur().messages.length"><h3 style="margin-top:10px">Messages before it failed</h3><pre class="code" style="white-space:pre-wrap"><template x-for="(m, i) in cur().messages" :key="i"><div x-text="m"></div></template></pre></div>
+                  <div class="tools" style="margin-top:8px"><button class="btn" @click="openRequest(cur().requestId)">Open the request</button></div>
+<div class="tools" style="margin-top:8px" x-show="aiInfo"><button class="btn" @click="copyPrompt('error', esel, esample)"><svg class="ic"><use href="#ph-copy"/></svg>Copy prompt</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('chatgpt', 'error', esel, esample)">Ask ChatGPT</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('claude', 'error', esel, esample)">Ask Claude</button><button class="btn primary" x-show="aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy" @click="explain('error', esel, esample)"><svg class="ic"><use href="#ph-sparkle"/></svg>Explain with AI</button></div>
+                </div>
+              </template>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Reports -->
+      <section x-show="tab === 'reports'">
+        <h1 class="h1">Reports <small>totals for this server</small></h1>
+        <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="rep && !rep.persisted">Totals are since the server started and are kept in memory. BoxLang+ keeps totals since first install across restarts.</div>
+        <template x-if="rep">
+          <div>
+            <div class="tiles">
+              <div class="card"><h3>Requests</h3><div class="big" x-text="rep.session.requests"></div><div class="sub" x-text="'up ' + dur(rep.uptimeMs / 1000)"></div></div>
+              <div class="card"><h3>Errors</h3><div class="big" :style="rep.session.errors ? 'color:var(--crit)' : ''" x-text="rep.session.errors"></div><div class="sub" x-text="(rep.session.requests ? (rep.session.errors * 100 / rep.session.requests).toFixed(1) : 0) + '% of requests'"></div></div>
+              <div class="card"><h3>Average</h3><div class="big"><span x-text="rep.session.avgMs"></span><small>ms</small></div><div class="sub" x-text="'max ' + rep.session.maxMs + ' ms'"></div></div>
+              <div class="card"><h3>p95 / p99</h3><div class="big"><span x-text="rep.session.p95"></span><small>ms</small></div><div class="sub" x-text="'p99 ' + rep.session.p99 + ' ms, p50 ' + rep.session.p50 + ' ms'"></div></div>
+              <div class="card"><h3>Slow</h3><div class="big" x-text="rep.session.slow"></div><div class="sub">over the slow request limit</div></div>
+            </div>
+            <div class="card" x-show="rep.lifetime" style="margin-top:10px"><h3>Since first install <span x-text="rep.lifetime ? new Date(rep.lifetime.since).toLocaleDateString() + ', ' + rep.lifetime.runs + ' starts' : ''"></span></h3>
+              <dl class="kv" x-show="rep.lifetime"><dt>Requests</dt><dd x-text="rep.lifetime ? rep.lifetime.requests : ''"></dd><dt>Errors</dt><dd x-text="rep.lifetime ? rep.lifetime.errors : ''"></dd><dt>Slow requests</dt><dd x-text="rep.lifetime ? rep.lifetime.slow : ''"></dd><dt>Queries</dt><dd x-text="rep.lifetime ? rep.lifetime.queries : ''"></dd><dt>Exceptions</dt><dd x-text="rep.lifetime ? rep.lifetime.exceptions : ''"></dd></dl></div>
+            <div class="grid2" style="margin-top:10px">
+              <div class="card"><h3>Requests per minute <span x-text="'last ' + (rep.seriesMinutes >= 120 ? Math.round(rep.seriesMinutes / 60) + ' hours' : rep.seriesMinutes + ' minutes')"></span></h3>
+                <svg viewBox="0 0 400 90" width="100%" height="90" role="img" aria-label="Requests per minute"><path :d="repPath(false)" fill="var(--cyan)" opacity=".8"/><path :d="repPath(true)" fill="var(--crit)"/></svg>
+                <p class="sub">Red is failed requests.</p></div>
+              <div class="card"><h3>Status codes</h3><template x-for="c in ['2xx', '3xx', '4xx', '5xx']" :key="c"><div><div class="rowbar" style="margin:6px 0 3px"><span class="mono" x-text="c"></span><span class="mute mono" x-text="rep.session.status[c]"></span></div><div class="bar" :class="c === '5xx' ? 'crit' : c === '4xx' ? 'warn' : ''"><div :style="'width:' + (rep.session.requests ? rep.session.status[c] * 100 / rep.session.requests : 0) + '%'"></div></div></div></template></div>
+              <div class="card"><h3>Slowest URLs</h3><table><thead><tr><th>URL</th><th class="num">Max</th><th class="num">Avg</th><th class="num">Hits</th></tr></thead><tbody><template x-for="u in rep.slowestUrls" :key="u.url"><tr><td class="mono" style="word-break:break-all" x-text="u.url"></td><td class="num" x-text="u.maxMs + ' ms'"></td><td class="num" x-text="u.avgMs"></td><td class="num" x-text="u.count"></td></tr></template></tbody></table></div>
+              <div class="card"><h3>Busiest URLs</h3><table><thead><tr><th>URL</th><th class="num">Hits</th><th class="num">Avg</th><th class="num">Errors</th></tr></thead><tbody><template x-for="u in rep.busiestUrls" :key="u.url"><tr><td class="mono" style="word-break:break-all" x-text="u.url"></td><td class="num" x-text="u.count"></td><td class="num" x-text="u.avgMs"></td><td class="num" x-text="u.errors"></td></tr></template></tbody></table></div>
+              <div class="card" x-show="rep.failingUrls.some(function (u) { return u.errors > 0; })"><h3>Most failing URLs</h3><table><thead><tr><th>URL</th><th class="num">Errors</th><th class="num">Hits</th></tr></thead><tbody><template x-for="u in rep.failingUrls.filter(function (x) { return x.errors > 0; })" :key="u.url"><tr><td class="mono" style="word-break:break-all" x-text="u.url"></td><td class="num" style="color:var(--crit)" x-text="u.errors"></td><td class="num" x-text="u.count"></td></tr></template></tbody></table></div>
+              <div class="card"><h3>Work done</h3><dl class="kv"><dt>Queries</dt><dd x-text="rep.session.queries + ' (' + rep.session.queryMs + ' ms in total)'"></dd><dt>Outgoing HTTP calls</dt><dd x-text="rep.session.httpCalls"></dd><dt>Exceptions</dt><dd x-text="rep.session.exceptions"></dd></dl>
+                <div class="tools" style="margin-top:8px"><button class="btn" :disabled="!state || state.readOnly" @click="resetReports()">Reset the counters</button></div></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Ask Lens -->
+      <section x-show="tab === 'ask'">
+        <h1 class="h1">Ask Lens <small>ask about this server in plain words</small></h1>
+        <div class="card" style="max-width:820px">
+          <p class="sub" x-show="aiInfo && !aiInfo.licensed">Asking a model from the server is a BoxLang+ feature (a license or a trial). Copy prompt and the chat links work without it.</p>
+          <p class="sub" x-show="aiInfo && aiInfo.licensed && !aiInfo.canCall">The server is not set to call a model (<span class="mono">ai.enabled</span> and the <span class="mono">bx-ai</span> module). You can still copy the prompt with a redacted summary of this server and paste it into a chat of your choice.</p>
+          <textarea x-model="askQ" rows="3" maxlength="1000" placeholder="Why was the server slow in the last few minutes?" style="width:100%;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px"></textarea>
+          <div class="tools" style="margin-top:8px"><button class="btn primary" x-show="aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy || !askQ.trim()" @click="ask()"><svg class="ic"><use href="#ph-sparkle"/></svg>Ask</button>
+            <button class="btn" :disabled="!askQ.trim()" @click="copyPrompt('ask', askQ, '')"><svg class="ic"><use href="#ph-copy"/></svg>Copy prompt</button>
+            <button class="btn" x-show="aiInfo && aiInfo.links" :disabled="!askQ.trim()" @click="sendPrompt('chatgpt', 'ask', askQ, '')">Ask ChatGPT</button><button class="btn" x-show="aiInfo && aiInfo.links" :disabled="!askQ.trim()" @click="sendPrompt('claude', 'ask', askQ, '')">Ask Claude</button></div>
+          <p class="sub">The summary holds uptime, heap, request totals, recent error messages, slow statements and executor health. Passwords, parameter values and the configuration are never included.</p>
+        </div>
+      </section>
+
+      <!-- System -->
+      <section x-show="tab === 'system'">
+        <h1 class="h1">System <small>JVM and host numbers, live</small></h1>
+        <template x-if="system">
+          <div>
+            <div class="tiles3">
+              <div class="card"><h3>Process CPU <span x-text="system.cpu.cores + ' cores'"></span></h3><div class="big"><span x-text="system.cpu.processCpu === null ? 'n/a' : system.cpu.processCpu"></span><small>%</small></div><div class="sub" x-text="'system ' + system.cpu.systemCpu + '%, load average ' + system.cpu.loadAverage"></div>
+                <svg viewBox="0 0 240 46" width="100%" height="46" role="img" aria-label="Process CPU"><path :d="line(sys.cpu, 100, 240, 46)" fill="none" stroke="var(--cyan)" stroke-width="1.6"/></svg></div>
+              <div class="card"><h3>Heap</h3><div class="big"><span x-text="bytes(system.memory.heap.used)"></span></div><div class="sub" x-text="'of ' + bytes(system.memory.heap.max) + ', non-heap ' + bytes(system.memory.nonHeap.used)"></div>
+                <svg viewBox="0 0 240 46" width="100%" height="46" role="img" aria-label="Heap used"><path :d="line(sys.heap, system.memory.heap.max, 240, 46)" fill="none" stroke="var(--cyan)" stroke-width="1.6"/></svg></div>
+              <div class="card"><h3>Threads</h3><div class="big" x-text="system.threads.live"></div><div class="sub" x-text="'peak ' + system.threads.peak + ', daemon ' + system.threads.daemon + ', deadlocked ' + system.threads.deadlocked"></div>
+                <svg viewBox="0 0 240 46" width="100%" height="46" role="img" aria-label="Thread count"><path :d="line(sys.thr, Math.max(10, system.threads.peak), 240, 46)" fill="none" stroke="var(--cyan)" stroke-width="1.6"/></svg></div>
+            </div>
+            <div class="grid2">
+              <div class="card"><h3>Memory pools <span>used / max</span></h3>
+                <div style="display:grid;gap:9px"><template x-for="p in system.memory.pools" :key="p.name"><div><div class="rowbar" style="margin:0 0 3px"><span class="mono" x-text="p.name"></span><span class="mute mono" x-text="bytes(p.used) + (p.max > 0 ? ' / ' + bytes(p.max) : ' / unbounded')"></span></div><div class="bar" :class="poolClass(p)"><div :style="'width:' + (p.max > 0 ? pctOf(p.used, p.max) : 12) + '%'"></div></div></div></template></div></div>
+              <div class="card"><h3>Garbage collection <span>since start</span></h3>
+                <div class="scroll"><table><thead><tr><th>Collector</th><th class="num">Runs</th><th class="num">Time</th></tr></thead><tbody><template x-for="g in system.gc" :key="g.name"><tr><td x-text="g.name"></td><td class="num" x-text="g.count"></td><td class="num" x-text="g.timeMs + ' ms'"></td></tr></template></tbody></table></div>
+                <h3 style="margin-top:14px">Host memory</h3>
+                <div x-show="system.ram"><div class="rowbar" style="margin:0 0 3px"><span class="mono">RAM</span><span class="mute mono" x-text="bytes(ramUsed()) + ' / ' + bytes(system.ram.total)"></span></div><div class="bar"><div :style="'width:' + pctOf(ramUsed(), system.ram.total) + '%'"></div></div>
+                  <div class="rowbar" style="margin:8px 0 3px" x-show="system.ram.swapTotal > 0"><span class="mono">Swap</span><span class="mute mono" x-text="bytes(system.ram.swapTotal - system.ram.swapFree) + ' / ' + bytes(system.ram.swapTotal)"></span></div></div>
+                <h3 style="margin-top:14px">Disks</h3>
+                <template x-for="d in system.disks" :key="d.path"><div style="margin-bottom:8px"><div class="rowbar" style="margin:0 0 3px"><span class="mono" x-text="d.path"></span><span class="mute mono" x-text="bytes(d.total - d.usable) + ' / ' + bytes(d.total)"></span></div><div class="bar"><div :style="'width:' + pctOf(d.total - d.usable, d.total) + '%'"></div></div></div></template></div>
+              <div class="card"><h3>Heap and garbage collection <span x-show="state && state.role === 'viewer'">admin only</span></h3>
+                <div class="tools" style="margin-bottom:10px"><button class="btn" :disabled="!state || state.readOnly || gcBusy" @click="runGc()"><svg class="ic"><use href="#ph-arrows-clockwise"/></svg>Run GC</button><span class="sub" x-text="gcResult"></span></div>
+                <template x-if="hd">
+                  <div>
+                    <p class="sub" x-show="state && !state.plus.heapDump"><span class="chipx plus">BoxLang+</span> Heap dumps need a BoxLang+ license or trial.</p>
+                    <p class="sub" x-show="state && state.plus.heapDump && !hd.enabled">Heap dumps are off. Set <span class="mono">console.allowHeapDump</span> to true in <span class="mono">boxlang.json</span> to turn them on.</p>
+                    <div x-show="hd.enabled && state && state.plus.heapDump">
+                      <p class="sub" x-show="hd.state === 'idle' || hd.state === 'failed'">A heap dump holds <b>everything in memory</b>, including passwords and session data. It pauses the JVM while it is written. Estimated size <span class="mono" x-text="bytes(hd.estimateBytes)"></span>, free disk in <span class="mono" x-text="hd.tempDir"></span> <span class="mono" x-text="bytes(hd.freeDiskBytes)"></span>.</p>
+                      <div class="msg err" x-show="hd.state === 'failed' || !hd.enoughDisk" x-text="hd.state === 'failed' ? 'The last dump failed: ' + hd.error : 'Not enough free disk space for a dump.'"></div>
+                      <div class="tools" x-show="hd.state === 'idle' || hd.state === 'failed'"><button class="btn warnb" :disabled="!hd.enoughDisk || !hd.supported || !state || state.role === 'viewer'" @click="hdConfirm = true"><svg class="ic"><use href="#ph-download-simple"/></svg>Take a heap dump</button></div>
+                      <div class="confirm" x-show="hdConfirm"><span>Write a full heap dump now? Live objects only (a full GC runs first). The JVM pauses while it is written.</span><button class="btn mini primary" @click="startHd()">Take the dump</button><button class="btn mini" @click="hdConfirm = false">Cancel</button></div>
+                      <p class="sub" x-show="hd.state === 'running'">Writing the dump... <span class="mono" x-text="dur((now - hd.startedAt) / 1000)"></span></p>
+                      <div x-show="hd.state === 'ready'"><p class="sub">Ready: <span class="mono" x-text="bytes(hd.bytes)"></span>. It is removed from the server after you download it (after 5 minutes) or <span x-text="dur(Math.max(0, (hd.expiresAt - now) / 1000))"></span> from now at the latest.</p>
+                        <div class="tools"><a class="btn primary" :href="hdHref()"><svg class="ic"><use href="#ph-download-simple"/></svg>Download .hprof</a><button class="btn" @click="discardHd()">Discard</button></div></div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+              <div class="card"><h3>Runtime</h3>
+                <dl class="kv"><dt>JVM</dt><dd x-text="system.runtime.vm"></dd><dt>Vendor</dt><dd x-text="system.runtime.vendor"></dd><dt>Java</dt><dd x-text="system.runtime.java"></dd><dt>OS</dt><dd x-text="system.cpu.os + ' ' + system.cpu.arch"></dd><dt>PID</dt><dd x-text="system.runtime.pid"></dd><dt>Uptime</dt><dd x-text="dur(system.runtime.uptimeMs / 1000)"></dd>
+                  <dt>Classes</dt><dd x-text="system.classes.loaded + ' loaded, ' + system.classes.unloaded + ' unloaded'"></dd><dt>Flags</dt><dd><template x-for="f in system.runtime.flags" :key="f"><div x-text="f"></div></template><span x-show="!system.runtime.flags.length">none</span></dd></dl></div>
+              <div class="card"><h3>System properties <span>selected, secrets masked</span></h3><dl class="kv"><template x-for="r in propRows()" :key="r.k"><div style="display:contents"><dt x-text="r.k"></dt><dd x-text="r.v"></dd></div></template></dl></div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Threads -->
+      <section x-show="tab === 'threads'">
+        <h1 class="h1">Threads <small>refreshes every 5 seconds while open</small></h1>
+        <template x-if="threads">
+          <div>
+            <div class="msg err" style="margin:0 0 10px" x-show="threads.deadlocked.length"><b>Deadlock detected</b> between <span x-text="threads.deadlocked.length"></span> threads.
+              <template x-for="t in threads.threads.filter(function (x) { return threads.deadlocked.indexOf(x.id) >= 0; })" :key="t.id"><div class="mono" x-text="t.name + ' waits for ' + (t.lock || '?') + ' held by ' + (t.lockOwner || '?')"></div></template>
+              <div class="tools" style="margin-top:8px" x-show="aiInfo"><button class="btn" @click="copyPrompt('deadlock', '', '')"><svg class="ic"><use href="#ph-copy"/></svg>Copy prompt</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('chatgpt', 'deadlock', '', '')">Ask ChatGPT</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('claude', 'deadlock', '', '')">Ask Claude</button><button class="btn primary" x-show="aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy" @click="explain('deadlock', '', '')"><svg class="ic"><use href="#ph-sparkle"/></svg>Explain with AI</button></div></div>
+            <div class="tools">
+              <div class="seg"><template x-for="f in ['ALL','RUNNABLE','WAITING','TIMED_WAITING','BLOCKED']" :key="f"><button :class="tf === f ? 'on' : ''" @click="tf = f" x-text="(f === 'ALL' ? 'All' : f.replace('_', ' ').toLowerCase()) + ' ' + tcount(f)"></button></template></div>
+              <select x-model="tpool" aria-label="Filter by pool" class="btn"><option value="">All pools</option><template x-for="p in pools()" :key="p"><option :value="p" x-text="p"></option></template></select>
+              <input type="search" placeholder="Filter by name or frame" aria-label="Filter threads" x-model="tq">
+              <span class="spacer"></span>
+              <button class="btn" @click="loadThreads()"><svg class="ic"><use href="#ph-arrow-clockwise"/></svg>Refresh</button>
+              <button class="btn" @click="copyDump()"><svg class="ic"><use href="#ph-copy"/></svg>Copy dump</button>
+              <a class="btn primary" :href="dumpUrl()" download><svg class="ic"><use href="#ph-download-simple"/></svg>Download dump</a>
+            </div>
+            <div class="split">
+              <div class="card scroll" style="padding:0;max-height:560px;overflow-y:auto"><table><thead><tr><th>Thread</th><th>State</th><th class="num">CPU ms</th><th class="num">Blocked</th></tr></thead><tbody>
+                <template x-for="t in tlist()" :key="t.id"><tr class="row" :class="[tsel === t.id ? 'sel' : '', t.self ? 'me' : '']" tabindex="0" @click="tsel = t.id" @keydown.enter="tsel = t.id">
+                  <td><span x-text="t.name"></span> <span class="pill" x-show="t.self">this request</span> <span class="pill ok" x-show="t.boxlang">BoxLang</span></td><td><span class="pill" :class="t.state === 'BLOCKED' ? 'crit' : t.state === 'RUNNABLE' ? 'ok' : ''" x-text="t.state"></span></td><td class="num" x-text="t.cpuMs === null ? 'n/a' : t.cpuMs"></td><td class="num" x-text="t.blockedCount"></td></tr></template>
+                <tr x-show="!tlist().length"><td colspan="4" class="empty">No threads match.</td></tr></tbody></table></div>
+              <div class="card">
+                <template x-if="thread()">
+                  <div>
+                    <h3><span class="mono" style="color:var(--ink)" x-text="thread().name"></span><span class="pill" x-text="thread().state"></span></h3>
+                    <div class="tools"><button class="btn" @click="copyStack()"><svg class="ic"><use href="#ph-copy"/></svg>Copy stack</button><span class="sub" x-show="thread().lock" x-text="'Waiting on ' + thread().lock + (thread().lockOwner ? ' held by ' + thread().lockOwner : '')"></span></div>
+                    <ul class="frames"><template x-for="(f, i) in thread().frames" :key="i"><li :class="f.bx ? 'bx' : ''" x-text="f.text"></li></template></ul>
+                    <div class="sub" x-show="!thread().frames.length">No stack.</div>
+                    <div class="legend"><span><i class="dot" style="background:var(--green)"></i>BoxLang template or function</span><span><i class="dot"></i>Java</span></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+
+      <!-- Bar designer -->
+      <section x-show="tab === 'designer'">
+        <h1 class="h1">Bar designer <small>choose the tabs the bar shows and their order</small></h1>
+        <template x-if="bar">
+          <div>
+            <div class="msg warn" style="margin:0 0 10px" x-show="!bar.enabled">The bar is off in the settings (<span class="mono">bar.enabled</span>). The layout is saved and applies when you turn it on.</div>
+            <div class="split">
+              <div class="card">
+                <h3>Tabs <span>drag to reorder, or use the arrows</span></h3>
+                <ul class="dlist" role="list">
+                  <template x-for="(t, i) in design" :key="t.id">
+                    <li class="drow" :class="[t.visible ? '' : 'off', dragOver === i ? 'over' : '']" draggable="true" @dragstart="dragFrom = i; $event.dataTransfer.effectAllowed = 'move'" @dragover.prevent="dragOver = i" @dragleave="dragOver = null" @drop.prevent="dropOn(i)" @dragend="dragFrom = null; dragOver = null">
+                      <svg class="ic grip"><use href="#ph-dots-six-vertical"/></svg>
+                      <button class="eye" @click="t.visible = !t.visible; dirty = true" :aria-pressed="t.visible" :aria-label="(t.visible ? 'Hide ' : 'Show ') + t.label" :disabled="t.hidden"><svg class="ic"><use :href="t.visible && !t.hidden ? '#ph-eye' : '#ph-eye-slash'"/></svg></button>
+                      <span class="dname" x-text="t.label"></span>
+                      <span class="chipx hid" x-show="t.custom">module panel</span><span class="chipx off" x-show="t.hidden">hidden in settings</span>
+                      <span class="spacer"></span>
+                      <button class="btn mini" @click="move(i, -1)" :disabled="i === 0" :aria-label="'Move ' + t.label + ' up'"><svg class="ic"><use href="#ph-caret-up"/></svg></button>
+                      <button class="btn mini" @click="move(i, 1)" :disabled="i === design.length - 1" :aria-label="'Move ' + t.label + ' down'"><svg class="ic"><use href="#ph-caret-down"/></svg></button>
+                    </li>
+                  </template>
+                </ul>
+                <div class="tools" style="margin-top:12px"><button class="btn primary" :disabled="!dirty || (state && !state.plus.barDesigner)" @click="saveDesign()"><svg class="ic"><use href="#ph-check-circle"/></svg>Save layout</button><button class="btn" :disabled="state && !state.plus.barDesigner" @click="resetDesign()">Reset to default</button><span class="chipx plus" x-show="state && !state.plus.barDesigner">BoxLang+ to save a layout</span><span class="sub" x-show="dirty">Unsaved changes</span></div>
+              </div>
+              <div class="card">
+                <h3>Preview <span>how the bar will look</span></h3>
+                <div class="prev"><div class="pstrip"><span class="plogo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#bx-mark"/></svg></span><b>Lens</b><span class="pchip ok">GET 200</span><span class="pchip">/orders.bxm</span><span class="pchip">time 41 ms</span><span class="pchip">sql 7</span></div>
+                  <div class="ptabs"><template x-for="(t, i) in previewTabs()" :key="t.id"><span class="ptab" :class="i === 0 ? 'on' : ''"><span x-text="t.label"></span><span class="pk" x-show="i < 9" x-text="i + 1"></span></span></template></div></div>
+                <p class="sub" style="margin-top:10px">The number keys switch tabs in this order. A tab with no data still shows. Developers see changes on the next page load.</p>
+              </div>
+            </div>
+          </div>
+        </template>
+      </section>
+
+      <!-- Settings -->
+      <section x-show="tab === 'settings'">
+        <h1 class="h1">Settings <small>changes apply at once and are saved, so they survive a restart</small></h1>
+        <template x-if="settings">
+          <div>
+            <div class="msg warn" style="margin:0 0 10px" x-show="settings.readOnly"><span x-show="settings.viewer">You are signed in as a viewer. Sign in with the admin password to change things.</span><span x-show="!settings.viewer">Read-only mode is on (<span class="mono">console.readOnly</span>). Nothing can be changed from the console.</span></div>
+            <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="!settings.readOnly">
+              <span x-text="settings.overridden"></span> setting(s) overridden. Saved to <span class="mono" x-text="settings.overridesFile"></span>.
+              <button class="btn" style="margin-left:8px" x-show="settings.overridden > 0" @click="resetSetting('')">Reset all to defaults</button>
+            </div>
+            <div class="msg err" style="margin:0 0 10px" x-show="settingsError" x-text="settingsError"></div>
+            <div class="grid2">
+              <template x-for="g in settings.groups" :key="g">
+                <div class="card" x-show="settings.settings.some(function (x) { return x.group === g; })"><h3 x-text="g"></h3>
+                  <template x-for="d in settings.settings.filter(function (x) { return x.group === g; })" :key="d.key">
+                    <div class="srow">
+                      <div class="slabel"><span x-text="d.label"></span> <span class="mono dim" x-text="d.key"></span>
+                        <span class="chipx hid" x-show="d.source === 'override'" :title="'Configured value: ' + String(d.configured)">changed</span>
+                        <span class="chipx hid" x-show="!d.live">boxlang.json only</span></div>
+                      <div class="sctl">
+                        <template x-if="d.type === 'bool' && d.live"><label class="sw"><input type="checkbox" :checked="sval(d) === true" :disabled="settings.readOnly" @change="sedit(d, $event.target.checked)"><span></span></label></template>
+                        <template x-if="d.type === 'enum' && d.live"><select :disabled="settings.readOnly" @change="sedit(d, $event.target.value)"><template x-for="o in d.options" :key="o"><option :value="o" :selected="sval(d) === o" x-text="o"></option></template></select></template>
+                        <template x-if="d.type === 'int' && d.live"><input type="number" :min="d.min" :max="d.max" :value="sval(d)" :disabled="settings.readOnly" @input="sedit(d, $event.target.value)"></template>
+                        <template x-if="(d.type === 'string' || d.type === 'list') && d.live"><input type="text" :value="Array.isArray(sval(d)) ? sval(d).join(', ') : sval(d)" :disabled="settings.readOnly" @input="sedit(d, $event.target.value)"></template>
+                        <template x-if="!d.live"><span class="mono" x-text="Array.isArray(d.value) ? d.value.join(', ') : String(d.value)"></span></template>
+                        <button class="btn" x-show="d.source === 'override' && !settings.readOnly" @click="resetSetting(d.key)" title="Back to the configured value">Reset</button>
+                      </div>
+                    </div>
+                  </template>
+                </div>
+              </template>
+            </div>
+            <div class="sbar" x-show="dirtyCount() > 0 && !settings.readOnly">
+              <span x-text="dirtyCount() + ' unsaved change(s)'"></span>
+              <button class="btn" @click="discardSettings()">Discard</button>
+              <button class="btn primary" @click="saveSettings()">Apply and save</button>
+            </div>
+          </div>
+        </template>
+      </section>
+    </main>
+    <div class="aipanel" x-show="aiOut.open" x-cloak><div class="rowbar"><b>AI answer</b><button class="btn mini" @click="aiOut.open = false">Close</button></div>
+      <p class="sub" x-show="aiBusy">Thinking...</p><p class="msg err" x-show="aiOut.error" x-text="aiOut.error"></p><div class="aitext" x-text="aiOut.text"></div></div>
+  </div>
+  <div class="toast" x-show="toastMsg" x-text="toastMsg" role="status"></div>
+</div>
+</body>
+</html>

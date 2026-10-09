@@ -1,0 +1,31 @@
+name: "BX Lens"
+description: "A request-level debug bar for BoxLang web apps. See templates, queries, HTTP calls, exceptions, timers and more on every page."
+source: docs
+baseURL: "/"
+theme:
+    name: bootstrap
+    options:
+        {
+            navCollapsible: true,
+            navExpandAll: false,
+            tocPosition: sticky,
+            accentColor: "#0097c0",
+            accentColorDark: "#00D4FF",
+        }
+    logo: "assets/bxlens-mark.svg"
+search: true
+social:
+    - url: "https://ortussolutions.atlassian.net/browse/BLMODULES"
+      icon: bug
+      label: "Report an issue (BLMODULES)"
+    - url: "https://www.ortussolutions.com/community/slack"
+      icon: slack
+      label: "Slack Community"
+footer: true
+lastUpdated: true
+pageActions: true
+imageGallery: true
+mermaid: true
+markdown:
+    enableFootnotes: true
+    enableDefinitionLists: true
