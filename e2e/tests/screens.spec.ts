@@ -281,6 +281,29 @@ test.describe( '@screens documentation screenshots', () => {
 		await consoleShot( page, 'console-modules' );
 	} );
 
+	test( 'console orm', async ( { page, request } ) => {
+		const orm = `http://127.0.0.1:${ process.env.ORM_PORT || '8091' }`;
+		await request.get( `${ orm }/orm.bxm?save=1` );
+		await page.goto( `${ orm }/~bxlens/index.bxm` );
+		await page.fill( '#pw', 'lens-demo' );
+		await page.click( '.go' );
+		await page.waitForSelector( '.shell .app' );
+		await page.click( '.nav:has-text("ORM")' );
+		await page.waitForTimeout( 1500 );
+		await consoleShot( page, 'console-orm' );
+	} );
+
+	test( 'console on the free tier', async ( { page } ) => {
+		const free = `http://127.0.0.1:${ process.env.FREE_PORT || '8090' }`;
+		await page.goto( `${ free }/~bxlens/index.bxm` );
+		await page.fill( '#pw', 'lens-demo' );
+		await page.click( '.go' );
+		await page.waitForSelector( '.shell .app' );
+		await page.click( '.nav:has-text("Caches")' );
+		await page.waitForTimeout( 1200 );
+		await consoleShot( page, 'console-free-locked' );
+	} );
+
 	test( 'bar bifs', async ( { lens } ) => {
 		await show( lens, '/orders.bxm', 'BIFs' );
 		await shoot( lens.page, 'bar-bifs' );
