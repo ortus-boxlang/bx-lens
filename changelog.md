@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* ORM support for bx-orm. The SQL Hibernate runs shows with the other queries, labelled ORM (free), by swapping the Hibernate connection provider for a JDK proxy, with a Logback fallback on `org.hibernate.SQL`. The console ORM page shows Hibernate statistics per session factory (BoxLang+, feature `ormStats`). New settings `collectors.orm.enabled` and `collectors.orm.statistics` (`boxlang.json` only). Harness: `WITH_ORM=1`. See [ORM](docs/panels/orm.md)
+
 ## [1.0.0] - 2026-10-08
 
 First release. BX Lens is a commercial Ortus Solutions product. Report issues in the BLMODULES Jira project.

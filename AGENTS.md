@@ -85,5 +85,5 @@ Relevant BoxLang development skills live under `.agents/skills` (restore with `n
   - `ai`: Explain with AI and Ask Lens (server side calls). Copy prompt and the ChatGPT and Claude buttons stay free.
   - `diskStore`: errors and reports saved, totals since first install, a longer minute series.
   - `fullHistory`: more than `LensService.FREE_HISTORY` (25) requests in memory.
-- Planned, not built: ORM SQL will be free like normal queries, and global ORM statistics will need Plus.
+  - `ormStats`: the console ORM page with Hibernate statistics. The ORM SQL in the query list stays free.
 - The rule: add a feature to `Licensing.PLUS_FEATURES`, gate it on the server with `plusOnly`, gate it in the UI with `state.plus` or `ui.plus`, add it to `docs/licensing.md` and to `e2e/tests/free.spec.ts`.

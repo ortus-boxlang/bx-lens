@@ -20,7 +20,7 @@ On Free, a locked item shows a "BoxLang+" note or chip next to it, and the serve
 ### What Free includes
 
 - The bar and all its tabs, except request cost and the slow request sample. This includes the BIFs timing tab, Copy prompt and the Ask ChatGPT and Ask Claude buttons.
-- Console Overview, Requests (the last 25 are kept in memory), In flight, Executors, Scheduled tasks (viewing), Datasources (including Test connection), Caches (statistics and the key list), Logs (browse, search, level filter, live tail), Environment, Modules, System, Threads (including the thread dump), Run GC, Queries, Errors (in memory), Reports (in memory, since startup, a 60 minute series), and Ask Lens with a copied prompt.
+- Console Overview, Requests (the last 25 are kept in memory), In flight, Executors, Scheduled tasks (viewing), Datasources (including Test connection), Caches (statistics and the key list), Logs (browse, search, level filter, live tail), Environment, Modules, System, Threads (including the thread dump), Run GC, Queries (including ORM SQL), Errors (in memory), Reports (in memory, since startup, a 60 minute series), and Ask Lens with a copied prompt.
 - Live Settings, read-only mode, the viewer role, the audit log, proxy header trust and `console.requireHttps`.
 - The bar designer page, including the Open console button and the More menu.
 - All `lens*` BIFs, including `lensReport`, `lensErrors`, `lensQueries`, `lensInflight` and `lensLicense`, and the extension API.
@@ -38,15 +38,12 @@ On Free, a locked item shows a "BoxLang+" note or chip next to it, and the serve
 | Save or reset a bar layout | Look at the designer | Allowed | Bar designer: Save layout and Reset to default are disabled, with a "BoxLang+ to save a layout" chip. Server: 403. |
 | AI calls from the server: Explain with AI and Ask Lens | No | Allowed, with `ai.enabled` | Ask Lens page: a note that server calls are a BoxLang+ feature. Server: 409. |
 | Disk store: errors and reports saved, totals since first install, a longer minute series | In memory, 60 minute series | Saved to disk, series as long as `store.retentionHours` | Errors and Reports pages: a note that the data is kept in memory only. |
+| ORM statistics (Hibernate totals per session factory) | The ORM SQL is free and shows with other queries | The console ORM page | ORM page: a BoxLang+ note. Server: 403. |
 | Requests kept in memory | 25 at most, even if `history.maxRequests` is higher | `history.maxRequests` as configured (default 50) | None. The Requests list and the History tab hold 25. |
 
 The disk store (`store.enabled`, on by default) writes `errors.json` and `reports.json` to `store.dir` (default `lens-data` in the BoxLang home). It keeps data for `store.retentionHours` (72), limits the errors file to `store.maxMB` (50) and writes every `store.flushSeconds` (30). Each file is replaced atomically. See [Errors and Reports](console/errors-and-reports.md#the-disk-store). Without the license the store settings have no effect. The bar layout file and the settings overrides file are small files for your own choices, and the settings file works on Free. Saving the bar layout needs BoxLang+.
 
 If a trial ends or a license expires, the locked features stop at the next license check (the answer is cached for 5 minutes). The disk store stops writing, the request history returns to 25, and request cost, the slow sample and the AI calls stop. The saved files stay on disk. Lens reads them at the next start if the license is valid then. Settings you configured do not have to change.
-
-### Planned
-
-Not built yet. ORM SQL will be free, like normal queries. Global ORM statistics will need BoxLang+.
 
 BoxLang AI (bx-ai) ships inside the module, in its `modules` folder, so there is nothing else to install. It is Apache 2.0 licensed. Using it from Lens still needs `ai.enabled` and, for the server calls, BoxLang+.
 
