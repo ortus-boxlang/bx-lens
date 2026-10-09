@@ -98,7 +98,9 @@ The password decides the role. `console.password` gives the admin role. `console
 
 | | Viewer | Admin |
 |---|---|---|
-| See every page and its data | yes | yes |
+| See Overview, Requests, In flight, Queries, Errors, Reports, Executors, Tasks, Datasources, Caches (statistics and key names), Modules and Settings | yes | yes |
+| Read the Logs page, the Environment page, the System page, the Threads page and thread stacks (`/api/threads`) | no | yes |
+| See the values of `console.access`, `access.proxyPeers` and `console.overridesFile` in Settings | no | yes |
 | Change settings | no | yes |
 | Task actions and saving the bar layout (BoxLang+ or a trial) | no | yes |
 | Cache evict, reap and clear (BoxLang+ or a trial) | no | yes |
@@ -113,7 +115,17 @@ The password decides the role. `console.password` gives the admin role. `console
 A viewer who sends such a request gets a 403, and the attempt goes to the audit log as `denied`. The list of routes only admins can use is `ADMIN_ONLY` in `ConsoleRouter`, plus every request that changes state.
 
 !!! warning "A viewer still sees a lot"
-    A viewer reads request data, queries, scope snapshots, key names of caches, the Environment page and the lines of every log file on screen. The viewer role limits what a person can change or take away as a file, not what they can read. Treat the viewer password as sensitive.
+    A viewer reads request data, queries, scope snapshots and key names of caches. Logs, thread stacks, the environment and system details are for admins. Request data can still be sensitive, so treat the viewer password as sensitive.
+
+### Brute force and the audit log
+
+Failed logins are counted per client in two windows, one for each role. A wrong password counts against both, because it may have been a guess at either. A sign in as a viewer clears only the viewer window, so the viewer password can never be used to give the admin window its attempts back. IPv6 clients are counted by their /64 network. Sessions (200) and failure records (5000) are capped and pruned on every login. A live stream does not keep a session from going idle.
+
+Every field in an audit line is stripped of control characters and cut to a length, so a client cannot forge a line. Refusals are audited too: `denied` (viewer), `denied.csrf`, `denied.readonly`, `denied.plus`, `denied.actions` and `denied.access` (a caller the console answers with 404, at most one line a minute per address). Reading a log file (`logfile.read`) and the environment (`environment.read`) are audited. A search term is logged as its length only.
+
+### Host names and DNS rebinding
+
+A guard whose rule is exactly `local` accepts only the Host names `localhost`, `127.0.0.1` and `[::1]`, unless `access.allowedHosts` is set. Add your own name there to reach the bar or console under it.
 
 `console.readOnly` is stricter: it refuses every change for both roles. Heap dumps (own switch, BoxLang+), the datasource connection test and the AI calls are not stopped by it. See [Console settings](console/settings.md#view-only).
 

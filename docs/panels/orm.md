@@ -28,7 +28,7 @@ The ORM page in the console shows Hibernate statistics for each session factory:
 
 | Setting | Default | Notes |
 |---|---|---|
-| `collectors.orm.enabled` | `true` | Turns the ORM SQL on or off. Does nothing when bx-orm is not installed. |
+| `collectors.orm.enabled` | `false` | Turns the ORM SQL on. Off by default: when off, Lens does not look at bx-orm at all (no reflection). It also shows the console ORM page. Does nothing when bx-orm is not installed. When Lens stops it puts the original connection provider back and removes its Logback appender. |
 | `collectors.orm.statistics` | `true` | Turns on Hibernate statistics for each session factory. Locked: set it in `boxlang.json` only. |
 
 ## How it works

@@ -27,12 +27,12 @@ A viewer can copy a prompt but cannot call the model. Calls from the server need
 
 A prompt holds only data that Lens has already redacted, and it is cut at 8000 characters.
 
-- An error prompt holds the type and message, the request line with the redacted query string, the status and time, the stack frames, the SQL statement without values, the last queries and the last messages.
+- An error prompt holds the type and message, the request id, the method and the path with numbers and ids replaced (no host and no query string), the status and time, the stack frames, the SQL statement, the last queries and the last messages. Credentials are hidden in all the text, and string and number literals in any SQL are replaced by `?`.
 - A query prompt holds the statement with placeholders, the datasource, the run counts and timings, and where it was called from.
 - A deadlock prompt holds each thread's name, state, the lock it waits for, who holds it, and up to 14 frames.
-- A question prompt holds your question and a short summary of the server: uptime, heap, thread counts, request totals, the slowest URLs, the latest error types and messages, slow or failing statements, the number of running requests and the executor summary.
+- A question prompt holds your question and a short summary of the server: uptime, heap, thread counts, request totals, the latest error types and messages, slow or failing statements (SQL without literals), the number of running requests and the executor summary.
 
-Passwords, parameter values and the configuration are not in a prompt. Credentials inside URLs and secret-looking `key=value` parameters are removed from the whole text. Exception messages and SQL text are shown as the application produced them, so read a prompt before you paste it into a service you do not control. See the [data flow](../security.md#ai-data-flow).
+Passwords, parameter values and the configuration are not in a prompt. Credentials inside URLs and secret-looking `key=value` parameters are removed from the whole text. Exception messages are passed through the credential masker and the same literal masking as SQL (every quoted string and number becomes `?`). No URL, host or query string is sent in a server summary. Still read a prompt before you paste it into a service you do not control. See the [data flow](../security.md#ai-data-flow).
 
 ## Let the server call a model
 

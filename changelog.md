@@ -9,7 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+* Defaults: `collect.level` is `light`, `history.trackNonHtml` is off in light and on in full, `collectors.queries.includeParams` is `false` everywhere, `collectors.orm.enabled` is `false` and the ORM collector does nothing (no reflection) while off. `collectors.bifs` and `collectors.logs` stay off. Light also skips the caller lookup of HTTP calls and transactions and the BoxLang frames of exceptions
+* Viewer role: the Logs (list, read, search), Environment, System and Threads pages and routes (including `/api/threads` and the dump) are admin only, and the settings values of `console.access`, `access.proxyPeers` and `console.overridesFile` are hidden from a viewer
+* A local only guard accepts only `localhost`, `127.0.0.1` and `[::1]` as Host names unless `access.allowedHosts` is set (DNS rebinding)
+* The snapshot JSON of a request is built when first needed (the bar is rendered for an allowed caller, or the console opens the request), not for every request. A request that is not kept in the history skips issue analysis, header capture and the snapshot collectors. The bar insert looks only at the last kilobyte of the page
+* Request ids are short counter and time based ids, not random UUIDs
+* Reports key URLs with numeric and UUID path segments collapsed (`/orders/:id`); QueryStats keeps SQL without string and number literals; stores trim in batches instead of scanning on every new key
+* The module list, JVM facts and cache configuration are cached instead of rebuilt for every request; `LensConfig` resolves paths once
+* Hand written scanners replace regular expressions in the query, error, statistics, secret and JSON code, and `Json.write` no longer uses `String.format`
+* Test dependency versions are pinned, `mavenLocal` is searched last, and the bundled bx-ai archive is verified by SHA-256
+
 ### Added
+
+* `history.headerAlways` (default `true`): the request id header on every tracked request. The id is also `request.bxlens.id`, `lensRequestId()` and the logging context key `requestId`. `collectors.http.propagateId` (default `false`, needs a core hook that does not exist yet)
+* Shared secret-name matcher (adds key, pass, pin, cvv, jwt, auth, session, csrf, webhook, dsn, sk_, cardnumber, x-api-key, accesstoken, clientsecret, trustStorePassword, sslpassword) used by the settings, JVM flags, datasource URLs, task definitions and headers; `-Dname=value` and `--flag=value` pairs are masked inside any value; outgoing HTTP URLs are masked
+* Query strings are masked in the snapshot, the history summary and the in-flight list
+* Editor link scheme allowlist (server and Settings page), `http(s)` only module links, escaped single quotes in Copy as cURL
+* Audit lines for refusals and for log and environment reads; every audit field is sanitized
+* Logs: reads from the end of the file, 8 MB scan window, two reads at once (429 when busy)
+* ORM collector: atomic hook, never affects the application's JDBC call, restores the original connection provider and removes its appender at shutdown; the Hikari metrics tracker is removed at shutdown
+* A request older than ten minutes is dropped from the in-flight list
+
+### Fixed
+
+* A viewer sign in no longer clears the admin failure counter; IPv6 clients are counted by /64; the stream no longer refreshes the session and its limit check is atomic
+* A proxy header value that is not an IP address is ignored
+* The AI call has its own bounded pool and is cancelled on timeout; the AI context carries no URLs, query strings or literals; `console.actions=false` also stops cache clear, evict and reap; the heap dump folder is kept until it is deleted and retried
+
+### Added (earlier in this release)
 
 * ORM support for bx-orm. The SQL Hibernate runs shows with the other queries, labelled ORM (free), by swapping the Hibernate connection provider for a JDK proxy, with a Logback fallback on `org.hibernate.SQL`. The console ORM page shows Hibernate statistics per session factory (BoxLang+, feature `ormStats`). New settings `collectors.orm.enabled` and `collectors.orm.statistics` (`boxlang.json` only). Harness: `WITH_ORM=1`. See [ORM](docs/panels/orm.md)
 

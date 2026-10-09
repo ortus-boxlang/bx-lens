@@ -47,7 +47,7 @@ Lens is off by default. There are two surfaces and you switch them on independen
 		"runTimeoutSeconds": 60,
 		"maxStreams": 10
 	},
-	"collect": { "level": "full" },
+	"collect": { "level": "light" },
 	"tabs": { "hide": [] },
 	"store": { "enabled": true, "dir": "", "retentionHours": 72, "maxMB": 50, "flushSeconds": 30 },
 	"ai": { "enabled": false, "provider": "", "model": "", "apiKey": "", "links": true },
@@ -63,7 +63,7 @@ Lens is off by default. There are two surfaces and you switch them on independen
 	"inject": true,
 	"contentTypes": [ "text/html" ],
 	"excludePaths": [ "/~bxlens/*", "/favicon.ico" ],
-	"history": { "trackNonHtml": true, "header": "X-BxLens-Id", "maxRequests": 50 },
+	"history": { "trackNonHtml": "", "header": "X-BxLens-Id", "headerAlways": true, "maxRequests": 50 },
 	"ui": {
 		"theme": "auto",
 		"startOpen": false,
@@ -83,7 +83,7 @@ Lens is off by default. There are two surfaces and you switch them on independen
 	"collectors": {
 		"templates": { "enabled": true, "max": 300 },
 		"functions": { "enabled": false, "max": 1000, "minMs": 0 },
-		"queries": { "enabled": true, "max": 200, "includeParams": true, "captureCaller": true },
+		"queries": { "enabled": true, "max": 200, "includeParams": false, "captureCaller": true },
 		"http": { "enabled": true, "max": 100 },
 		"exceptions": { "enabled": true, "max": 50 },
 		"messages": { "enabled": true, "max": 200 },
@@ -150,7 +150,7 @@ The console needs `enabled: true` and a password. See [Console](console/index.md
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `level` | string | `"full"` | `off`, `light` or `full`. `off` collects nothing. `light` is for production: it skips request headers, bound query parameters, the caller of each query, scope contents, Java stack traces, and the `functions`, `logs` and `scopes` collectors. SQL text, timings and counts are kept. |
+| `level` | string | `"light"` | `off`, `light` or `full`. `off` collects nothing. `light` is the default and is for production: it skips request headers, bound query parameters, the caller (template and line) of queries, outgoing HTTP calls and transactions, BoxLang frames of exceptions, scope contents, Java stack traces, and the `functions`, `logs`, `scopes` and `bifs` collectors. SQL text, timings and counts are kept. Use `full` while you develop. |
 
 ## `tabs`
 
@@ -164,7 +164,7 @@ These extra checks apply to the bar and the console.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `allowedHosts` | list | `[]` | Restrict to these `Host` header names. Empty means any host. |
+| `allowedHosts` | list | `[]` | Restrict to these `Host` header names. Empty means: any host, except that a guard whose rule is exactly `"local"` accepts only the names `localhost`, `127.0.0.1` and `[::1]` (this stops DNS rebinding, where a web page points its own name at 127.0.0.1). To reach a local-only bar or console under another name, such as `myapp.test` or a container name, list that name here. |
 | `requireHeader` | string | `""` | Require a request header: `"Name"` or `"Name=value"`. Empty means none. |
 | `trustProxyHeader` | boolean | `true` | Behind a proxy or load balancer, take the client address from `proxyHeader`. The header is only believed when the direct connection comes from one of `proxyPeers`. The same rule decides whether `X-Forwarded-Proto` is believed for the HTTPS check. |
 | `proxyHeader` | string | `"X-Forwarded-For"` | The header that carries the client address. With a list of addresses, Lens reads it from the right and takes the first address that is not a trusted proxy. |
@@ -184,8 +184,9 @@ See [Security](security.md#behind-a-proxy).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `trackNonHtml` | boolean | `true` | Record JSON, SSE, file and redirect requests too. They show no bar. |
-| `header` | string | `"X-BxLens-Id"` | Response header that carries the stored request id. |
+| `trackNonHtml` | boolean | empty | Record JSON, SSE, file and redirect requests too. They show no bar. Empty means off at `collect.level` `light` and on at `full`. A request that is not kept costs no snapshot, no issue analysis and no history entry; the console totals still count it. |
+| `header` | string | `"X-BxLens-Id"` | Response header that carries the request id. |
+| `headerAlways` | boolean | `true` | Send the id header on every tracked request, not only when the bar is shown. The id is short and unique, not a secret. It is also `request.bxlens.id` in the request scope, the result of `lensRequestId()`, and the logging context key `requestId` (SLF4J MDC) for the request thread, so a log pattern with `%X{requestId}` prints it. |
 | `maxRequests` | number | `50` | Size of the in-memory ring buffer. The oldest request is recycled when full. On Free the buffer is capped at 25. See [Licensing](licensing.md#free-and-boxlang). |
 
 ## `ui`
@@ -244,7 +245,7 @@ Optional help from a language model. Off by default. See [Ask Lens and AI help](
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `linkPattern` | string | `"vscode://file/{path}:{line}"` | Click-to-editor link. `{path}` and `{line}` are replaced. |
+| `linkPattern` | string | `"vscode://file/{path}:{line}"` | Click-to-editor link. `{path}` and `{line}` are replaced. The scheme must be one of `vscode:`, `vscode-insiders:`, `idea:`, `phpstorm:`, `subl:`, `file:`, `http:`, `https:`, `cursor:` or `zed:`. Any other scheme (such as `javascript:`) is replaced by the default on the server, and the Settings page refuses it. |
 | `remoteBase` | string | `""` | Path prefix on the server, for example inside a container. |
 | `localBase` | string | `""` | Path prefix on your machine that replaces `remoteBase`. |
 
@@ -284,9 +285,10 @@ Each collector powers one or more panels and has an `enabled` flag. Most also ha
 | | `minMs` | `0` | Skip calls faster than this. |
 | `queries` | `enabled` | `true` | SQL queries. Also switches the console [Queries](console/in-flight-and-queries.md#queries) page, which uses the same id. |
 | | `max` | `200` | Max query entries. |
-| | `includeParams` | `true` | Show bound parameters. Off at `light`. |
+| | `includeParams` | `false` | Show bound parameters. Off by default because bound values can be personal data. Off at `light` whatever this says. |
 | | `captureCaller` | `true` | Record the template and line that ran each query. Off at `light`. |
-| `http` | `enabled`, `max` | `true`, `100` | Outgoing HTTP calls. |
+| `http` | `enabled`, `max` | `true`, `100` | Outgoing HTTP calls. URLs are passed through the secret masker (user info and secret parameters are hidden), so Copy as cURL cannot expose a credential. |
+| | `propagateId` | `false` | Add the request id as `X-Request-Id` to outgoing calls. Off by default. It only works when core hands Lens a request builder with the event; today it hands an immutable request, so this has no effect yet. `boxlang.json` only. |
 | `exceptions` | `enabled`, `max` | `true`, `50` | Thrown and caught exceptions. |
 | `messages` | `enabled`, `max` | `true`, `200` | Messages and dumps. |
 | `timers` | `enabled`, `max` | `true`, `200` | Timers and measures. |
