@@ -68,7 +68,7 @@ def summarize(content):
 	try:
 		d = json.loads(content)
 	except ValueError:
-		return "Based on the tool result: " + str(content)[:400]
+		return "Here is what the tool returned (shortened): " + str(content)[:400]
 	res = d.get("result", d) if isinstance(d, dict) else d
 	lines = ["Here is what the **%s** tool returned:" % (d.get("tool", "?") if isinstance(d, dict) else "?"), ""]
 	if isinstance(res, dict):
@@ -78,7 +78,7 @@ def summarize(content):
 			elif isinstance(v, list):
 				vs = "%d items" % len(v)
 			else:
-				vs = str(v)[:140]
+				vs = (json.dumps(v) if isinstance(v, bool) else str(v))[:140]
 			lines.append("- %s: %s" % (k, vs))
 	else:
 		lines.append(str(res)[:300])
