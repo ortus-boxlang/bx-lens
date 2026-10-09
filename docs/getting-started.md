@@ -128,7 +128,7 @@ The bar inlines its CSS, JavaScript and data into the HTML response. That adds a
 
 - Lens injects into HTML responses (`text/html` by default), before the last `</body>`. Other responses are recorded but show no bar. They are kept in the console history.
 - Callers must pass the [access rules](security.md). By default only loopback addresses see the bar (`bar.access` is `"local"`).
-- When a request ends in an uncaught exception or abort, core renders its own error page and Lens cannot inject into it. The request is still recorded in History. See [Exceptions](panels/exceptions.md).
+- When a request ends in an uncaught exception or abort, core renders its own error page and Lens cannot inject into it. The request is still recorded in the console history. See [Exceptions](panels/exceptions.md).
 
 ## Next steps
 

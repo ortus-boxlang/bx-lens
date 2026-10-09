@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import ortus.boxlang.modules.bxlens.interceptors.ILensCollector;
+import ortus.boxlang.modules.bxlens.render.BarRenderer;
 import ortus.boxlang.modules.bxlens.store.RequestStore;
 import ortus.boxlang.modules.bxlens.util.Json;
 import ortus.boxlang.modules.bxlens.web.WebExchange;
@@ -62,6 +63,13 @@ public final class ConsoleRouter {
 			return;
 		}
 		LensConfig cfg = service.getConfig();
+		// The files of the bar hold no data and no secret, and the page of any caller who may see the bar must be able to load them, so they
+		// do not depend on console.access. Console pages and the console files keep their rules below
+		if ( ex.method().equalsIgnoreCase( "GET" ) && ex.pathInfo().startsWith( "/assets/" ) && ( cfg.barEnabled || cfg.consoleEnabled )
+		    && BarRenderer.isBarAsset( ex.pathInfo().substring( "/assets/".length() ) )
+		    && barAsset( context, ex, ex.pathInfo().substring( "/assets/".length() ) ) ) {
+			return;
+		}
 		if ( !cfg.consoleEnabled
 		    || !service.getConsoleGuard().isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( service.getConsoleGuard().requiredHeader() ) ) ) {
 			// Do not reveal that a console exists. The refusal is written to the audit log, at most once a minute per address
@@ -118,6 +126,32 @@ public final class ConsoleRouter {
 		html = html.replace( "<!--ICONS-->", read( "icons.svg" ) ).replace( "{{base}}", base ).replace( "{{version}}", escape( service.getVersion() ) )
 		    .replace( "{{csrf}}", s == null ? "" : s.csrf );
 		send( context, ex, 200, "text/html; charset=UTF-8", html, true );
+	}
+
+	/**
+	 * Serve a file of the bar. The URL carries the hash of the file, so a request with the current hash is cached for a year and never asked
+	 * about again. Without the hash (or when the UI files reload) the browser checks the ETag each time.
+	 *
+	 * @return true when it answered
+	 */
+	private boolean barAsset( IBoxContext context, WebExchange ex, String name ) {
+		BarRenderer.Asset a = service.getBarAsset( name );
+		if ( a == null ) {
+			return false;
+		}
+		String	etag	= "\"" + a.hash() + "\"";
+		String	inm		= ex.requestHeader( "If-None-Match" );
+		ex.setResponseHeader( "ETag", etag );
+		ex.setResponseHeader( "X-Content-Type-Options", "nosniff" );
+		ex.setResponseHeader( "Cache-Control", service.barAssetImmutable( name, ex.urlParam( "v" ) ) ? "public, max-age=31536000, immutable" : "no-cache" );
+		if ( etag.equals( inm ) ) {
+			ex.setStatus( 304 );
+			return true;
+		}
+		ex.setStatus( 200 );
+		ex.setResponseHeader( "Content-Type", a.type() );
+		context.writeToBuffer( a.text() );
+		return true;
 	}
 
 	private void asset( IBoxContext context, WebExchange ex, String name ) {
@@ -197,6 +231,8 @@ public final class ConsoleRouter {
 			json( context, ex, 401, Map.of( "error", "Sign in required" ) );
 			return;
 		}
+		// What the worker has queued (statistics, history, audit lines) lands before anything is read
+		service.sync();
 		if ( !method.equals( "GET" ) && !service.getAuth().csrfOk( s, ex.requestHeader( "X-Lens-CSRF" ) ) ) {
 			service.getAudit().log( "denied.csrf", s.role, ex.remoteAddr(), method + " " + route );
 			json( context, ex, 403, Map.of( "error", "Bad CSRF token" ) );
@@ -844,6 +880,7 @@ public final class ConsoleRouter {
 			series.add( b );
 		}
 		m.put( "series", series );
+		m.put( "lens", service.asyncStats() );
 		// Attention list from what we know today: failing routes and slow routes
 		List<Map<String, Object>> attention = new ArrayList<>();
 		for ( Map<String, Object> r : slow ) {

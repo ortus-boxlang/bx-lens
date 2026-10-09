@@ -292,16 +292,43 @@
 		return e.ctrlKey === want.ctrl && e.altKey === want.alt && e.shiftKey === want.shift && e.metaKey === want.meta && e.key.toLowerCase() === key.toLowerCase();
 	}
 
-	function register( Alpine ) {
-		Alpine.data( "bxLens", component );
+	// ---- boot
+	// The page holds an empty element, the request data and this script. The markup and the icons are fetched from the same server (the browser
+	// keeps them, the URL carries their hash). Alpine comes from the host page when it has one, else from the same place.
+	function boot() {
+		var root = document.getElementById( "bxlens" );
+		if ( !root || root.getAttribute( "data-booted" ) ) { return; }
+		root.setAttribute( "data-booted", "1" );
+		var base = root.getAttribute( "data-base" );
+		var url = function ( name, key ) { return base + name + "?v=" + root.getAttribute( key ); };
+		var begin = function () {
+			var A = window.Alpine;
+			A.data( "bxLens", component );
+			var get = function ( u ) { return fetch( u, { credentials: "same-origin" } ).then( function ( r ) { return r.ok ? r.text() : ""; } ); };
+			Promise.all( [ get( url( "lens.html", "data-html" ) ), get( url( "bar-icons.svg", "data-icons" ) ) ] ).then( function ( parts ) {
+				if ( !parts[ 0 ] ) { return; }
+				// Alpine watches the page for new elements. Changing the root while it is not looking, then starting it by hand, makes sure it is
+				// initialized once, not twice (two initializations would leave half of the bar bound to a copy of its data)
+				var apply = function () {
+					root.innerHTML = parts[ 1 ] + parts[ 0 ];
+					root.setAttribute( "x-data", "bxLens()" );
+				};
+				if ( A.mutateDom ) { A.mutateDom( apply ); } else { apply(); }
+				A.initTree( root );
+			} ).catch( function () { /* the bar stays hidden */ } );
+		};
+		var haveAlpine = function () { return window.Alpine && window.Alpine.version; };
+		if ( haveAlpine() ) { begin(); return; }
+		// The host may still be loading its own Alpine. Decide once everything on the page has run
+		var load = function () {
+			if ( haveAlpine() ) { begin(); return; }
+			var s = document.createElement( "script" );
+			s.src = url( "alpine.min.js", "data-alpine" );
+			s.onload = begin;
+			document.head.appendChild( s );
+		};
+		if ( document.readyState === "complete" ) { load(); } else { window.addEventListener( "load", load ); }
 	}
 
-	// Works whether Lens brings its own Alpine or the host page already runs one
-	if ( window.Alpine && window.Alpine.version ) {
-		register( window.Alpine );
-		var root = document.getElementById( "bxlens" );
-		if ( root && !root._x_dataStack ) { window.Alpine.initTree( root ); }
-	} else {
-		document.addEventListener( "alpine:init", function () { register( window.Alpine ); } );
-	}
+	if ( document.readyState === "loading" ) { document.addEventListener( "DOMContentLoaded", boot ); } else { boot(); }
 }() );

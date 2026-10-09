@@ -18,6 +18,9 @@ public final class Keys {
 	// Module identity
 	public static final Key	moduleName			= Key.of( "bxLens" );
 	public static final Key	requestAttach		= Key.of( "__bxLensRequest__" );
+	/** <code>request.bxlens</code> and its <code>id</code>, created once. */
+	public static final Key	bxlens				= Key.of( "bxlens" );
+	public static final Key	idKey				= Key.of( "id" );
 
 	// Event payload keys sent by BoxLang core
 	public static final Key	context				= Key.of( "context" );

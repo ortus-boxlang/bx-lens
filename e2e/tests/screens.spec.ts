@@ -46,9 +46,13 @@ test.describe( '@screens documentation screenshots', () => {
 		await shoot( page, 'queries' );
 	} );
 
-	test( 'issues', async ( { lens, page } ) => {
-		await show( lens, '/n-plus-one.bxm', 'Issues' );
-		await shoot( page, 'issues' );
+	test( 'issues, in the console request detail', async ( { page, request } ) => {
+		await request.get( '/n-plus-one.bxm' );
+		await consoleLogin( page );
+		await page.click( '.nav:has-text("Requests")' );
+		await page.locator( 'tr.row', { hasText: '/n-plus-one.bxm' } ).first().locator( 'td' ).first().click();
+		await expect( page.locator( '.wf div' ).first() ).toBeVisible();
+		await consoleShot( page, 'issues' );
 	} );
 
 	test( 'exceptions', async ( { lens, page } ) => {
@@ -56,11 +60,6 @@ test.describe( '@screens documentation screenshots', () => {
 		await shoot( page, 'issues-exception' );
 		await lens.open( 'Exceptions' );
 		await shoot( page, 'exceptions' );
-	} );
-
-	test( 'templates and functions', async ( { lens, page } ) => {
-		await show( lens, '/functions.bxm', 'Templates' );
-		await shoot( page, 'templates' );
 	} );
 
 	test( 'http', async ( { lens, page } ) => {
@@ -75,16 +74,6 @@ test.describe( '@screens documentation screenshots', () => {
 		await shoot( page, 'timers' );
 	} );
 
-	test( 'cache', async ( { lens, page } ) => {
-		await show( lens, '/cache.bxm', 'Cache' );
-		await shoot( page, 'cache' );
-	} );
-
-	test( 'modules', async ( { lens, page } ) => {
-		await show( lens, '/orders.bxm', 'Modules' );
-		await shoot( page, 'modules' );
-	} );
-
 	test( 'request, scopes and runtime', async ( { lens, page } ) => {
 		await page.goto( '/forms.bxm' );
 		await page.locator( '#login button' ).click();
@@ -96,12 +85,11 @@ test.describe( '@screens documentation screenshots', () => {
 		await shoot( page, 'runtime' );
 	} );
 
-	test( 'history', async ( { lens, page, request } ) => {
-		await request.get( '/api/orders.json.bxm' );
-		await request.get( '/events.bxm' );
-		await request.get( '/error.bxm', { failOnStatusCode: false } );
-		await show( lens, '/orders.bxm', 'History' );
-		await shoot( page, 'history' );
+	test( 'an interrupted span in the timeline', async ( { lens, page } ) => {
+		await show( lens, '/spans/caught-func.bxm', 'Timeline' );
+		await expect( page.locator( '#bxlens .wf .r', { hasText: 'risky()' } ).locator( '.flag:visible', { hasText: 'interrupted' } ) ).toBeVisible();
+		await page.locator( '#bxlens .wf .r', { hasText: 'risky()' } ).click();
+		await shoot( page, 'interrupted' );
 	} );
 
 	test( 'custom panels', async ( { lens, page } ) => {
@@ -199,7 +187,7 @@ test.describe( '@screens documentation screenshots', () => {
 		await consoleShot( page, 'console-threads' );
 		await page.click( '.nav:has-text("Bar designer")' );
 		await page.locator( '.drow', { hasText: 'Scopes' } ).locator( '.eye' ).click();
-		await page.locator( '.drow', { hasText: 'History' } ).locator( 'button[aria-label^="Move History up"]' ).click();
+		await page.locator( '.drow', { hasText: 'Runtime' } ).locator( 'button[aria-label^="Move Runtime up"]' ).click();
 		await consoleShot( page, 'console-designer' );
 		await page.click( '.nav:has-text("Settings")' );
 		await consoleShot( page, 'console-settings' );
@@ -272,6 +260,29 @@ test.describe( '@screens documentation screenshots', () => {
 		await page.locator( '.card', { hasText: 'Heap and garbage collection' } ).scrollIntoViewIfNeeded();
 		await page.waitForTimeout( 500 );
 		await consoleShot( page, 'console-system-heap' );
+	} );
+
+	test( 'console configuration', async ( { page } ) => {
+		await consoleLogin( page );
+		await page.click( '.nav:has-text("Configuration")' );
+		await expect( page.locator( '.main section:visible td.mono', { hasText: 'debugMode' } ) ).toBeVisible();
+		await consoleShot( page, 'console-configuration' );
+	} );
+
+	test( 'console unfinished request', async ( { page, request } ) => {
+		test.setTimeout( 150_000 );
+		request.get( '/spans/hang.bxm', { timeout: 4000 } ).catch( () => undefined );
+		await consoleLogin( page );
+		await page.click( '.nav:has-text("Requests")' );
+		const row = page.locator( 'tr.row', { hasText: '/spans/hang.bxm' } );
+		await expect( async () => {
+			await page.click( '.nav:has-text("Overview")' );
+			await page.click( '.nav:has-text("Requests")' );
+			await expect( row.locator( '.pill', { hasText: 'unfinished' } ) ).toBeVisible( { timeout: 2000 } );
+		} ).toPass( { timeout: 120_000, intervals: [ 3000 ] } );
+		await row.first().locator( 'td' ).first().click();
+		await expect( page.locator( '.wf div' ).first() ).toBeVisible();
+		await consoleShot( page, 'console-unfinished' );
 	} );
 
 	test( 'console modules', async ( { page } ) => {

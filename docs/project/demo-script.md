@@ -19,31 +19,29 @@ Press ``Ctrl+` `` to open the panel. Show the Timeline, then press `3` for Queri
 
 ## 2. An N+1
 
-Open `/n-plus-one.bxm`. The strip turns amber. Open Issues and click the N+1 issue to jump to its row. Show the caller in Queries.
+Open `/n-plus-one.bxm`. The bar only says what happened: 11 queries, no color. Show the queries and their caller in Queries, then press **Console** to open the request in the console, where the N+1 issue is listed.
 
-![Issues for the N+1 page](../assets/screenshots/issues.png)
+![The N+1 page in the console, with its issues](../assets/screenshots/issues.png)
 
 ## 3. A slow query
 
-Open `/slow.bxm`. Show the slow query flag in Issues and on the Timeline.
+Open `/slow.bxm`. Show the slow query on the Timeline, then the Slow query issue in the console request detail.
 
 ## 4. A caught exception
 
-Open `/caught-exception.bxm`. Lens opens the panel on Issues by itself. Open Exceptions to show the stack and the editor link.
+Open `/caught-exception.bxm`. Lens opens the panel on Exceptions by itself. Open Exceptions to show the stack and the editor link.
 
 ## 5. An uncaught error
 
-Open `/error.bxm`. Core shows its own page, so there is no bar. Go back to `/orders.bxm` and open History to show the request, its exception and its issue.
+Open `/error.bxm`. Core shows its own page, so there is no bar. Open the console Requests page to show the request, its exception and its issue.
 
 ## 6. History
 
-Visit `/api/orders.json.bxm` and `/events.bxm`, then open History on an HTML page. Show the JSON and SSE rows with their type pills. Mention the 50 request ring buffer and that nothing is saved.
+Visit `/api/orders.json.bxm` and `/events.bxm`, then open the console Requests page. Show the JSON and SSE rows with their type. Mention the 50 request ring buffer and that nothing is saved.
 
-![History with HTML, JSON and SSE rows](../assets/screenshots/history.png)
+## 7. HTTP and the runtime
 
-## 7. HTTP and cache
-
-Open `/http.bxm` and show the 404 flagged on HTTP. Open `/cache.bxm`, then the Cache tab, and show the request hits and misses.
+Open `/http.bxm` and show the 404 in HTTP. Open the Runtime tab to show the versions, the heap and the main settings, then the console Configuration page.
 
 ## 8. Redaction
 
@@ -75,7 +73,7 @@ Open `/load.bxm`, then the Executors page. The `demo-pool` goes degraded and the
 
 ## 13. A slow request
 
-Open `/stall.bxm`, then Issues. The Slow request issue names the line where the request was after 3 seconds. Point at the `cpu` and `alloc` chips in the strip.
+Open `/stall.bxm`, then open the request in the console. The Slow request issue names the line where the request was after 3 seconds. The Request tab of the bar shows the CPU time and the memory.
 
 ## 14. Design the bar
 

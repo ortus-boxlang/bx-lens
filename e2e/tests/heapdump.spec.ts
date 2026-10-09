@@ -15,6 +15,9 @@ async function signIn( page: Page, pw = 'lens-demo' ) {
 
 test.describe( 'heap and GC', () => {
 
+	// A full GC and a heap dump make the shared server slow on small CI machines
+	test.describe.configure( { timeout: 60_000 } );
+
 	test( 'Run GC reports how much was freed', async ( { page } ) => {
 		await signIn( page );
 		await page.click( 'button:has-text("Run GC")' );
@@ -45,6 +48,8 @@ test.describe( 'heap and GC', () => {
 		} );
 		expect( status ).toBe( 400 );
 		await page.click( 'button:has-text("Log out")' );
+		// Wait for the login form so the sign in does not race the page change after the log out
+		await expect( page.locator( '#pw' ) ).toBeVisible();
 		await signIn( page, 'lens-view' );
 		const viewer = await page.evaluate( async () => {
 			const r = await fetch( '/~bxlens/index.bxm/api/heapdump', { credentials: 'same-origin' } );

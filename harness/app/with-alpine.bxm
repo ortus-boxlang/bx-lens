@@ -1,0 +1,8 @@
+<bx:script>request.pageTitle = "Host Alpine";</bx:script>
+<bx:include template="/includes/header.bxm" />
+<bx:output>
+<h1>A page with its own Alpine</h1>
+<div x-data="{ n: 1 }"><button id="hostbtn" @click="n++">Add</button> <span id="hostn" x-text="n"></span></div>
+<script defer src="/vendor/alpine.min.js"></script>
+</bx:output>
+<bx:include template="/includes/footer.bxm" />

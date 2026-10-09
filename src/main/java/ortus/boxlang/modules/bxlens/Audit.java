@@ -27,11 +27,17 @@ public final class Audit {
 	 */
 	public void log( String event, String role, String ip, String detail ) {
 		try {
-			BoxLangLogger l = service.auditLogger();
-			if ( l != null ) {
-				l.info( "event={} role={} ip={} {}", clean( event, 64 ), clean( role == null ? "none" : role, 16 ), clean( ip, 64 ),
-				    clean( detail, 500 ) );
-			}
+			// Cleaned here, so a client cannot make the queue hold something large. Written by the worker, off the request thread
+			final String	e	= clean( event, 64 );
+			final String	r	= clean( role == null ? "none" : role, 16 );
+			final String	i	= clean( ip, 64 );
+			final String	d	= clean( detail, 500 );
+			service.async( () -> {
+				BoxLangLogger l = service.auditLogger();
+				if ( l != null ) {
+					l.info( "event={} role={} ip={} {}", e, r, i, d );
+				}
+			} );
 		} catch ( Throwable t ) {
 			// Auditing never breaks a request
 		}

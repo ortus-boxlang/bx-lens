@@ -27,13 +27,18 @@ test.describe( 'safety', () => {
 		}
 	} );
 
-	test( 'the bar adds exactly one root element and no extra network requests', async ( { lens, page } ) => {
+	test( 'the bar adds exactly one root element and requests only its own same-origin files', async ( { lens, page } ) => {
 		const requests: string[] = [];
 		page.on( 'request', ( r ) => requests.push( r.url() ) );
 		await lens.visit( '/orders.bxm' );
 		await lens.open( 'Timeline' );
 		expect( await page.locator( '#bxlens' ).count() ).toBe( 1 );
-		expect( requests.filter( ( u ) => !u.includes( '/orders.bxm' ) && !u.includes( 'favicon' ) ) ).toEqual( [] );
+		const others = requests.filter( ( u ) => !u.includes( '/orders.bxm' ) && !u.includes( 'favicon' ) );
+		// Only the five files of the bar, from the same server, with their hash: nothing external, nothing else
+		for ( const u of others ) {
+			expect( u ).toMatch( /^http:\/\/127\.0\.0\.1:\d+\/~bxlens\/index\.bxm\/assets\/(lens\.css|lens\.js|lens\.html|bar-icons\.svg|alpine\.min\.js)\?v=[0-9a-f]{12}$/ );
+		}
+		expect( others.length ).toBe( 5 );
 	} );
 
 } );

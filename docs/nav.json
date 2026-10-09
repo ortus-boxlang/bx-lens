@@ -58,6 +58,7 @@
 		"title": "Reference",
 		"children": [
 			"reference/events.md",
+			"reference/bar-files.md",
 			"design/api-spec.md"
 		]
 	},

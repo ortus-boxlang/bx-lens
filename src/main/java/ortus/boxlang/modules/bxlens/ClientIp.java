@@ -5,7 +5,6 @@
  */
 package ortus.boxlang.modules.bxlens;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -22,7 +21,7 @@ public final class ClientIp {
 	 * Is the proxy header honored for this connection?
 	 */
 	public static boolean trustsProxy( LensConfig cfg, String peer ) {
-		return cfg.getBool( "access.trustProxyHeader", true ) && AccessGuard.matchesAny( peers( cfg ), peer );
+		return cfg.trustProxyHeader && AccessGuard.matchesAny( cfg.proxyPeers, peer );
 	}
 
 	/**
@@ -35,7 +34,7 @@ public final class ClientIp {
 		if ( headerValue == null || headerValue.isBlank() || !trustsProxy( cfg, peer ) ) {
 			return peer;
 		}
-		List<String>	trusted		= peers( cfg );
+		List<String>	trusted		= cfg.proxyPeers;
 		String[]		parts		= headerValue.split( "," );
 		String			leftmost	= null;
 		for ( int i = parts.length - 1; i >= 0; i-- ) {
@@ -73,15 +72,6 @@ public final class ClientIp {
 			return t.substring( 0, t.indexOf( ':' ) );
 		}
 		return t;
-	}
-
-	private static List<String> peers( LensConfig cfg ) {
-		List<String> l = new ArrayList<>( cfg.getList( "access.proxyPeers", List.of() ) );
-		if ( l.isEmpty() ) {
-			String single = cfg.getString( "access.proxyPeers", "private" );
-			l.add( single.isBlank() ? "private" : single );
-		}
-		return l;
 	}
 
 }

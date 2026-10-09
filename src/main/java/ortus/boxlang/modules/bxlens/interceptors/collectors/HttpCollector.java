@@ -25,6 +25,11 @@ import ortus.boxlang.runtime.types.IStruct;
 @ortus.boxlang.runtime.events.Interceptor( autoLoad = false )
 public class HttpCollector extends BaseCollector {
 
+	private static final Key	STATUS_CODE		= Key.of( "statusCode" );
+	private static final Key	STATUS_CODE_ALT	= Key.of( "status_code" );
+	private static final Key	FILE_CONTENT	= Key.of( "fileContent" );
+	private static final Key	REQUEST_BUILDER	= Key.of( "httpRequestBuilder" );
+
 	@Override
 	public String id() {
 		return "http";
@@ -76,9 +81,9 @@ public class HttpCollector extends BaseCollector {
 			int		status	= 0;
 			long	size	= 0;
 			if ( event.get( Keys.result ) instanceof IStruct r ) {
-				Object s = firstNonNull( r.get( Key.of( "statusCode" ) ), r.get( Key.of( "status_code" ) ) );
+				Object s = firstNonNull( r.get( STATUS_CODE ), r.get( STATUS_CODE_ALT ) );
 				status = s instanceof Number n ? n.intValue() : parseInt( s );
-				Object content = r.get( Key.of( "fileContent" ) );
+				Object content = r.get( FILE_CONTENT );
 				size = content == null ? 0 : content.toString().length();
 			}
 			span.detail.put( "status", status );
@@ -138,7 +143,7 @@ public class HttpCollector extends BaseCollector {
 	 */
 	private void propagate( IStruct event, LensRequest req ) {
 		try {
-			if ( config().collectorBool( id(), "propagateId", false ) && event.get( Key.of( "httpRequestBuilder" ) ) instanceof HttpRequest.Builder b ) {
+			if ( config().collectorBool( id(), "propagateId", false ) && event.get( REQUEST_BUILDER ) instanceof HttpRequest.Builder b ) {
 				b.setHeader( "X-Request-Id", req.id );
 			}
 		} catch ( Throwable t ) {

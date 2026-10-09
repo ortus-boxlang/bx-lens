@@ -27,6 +27,8 @@ These functions work whenever the module is loaded. When Lens is not collecting 
 | [`lensQueries`](#lensqueries) | `( limit=20, sort="slowest" )` | array of structs |
 | [`lensInflight`](#lensinflight) | `()` | array of structs |
 | [`lensLicense`](#lenslicense) | `()` | struct |
+| [`lensDiagnostics`](#lensdiagnostics) | `()` | struct |
+| [`lensRequestId`](#lensrequestid) | `()` | string |
 
 `lensConsole()` also exists. It serves the [console](../console/index.md) and is called only by the module's own `index.bxm`. Do not call it from your code.
 
@@ -226,6 +228,19 @@ stuck = lensInflight().filter( ( r ) => r.elapsedMs > 5000 );
 if ( lensLicense().state == "expired" ) {
 	lensMessage( "The BoxLang+ license has expired", "warn" );
 }
+```
+
+### lensDiagnostics
+
+`lensDiagnostics()` shows how Lens itself is doing: `version`, `enabled`, `collectLevel`, `history` (`size`, `capacity`) and `async`, the state of the [work queue](production.md#work-off-the-request-thread): `enabled`, `depth` (waiting), `capacity`, `processed`, `dropped` (refused because the queue was full) and `failed` (tasks that threw).
+
+### lensRequestId
+
+`lensRequestId()` returns the id Lens gave this request, the same one as the `X-BxLens-Id` response header, `request.bxlens.id`, the id in the bar and the console and the logging context key `requestId`. It is an empty string when the request is not tracked. Use it to tie your own log lines or a support ticket to the request.
+
+```javascript
+writeLog( text = "order saved", log = "orders", type = "info" );   // with %X{requestId} in the log pattern, the id is on the line
+return { ok : true, requestId : lensRequestId() };
 ```
 
 ## Not available

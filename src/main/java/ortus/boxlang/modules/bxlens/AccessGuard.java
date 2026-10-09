@@ -23,14 +23,15 @@ import java.util.Locale;
  */
 public final class AccessGuard {
 
-	private final List<String>	rules;
-	private final boolean		allowAll;
-	private final boolean		downgraded;
-	private final List<String>	allowedHosts;
+	private final List<String>												rules;
+	private final boolean													allowAll;
+	private final boolean													downgraded;
+	private final List<String>												allowedHosts;
 	/** The rule is exactly "local": then only a loopback Host name is accepted unless access.allowedHosts says otherwise. */
-	private final boolean		localOnly;
-	private final String		requireHeaderName;
-	private final String		requireHeaderValue;
+	private final boolean													localOnly;
+	private final String													requireHeaderName;
+	private final String													requireHeaderValue;
+	private final java.util.concurrent.ConcurrentHashMap<String, Boolean>	addressCache	= new java.util.concurrent.ConcurrentHashMap<>();
 
 	/**
 	 * @param config            the settings
@@ -126,11 +127,20 @@ public final class AccessGuard {
 		if ( allowAll ) {
 			return true;
 		}
-		InetAddress addr = parse( remoteAddr );
-		if ( addr == null ) {
+		if ( remoteAddr == null ) {
 			return false;
 		}
-		return matchesAny( rules, addr );
+		// The same few addresses call over and over: the parse and the rule match are done once per address
+		Boolean known = addressCache.get( remoteAddr );
+		if ( known == null ) {
+			InetAddress addr = parse( remoteAddr );
+			known = addr != null && matchesAny( rules, addr );
+			if ( addressCache.size() >= 512 ) {
+				addressCache.clear();
+			}
+			addressCache.put( remoteAddr, known );
+		}
+		return known;
 	}
 
 	/**

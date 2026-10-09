@@ -36,6 +36,7 @@ import ortus.boxlang.modules.bxlens.model.SecurityChecks;
 import ortus.boxlang.modules.bxlens.model.Snapshot;
 import ortus.boxlang.modules.bxlens.render.BarRenderer;
 import ortus.boxlang.modules.bxlens.store.RequestStore;
+import ortus.boxlang.modules.bxlens.util.AsyncWorker;
 import ortus.boxlang.modules.bxlens.util.GlobalStats;
 import ortus.boxlang.modules.bxlens.util.Json;
 import ortus.boxlang.modules.bxlens.util.Keys;
@@ -93,8 +94,11 @@ public final class LensService {
 	private volatile String											version				= "0.0.0";
 	private volatile String											moduleDir			= "";
 	private final GlobalStats										stats				= new GlobalStats();
+	/** The one worker for statistics, history and audit. Inline until Lens is activated. */
+	private volatile AsyncWorker									worker				= new AsyncWorker( false, 1 );
 	private final LensRegistry										registry			= new LensRegistry();
-	private final List<ILensCollector>								collectors			= Collections.synchronizedList( new ArrayList<>() );
+	/** Copy on write: a request walks it without a lock. Changes (a setting, a reload) are rare. */
+	private final List<ILensCollector>								collectors			= new java.util.concurrent.CopyOnWriteArrayList<>();
 	private volatile BoxLangLogger									logger;
 	private volatile BoxLangLogger									auditLogger;
 	private final Audit												audit				= new Audit( this );
@@ -184,7 +188,8 @@ public final class LensService {
 		if ( this.config.consoleEnabled ) {
 			runtime.getInterceptorService().register( this.outcomes );
 		}
-		this.store = new RequestStore( this.config.maxRequests );
+		this.worker	= new AsyncWorker( this.config.getBool( "async.enabled", true ), this.config.getInt( "async.queueSize", 2000 ) );
+		this.store	= new RequestStore( this.config.maxRequests );
 		loadStore();
 		this.renderer = new BarRenderer( Path.of( moduleDir ).resolve( "assets" ), this.config.getBool( "dev.reloadAssets", false ) );
 		if ( !this.renderer.isComplete() ) {
@@ -214,6 +219,9 @@ public final class LensService {
 	 * Unregister all collectors and clear history.
 	 */
 	public synchronized void shutdown() {
+		// Let the queued statistics land before they are saved or cleared
+		worker.shutdown( 3000 );
+		worker = new AsyncWorker( false, 1 );
 		flushStore( true );
 		heapDumper.shutdown();
 		heapDumper = new HeapDumper();
@@ -440,7 +448,6 @@ public final class LensService {
 		req.showBar			= showBar;
 		req.requestContext	= rc;
 		req.method			= ex.method();
-		req.url				= ex.url();
 		req.uri				= uri;
 		req.queryString		= ex.queryString();
 		req.remoteAddr		= ex.remoteAddr();
@@ -462,16 +469,14 @@ public final class LensService {
 			// Headers already sent
 		}
 		tie( rc, req );
-		synchronized ( collectors ) {
-			for ( ILensCollector c : collectors ) {
-				try {
-					c.onRequestStart( req );
-				} catch ( Throwable t ) {
-					getLogger().debug( "Collector [{}] failed on request start: {}", c.id(), t.toString() );
-				}
+		for ( ILensCollector c : collectors ) {
+			try {
+				c.onRequestStart( req );
+			} catch ( Throwable t ) {
+				getLogger().debug( "Collector [{}] failed on request start: {}", c.id(), t.toString() );
 			}
 		}
-		announce( Keys.onLensRequestStart, Struct.of( "context", rc, "requestId", req.id ) );
+		announce( Keys.onLensRequestStart, () -> Struct.of( "context", rc, "requestId", req.id ) );
 		return req;
 	}
 
@@ -481,7 +486,9 @@ public final class LensService {
 	 */
 	private void tie( RequestBoxContext rc, LensRequest req ) {
 		try {
-			rc.getScopeNearby( ortus.boxlang.runtime.scopes.RequestScope.name ).put( Key.of( "bxlens" ), Struct.of( "id", req.id ) );
+			IStruct mine = new Struct();
+			mine.put( Keys.idKey, req.id );
+			rc.getScopeNearby( ortus.boxlang.runtime.scopes.RequestScope.name ).put( Keys.bxlens, mine );
 		} catch ( Throwable t ) {
 			// The request scope is optional
 		}
@@ -539,28 +546,29 @@ public final class LensService {
 		}
 		// A request that will not be kept in the history and will not show the bar needs none of the work that only feeds the page
 		final boolean keep = req.html || cfg.trackNonHtml;
-		synchronized ( collectors ) {
-			for ( ILensCollector c : collectors ) {
-				if ( !keep && c.snapshotOnly() ) {
-					continue;
-				}
-				try {
-					c.onRequestFinish( req );
-				} catch ( Throwable t ) {
-					getLogger().debug( "Collector [{}] failed on request finish [{}]: {}", c.id(), req.id, t.toString() );
-				}
+		for ( ILensCollector c : collectors ) {
+			if ( !keep && c.snapshotOnly() ) {
+				continue;
+			}
+			try {
+				c.onRequestFinish( req );
+			} catch ( Throwable t ) {
+				getLogger().debug( "Collector [{}] failed on request finish [{}]: {}", c.id(), req.id, t.toString() );
 			}
 		}
-		announce( Keys.onLensCollect, Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
-		// The console totals read the finished request directly
-		queryStats.record( req, cfg.slowQueryMs );
-		errors.record( req, cfg );
-		reports.record( req, cfg.slowRequestMs );
+		announce( Keys.onLensCollect, () -> Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
 		stats.recordRequest( Math.round( req.durationNs() / 1_000_000.0 ) );
+		// The console totals read the finished request directly. They are not needed to answer this request, so a worker does them
+		worker.submit( () -> {
+			queryStats.record( req, cfg.slowQueryMs );
+			errors.record( req, cfg );
+			reports.record( req, cfg.slowRequestMs );
+		} );
 
 		// What the page and the console need from the web request is copied now, while it is still there. Nothing is analyzed or serialized yet
 		if ( keep && ex != null ) {
 			try {
+				req.url = ex.url();
 				if ( !cfg.light ) {
 					req.requestHeaders = ex.requestHeaders();
 				}
@@ -577,7 +585,8 @@ public final class LensService {
 		RequestStore.Entry entry = null;
 		if ( keep && cfg.consoleEnabled ) {
 			entry = entryFor( req, cfg );
-			store.add( entry );
+			final RequestStore.Entry stored = entry;
+			worker.submit( () -> store.add( stored ) );
 		}
 		if ( keep && trigger == Trigger.END && req.showBar && req.html && renderer != null && renderer.isComplete() && ex != null
 		    && !ex.responseStarted() ) {
@@ -600,7 +609,7 @@ public final class LensService {
 				getLogger().warn( "bx-lens could not inject the bar for request [{}]: {}", req.id, t.toString() );
 			}
 		}
-		announce( Keys.onLensRequestFinish, Struct.of( "context", rc, "requestId", req.id ) );
+		announce( Keys.onLensRequestFinish, () -> Struct.of( "context", rc, "requestId", req.id ) );
 		req.release();
 	}
 
@@ -608,7 +617,7 @@ public final class LensService {
 	 * The history entry of a finished request. Its payloads and the issue analysis are built when somebody asks.
 	 */
 	private RequestStore.Entry entryFor( LensRequest req, LensConfig cfg ) {
-		return new RequestStore.Entry( req.id, Snapshot.summary( req, cfg ), () -> snapshotJson( req, cfg ), () -> {
+		return new RequestStore.Entry( req.id, () -> Snapshot.summary( req, cfg ), () -> snapshotJson( req, cfg ), () -> {
 			try {
 				analyze( req, cfg );
 				return Json.write( Snapshot.build( req, cfg, true ) );
@@ -671,13 +680,45 @@ public final class LensService {
 		req.status		= 0;
 		req.html		= false;
 		req.closeAll();
-		queryStats.record( req, cfg.slowQueryMs );
-		errors.record( req, cfg );
-		reports.record( req, cfg.slowRequestMs );
-		if ( cfg.consoleEnabled ) {
-			store.add( entryFor( req, cfg ) );
-		}
+		worker.submit( () -> {
+			queryStats.record( req, cfg.slowQueryMs );
+			errors.record( req, cfg );
+			reports.record( req, cfg.slowRequestMs );
+			if ( cfg.consoleEnabled ) {
+				store.add( entryFor( req, cfg ) );
+			}
+		} );
 		req.release();
+	}
+
+	/**
+	 * Run something off the request thread, in order. Never blocks and never throws.
+	 */
+	public void async( Runnable task ) {
+		worker.submit( task );
+	}
+
+	/**
+	 * Wait (a little) until the work queued so far has run. Readers of the statistics call it first, so what they show includes the request
+	 * that just ended.
+	 */
+	public void sync() {
+		worker.barrier( 1000 );
+	}
+
+	/**
+	 * The state of the worker, for the console and for diagnostics.
+	 */
+	public Map<String, Object> asyncStats() {
+		AsyncWorker			w	= worker;
+		Map<String, Object>	m	= new LinkedHashMap<>();
+		m.put( "enabled", w.enabled() );
+		m.put( "depth", w.depth() );
+		m.put( "capacity", w.capacity() );
+		m.put( "dropped", w.dropped() );
+		m.put( "processed", w.processed() );
+		m.put( "failed", w.failed() );
+		return m;
 	}
 
 	private String snapshotJson( LensRequest req, LensConfig cfg ) {
@@ -836,7 +877,10 @@ public final class LensService {
 		return sb.toString();
 	}
 
-	private void announce( ortus.boxlang.runtime.scopes.Key point, IStruct data ) {
+	/**
+	 * Announce a Lens point. The data is built only when something listens.
+	 */
+	private void announce( ortus.boxlang.runtime.scopes.Key point, java.util.function.Supplier<IStruct> data ) {
 		try {
 			if ( runtime != null ) {
 				runtime.getInterceptorService().announce( point, data );
@@ -1075,6 +1119,22 @@ public final class LensService {
 		m.put( "state", r.thread.getState().name() );
 		m.put( "frames", frames );
 		return m;
+	}
+
+	/**
+	 * A file of the bar (styles, script, markup, icons, Alpine), or null.
+	 */
+	public BarRenderer.Asset getBarAsset( String name ) {
+		BarRenderer r = renderer;
+		return r == null ? null : r.asset( name );
+	}
+
+	/**
+	 * May the browser keep this file for a year? True when the URL carries the current hash of the file.
+	 */
+	public boolean barAssetImmutable( String name, String version ) {
+		BarRenderer r = renderer;
+		return r != null && r.immutable( name, version );
 	}
 
 	public RuntimeInfo getRuntimeInfo() {

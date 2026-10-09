@@ -21,6 +21,7 @@ public class LensReport extends BaseLensBIF {
 
 	@Override
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
+		service().sync();
 		return BoxData.of( service().getReports().snapshot( service().diskStoreOn() ) );
 	}
 
