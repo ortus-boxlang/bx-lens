@@ -315,6 +315,7 @@ Each collector powers one or more panels and has an `enabled` flag. Most also ha
 | `jvm` | `enabled` | `true` | Runtime tab of the bar: a snapshot of the runtime, cached for a few seconds. |
 | `modules` | `enabled` | `true` | Console [Modules](console/modules.md) page. |
 | `configuration` | `enabled` | `true` | Console [Configuration](console/configuration.md) page. |
+| `orm` | `enabled` | `false` | The bx-orm [integration](reference/integrations.md): listens to `onORMQuery`, `onORMFlush` and `onORMException` and shows the SQL like a normal query. Opt in and needs the bx-orm module (1.7.2 or later) installed: until both are true Lens registers no listener. Live: an admin can switch it from the console Modules or ORM page. The console [ORM](panels/orm.md) page is always listed and shows the state. Parameter values need `announceQueryParams` in the ORM application's `ormSettings` and `queries.includeParams` here. |
 | `bifs` | `enabled` | `false` | Time per built-in function, from `postBIFInvocation`. Off by default and skipped at `light`, because every BIF call allocates an event while it is on. Needs a BoxLang build with core pull request 657. Lens's own `lens*` functions are left out, a request keeps up to 300 names, and the [panel](panels/bifs.md) shows the top 60 by total time. |
 | `executors` | `enabled` | `true` | Console [Executors](console/executors.md) page. |
 | `tasks` | `enabled` | `true` | Console [Tasks](console/tasks.md) page. |
@@ -366,6 +367,7 @@ Earlier builds had one top-level switch and one access rule for the bar. They ma
 | `access.allowPrivateNetworks: true` | add the word `private` to `bar.access` |
 | `access.allowedIPs: ["*"]` | `bar.access: "all"` plus `bar.allowAllIPs: true` |
 | `access.allowedHosts`, `access.requireHeader` | unchanged, now also apply to the console |
+| `collectors.orm.statistics` | removed. Lens no longer forces Hibernate statistics on. Set `generateStatistics` in the ORM application's `ormSettings`, or press Turn statistics on on the console ORM page |
 
 `checks.*` and `dev.*` were read with defaults but not declared in the schema. They are declared now, with the same names and defaults, so no change is needed. `console.allowHeapDump` is the one key that is still read without being declared.
 

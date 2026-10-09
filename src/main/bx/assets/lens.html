@@ -84,7 +84,7 @@
 			<thead><tr><th>SQL</th><th>Datasource</th><th>Rows</th><th>Time</th><th></th></tr></thead>
 			<tbody><template x-for="(q, n) in d.queries" :key="n">
 				<tr>
-					<td><div class="sql" x-text="q.sql"></div><span class="pill info" x-show="q.orm" title="Run by bx-orm (Hibernate)">ORM</span>
+					<td><div class="sql" x-text="q.sql"></div><span class="pill info" x-show="q.orm" title="Run by bx-orm (Hibernate)">ORM</span> <span class="pill" x-show="q.orm && q.kind" x-text="q.kind"></span>
 						<div class="mono" x-show="q.error" style="color:var(--crit)" x-text="q.error"></div>
 						<div class="mono muted" x-show="q.params && q.params.length" x-text="'params ' + JSON.stringify(q.params)"></div>
 						<div class="mono" x-show="q.file"><a :href="editorUrl(q.file, q.line)" x-text="shortPath(q.file) + ':' + q.line"></a></div></td>

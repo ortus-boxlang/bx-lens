@@ -5,104 +5,165 @@
  */
 package ortus.boxlang.modules.bxlens;
 
-import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 
-import ortus.boxlang.modules.bxlens.interceptors.collectors.OrmCollector;
+import ortus.boxlang.runtime.BoxRuntime;
+import ortus.boxlang.runtime.scopes.Key;
 
 /**
- * Global Hibernate statistics of every bx-orm session factory Lens hooked, read by reflection (Hibernate lives in bx-orm's class loader).
- * These are totals since the factory was built: no attribution to a request. Empty when bx-orm is not installed or no ORM application has started.
+ * Hibernate statistics of the bx-orm applications, for the ORM page. bx-orm offers them to tools through its own service:
+ * <code>ORMService.getStatistics( appName )</code> and <code>ORMService.setStatisticsEnabled( appName, enabled )</code>. Lens calls those two by
+ * reflection, because bx-orm lives in another class loader and Lens has no dependency on it. Lens never reads Hibernate itself.
+ * <p>
+ * The SQL, the flush counts and the failures come from the ORM events instead (see {@link OrmTotals}).
  */
 public final class OrmData {
 
-	private static final String[] COUNTS = { "queryExecutionCount", "entityLoadCount", "entityFetchCount", "entityInsertCount", "entityUpdateCount",
-	    "entityDeleteCount", "collectionLoadCount", "collectionFetchCount", "collectionUpdateCount", "flushCount", "sessionOpenCount", "sessionCloseCount",
-	    "transactionCount", "successfulTransactionCount", "connectCount", "prepareStatementCount", "closeStatementCount", "optimisticFailureCount",
-	    "secondLevelCacheHitCount", "secondLevelCacheMissCount", "secondLevelCachePutCount", "queryCacheHitCount", "queryCacheMissCount",
-	    "queryCachePutCount" };
+	/** Hibernate statistics are not collected unless the application sets <code>generateStatistics</code>, or an admin switches them on. */
+	public static final String		OFF_MESSAGE	= "statistics are off in this app: set generateStatistics in ormSettings, or turn them on here";
 
-	public Map<String, Object> stats() {
-		List<Map<String, Object>>						out	= new ArrayList<>();
-		List<Map.Entry<Object, Map<String, Object>>>	all;
-		synchronized ( OrmCollector.FACTORIES ) {
-			all = new ArrayList<>( OrmCollector.FACTORIES.entrySet() );
-		}
-		for ( Map.Entry<Object, Map<String, Object>> e : all ) {
-			Map<String, Object> m = new LinkedHashMap<>( e.getValue() );
-			try {
-				Object st = e.getKey().getClass().getMethod( "getStatistics" ).invoke( e.getKey() );
-				m.put( "enabled", Boolean.TRUE.equals( st.getClass().getMethod( "isStatisticsEnabled" ).invoke( st ) ) );
-				Map<String, Object> counts = new LinkedHashMap<>();
-				for ( String c : COUNTS ) {
-					Object v = get( st, c );
-					if ( v != null ) {
-						counts.put( c, v );
-					}
-				}
-				m.put( "counts", counts );
-				m.put( "slowestMs", get( st, "queryExecutionMaxTime" ) );
-				m.put( "slowestQuery", get( st, "queryExecutionMaxTimeQueryString" ) );
-				m.put( "startedAt", get( st, "start" ) instanceof java.time.Instant i ? i.toEpochMilli() : get( st, "startTime" ) );
-				Object ents = get( st, "entityNames" );
-				m.put( "entities", ents instanceof String[] a ? List.of( a ) : List.of() );
-				List<Map<String, Object>>	queries	= new ArrayList<>();
-				Object						qs		= get( st, "queries" );
-				if ( qs instanceof String[] arr ) {
-					Method one = st.getClass().getMethod( "getQueryStatistics", String.class );
-					for ( String hql : arr ) {
-						Object				q	= one.invoke( st, hql );
-						Map<String, Object>	qm	= new LinkedHashMap<>();
-						qm.put( "hql", hql.length() > 1000 ? hql.substring( 0, 1000 ) : hql );
-						for ( String f : new String[] { "executionCount", "executionRowCount", "executionAvgTime", "executionMaxTime", "executionMinTime",
-						    "cacheHitCount",
-						    "cacheMissCount", "cachePutCount" } ) {
-							qm.put( f, get( q, f ) );
-						}
-						queries.add( qm );
-					}
-				}
-				queries.sort(
-				    Comparator.comparingLong( ( Map<String, Object> q ) -> q.get( "executionMaxTime" ) instanceof Number n ? n.longValue() : 0 ).reversed() );
-				m.put( "queries", queries.size() > 50 ? queries.subList( 0, 50 ) : queries );
-			} catch ( Throwable t ) {
-				m.put( "error", String.valueOf( t.getMessage() ) );
-			}
-			out.add( m );
-		}
-		Map<String, Object> r = new LinkedHashMap<>();
-		r.put( "factories", out );
-		r.put( "installed", BoxRuntimeOrm.installed() );
-		return r;
+	private final Supplier<Object>	service;
+
+	/** Finds the ORM service in the runtime. */
+	public OrmData() {
+		this( OrmData::runtimeService );
 	}
 
-	private static Object get( Object o, String name ) {
+	/**
+	 * @param service gives the ORM service object, or null when bx-orm is not there (tests pass a fake)
+	 */
+	public OrmData( Supplier<Object> service ) {
+		this.service = service;
+	}
+
+	private static Object runtimeService() {
 		try {
-			String cap = Character.toUpperCase( name.charAt( 0 ) ) + name.substring( 1 );
-			try {
-				return o.getClass().getMethod( "get" + cap ).invoke( o );
-			} catch ( NoSuchMethodException e ) {
-				return o.getClass().getMethod( name ).invoke( o );
-			}
+			return BoxRuntime.getInstance().getGlobalService( Key.of( "ORMService" ) );
 		} catch ( Throwable t ) {
 			return null;
 		}
 	}
 
-	/** Is bx-orm present? */
-	private static final class BoxRuntimeOrm {
-
-		static boolean installed() {
-			try {
-				return ortus.boxlang.runtime.BoxRuntime.getInstance().getGlobalService( ortus.boxlang.runtime.scopes.Key.of( "ORMService" ) ) != null;
-			} catch ( Throwable t ) {
-				return false;
-			}
+	/**
+	 * The statistics of every ORM application that started: <code>apps</code> is a list of <code>{ app, enabled, datasources: [ { name,
+	 * enabled, ...counters } ] }</code>. <code>supported</code> is false when the installed bx-orm has no statistics API (before 1.7.2).
+	 */
+	public Map<String, Object> statistics() {
+		Map<String, Object>	out		= new LinkedHashMap<>();
+		List<Object>		apps	= new ArrayList<>();
+		out.put( "apps", apps );
+		Object svc = this.service.get();
+		out.put( "serviceFound", svc != null );
+		out.put( "offMessage", OFF_MESSAGE );
+		out.put( "supported", svc != null && has( svc, "getStatistics", Key.class ) );
+		if ( svc == null || !Boolean.TRUE.equals( out.get( "supported" ) ) ) {
+			return out;
 		}
+		for ( String name : appNames( svc ) ) {
+			Map<String, Object> app = new LinkedHashMap<>();
+			app.put( "app", name );
+			List<Object>	datasources	= new ArrayList<>();
+			boolean			any			= false;
+			try {
+				Object raw = svc.getClass().getMethod( "getStatistics", Key.class ).invoke( svc, Key.of( name ) );
+				if ( plain( raw, 0 ) instanceof Map<?, ?> stats && stats.get( "datasources" ) instanceof Map<?, ?> byName ) {
+					for ( Map.Entry<?, ?> e : byName.entrySet() ) {
+						Map<String, Object> ds = new LinkedHashMap<>();
+						ds.put( "name", String.valueOf( e.getKey() ) );
+						if ( e.getValue() instanceof Map<?, ?> counters ) {
+							for ( Map.Entry<?, ?> c : counters.entrySet() ) {
+								ds.put( String.valueOf( c.getKey() ), c.getValue() );
+							}
+						}
+						any = any || Boolean.TRUE.equals( ds.get( "enabled" ) );
+						datasources.add( ds );
+					}
+				}
+			} catch ( Throwable t ) {
+				app.put( "error", String.valueOf( cause( t ).getMessage() ) );
+			}
+			app.put( "enabled", any );
+			app.put( "datasources", datasources );
+			apps.add( app );
+		}
+		return out;
+	}
+
+	/**
+	 * Switch the statistics of an ORM application on or off, through <code>ORMService.setStatisticsEnabled</code>.
+	 *
+	 * @throws IllegalArgumentException when there is no such ORM application
+	 * @throws IllegalStateException    when bx-orm is missing or too old to offer the call
+	 */
+	public void setStatistics( String app, boolean enabled ) {
+		Object svc = this.service.get();
+		if ( svc == null || !has( svc, "setStatisticsEnabled", Key.class, boolean.class ) ) {
+			throw new IllegalStateException( "This bx-orm cannot switch statistics. Update bx-orm to 1.7.2 or later." );
+		}
+		if ( app == null || !appNames( svc ).contains( app ) ) {
+			throw new IllegalArgumentException( "No ORM application named [" + app + "]" );
+		}
+		try {
+			svc.getClass().getMethod( "setStatisticsEnabled", Key.class, boolean.class ).invoke( svc, Key.of( app ), enabled );
+		} catch ( Throwable t ) {
+			throw new IllegalStateException( String.valueOf( cause( t ).getMessage() ) );
+		}
+	}
+
+	/** Is bx-orm there and does it offer statistics? */
+	public boolean canSwitchStatistics() {
+		Object svc = this.service.get();
+		return svc != null && has( svc, "setStatisticsEnabled", Key.class, boolean.class );
+	}
+
+	@SuppressWarnings( "unchecked" )
+	private List<String> appNames( Object svc ) {
+		try {
+			Object names = svc.getClass().getMethod( "getORMAppNames" ).invoke( svc );
+			return names instanceof List<?> l ? new ArrayList<>( ( List<String> ) l ) : List.of();
+		} catch ( Throwable t ) {
+			return List.of();
+		}
+	}
+
+	private static boolean has( Object svc, String method, Class<?>... types ) {
+		try {
+			svc.getClass().getMethod( method, types );
+			return true;
+		} catch ( NoSuchMethodException e ) {
+			return false;
+		}
+	}
+
+	private static Throwable cause( Throwable t ) {
+		return t instanceof java.lang.reflect.InvocationTargetException e && e.getCause() != null ? e.getCause() : t;
+	}
+
+	/** Struct keys become names, so the JSON writer gets plain maps, lists and scalars. Nesting is capped. */
+	private static Object plain( Object o, int depth ) {
+		if ( depth > 6 ) {
+			return String.valueOf( o );
+		}
+		if ( o instanceof Map<?, ?> m ) {
+			Map<String, Object> out = new LinkedHashMap<>();
+			for ( Map.Entry<?, ?> e : m.entrySet() ) {
+				Object k = e.getKey();
+				out.put( k instanceof Key key ? key.getName() : String.valueOf( k ), plain( e.getValue(), depth + 1 ) );
+			}
+			return out;
+		}
+		if ( o instanceof List<?> l ) {
+			List<Object> out = new ArrayList<>();
+			for ( Object x : l ) {
+				out.add( plain( x, depth + 1 ) );
+			}
+			return out;
+		}
+		return o == null || o instanceof Number || o instanceof Boolean || o instanceof String ? o : String.valueOf( o );
 	}
 
 }

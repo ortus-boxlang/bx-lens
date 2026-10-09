@@ -77,6 +77,22 @@ These are not per request. Lens uses two of them, and only when the console is o
 
 Core keeps run counts for a task but not the error of its last run, so the Tasks page keeps it in memory since Lens started. Everything else on the console Executors, Tasks, System and Threads pages is read on demand from core's async and scheduler services and the JDK management beans, not from events.
 
+## ORM events (bx-orm)
+
+These come from the bx-orm module (1.7.2 or later), not from core. Lens listens to them only when the [ORM integration](integrations.md) is on and bx-orm is installed. They carry no `context`, so Lens finds the request that is current on the thread that announced them.
+
+| Event | Payload | Use |
+|---|---|---|
+| `onORMQuery` | `sql`, `kind`, `elapsedNanos`, `rows` (-1 unknown), `datasource`, `appName`, `hql`, `entityName`, `error`, `params` (only when the app sets `announceQueryParams`) | A query span and a query entry on the request, and the ORM totals. A select fires when its result set closes, so the span is `elapsedNanos` long and ends when the event arrives. Startup DDL and failed statements are announced too. |
+| `onORMFlush` | `inserts`, `updates`, `deletes` (statements, not entities), `elapsedNanos`, `datasource`, `appName` | Flush counts per datasource. |
+| `onORMException` | `error`, `sql`, `datasource`, `appName` | The recent failures list. |
+
+The statistics use two service calls instead of events: `ORMService.getStatistics( appName )` and `ORMService.setStatisticsEnabled( appName, enabled )`. See [ORM](../panels/orm.md).
+
+## Module events
+
+Lens listens to `postModuleLoad` and `postModuleUnload` (payload `moduleRecord`, `moduleName`) so an [integration](integrations.md) whose module is installed or removed while Lens runs starts or stops listening without a restart.
+
 ## Spans that never close
 
 A span opens on a `pre` event and closes on the matching `post` event. Core does not always fire the `post` event. This is what the harness pages in `harness/app/spans` showed on core 1.19, checked by the end to end tests in `e2e/tests/interrupted.spec.ts`:

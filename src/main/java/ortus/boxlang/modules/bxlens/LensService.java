@@ -108,6 +108,8 @@ public final class LensService {
 	private final LogData											logs				= new LogData();
 	private final EnvironmentData									environment			= new EnvironmentData( this );
 	private final OrmData											orm					= new OrmData();
+	private final OrmTotals											ormTotals			= new OrmTotals();
+	private volatile Integrations									integrations		= new Integrations();
 	private final RuntimeInfo										runtimeInfo			= new RuntimeInfo();
 	private final QueryStats										queryStats			= new QueryStats();
 	private final ErrorStore										errors				= new ErrorStore();
@@ -251,12 +253,7 @@ public final class LensService {
 		}
 		store.clear();
 		registry.clear();
-		// Put back what Lens changed in other modules and pools
-		try {
-			OrmCollector.shutdownAll();
-		} catch ( Throwable t ) {
-			// Nothing to undo
-		}
+		ormTotals.reset();
 		try {
 			ai.shutdown();
 		} catch ( Throwable t ) {
@@ -300,8 +297,9 @@ public final class LensService {
 		synchronized ( collectors ) {
 			for ( ILensCollector c : allBuiltIns ) {
 				boolean	heavyBlocked	= this.config.light && c.heavy();
-				boolean	want			= c instanceof LifecycleCollector
-				    || ( !heavyBlocked && this.config.isCollectorEnabled( c.id(), c.enabledByDefault() ) );
+				boolean	switchedOn		= c.integration() != null ? this.integrations.on( c.integration(), this.config )
+				    : this.config.isCollectorEnabled( c.id(), c.enabledByDefault() );
+				boolean	want			= c instanceof LifecycleCollector || ( !heavyBlocked && switchedOn );
 				boolean	has				= collectors.contains( c );
 				if ( want && !has ) {
 					register( c );
@@ -310,6 +308,46 @@ public final class LensService {
 				}
 			}
 		}
+	}
+
+	/**
+	 * A module was loaded or unloaded: register the listeners of integrations whose module is now installed, remove the ones whose module is gone.
+	 * Called from the module events, so no restart is needed.
+	 */
+	public synchronized void reconcileIntegrations() {
+		if ( runtime != null ) {
+			reconcileCollectors();
+		}
+	}
+
+	/**
+	 * Switch an integration on or off, live. Switching on needs its module.
+	 *
+	 * @throws IllegalArgumentException when the id is not an integration
+	 * @throws IllegalStateException    when the module is not installed
+	 */
+	public synchronized void setIntegration( String id, boolean enabled ) throws java.io.IOException {
+		Integrations.Def d = Integrations.get( id );
+		if ( d == null ) {
+			throw new IllegalArgumentException( "Unknown integration: " + id );
+		}
+		if ( enabled && !integrations.isInstalled( d ) ) {
+			throw new IllegalStateException( "Install " + d.install() + " to enable " + d.name() );
+		}
+		changeSettings( Map.of( d.settingKey(), enabled ) );
+	}
+
+	public Integrations getIntegrations() {
+		return integrations;
+	}
+
+	/** Replace how installed modules are found (tests). */
+	public void setIntegrations( Integrations integrations ) {
+		this.integrations = integrations;
+	}
+
+	public OrmTotals getOrmTotals() {
+		return ormTotals;
 	}
 
 	public SettingsRegistry getSettingsRegistry() {

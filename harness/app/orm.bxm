@@ -8,6 +8,19 @@
 		entitySave( b );
 		ormFlush();
 	}
+	failure = "";
+	if ( url.keyExists( "fail" ) ) {
+		// A title longer than its column: the INSERT fails at the flush, which announces onORMQuery with the error and onORMException
+		try {
+			bad = entityNew( "Book" );
+			bad.setTitle( repeatString( "x", 400 ) );
+			bad.setAuthor( "Bad" );
+			entitySave( bad );
+			ormFlush();
+		} catch ( any e ) {
+			failure = e.message;
+		}
+	}
 	books = entityLoad( "Book" );
 	byAuthor = ormExecuteQuery( "from Book where author = :a", { a : "Ada" } );
 </bx:script>
@@ -15,5 +28,6 @@
 <bx:output>
 <h1>ORM</h1>
 <p>#books.len()# books loaded through bx-orm, #byAuthor.len()# by Ada. Lens shows the SQL with the ORM label.</p>
+<p id="failure">#failure.len() ? "The insert failed" : ""#</p>
 </bx:output>
 <bx:include template="/includes/footer.bxm" />

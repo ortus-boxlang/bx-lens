@@ -11,7 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-* Defaults: `collect.level` is `light`, `history.trackNonHtml` is off in light and on in full, `collectors.queries.includeParams` is `false` everywhere, `collectors.orm.enabled` is `false` and the ORM collector does nothing (no reflection) while off. `collectors.bifs` and `collectors.logs` stay off. Light also skips the caller lookup of HTTP calls and transactions and the BoxLang frames of exceptions
+* The ORM integration replaced the first ORM spike: the JDK proxy around the Hibernate connection provider, the swap of a private Hibernate field, the Logback fallback on `org.hibernate.SQL` and the reading of Hibernate statistics by reflection are gone. `collectors.orm.statistics` is removed (Lens no longer forces Hibernate statistics on; use `generateStatistics` in `ormSettings`). The console ORM page is always listed so it can show the integration state
+* Defaults: `collect.level` is `light`, `history.trackNonHtml` is off in light and on in full, `collectors.queries.includeParams` is `false` everywhere, `collectors.orm.enabled` is `false` and Lens registers no ORM listener while it is off or bx-orm is not installed. `collectors.bifs` and `collectors.logs` stay off. Light also skips the caller lookup of HTTP calls and transactions and the BoxLang frames of exceptions
 * Viewer role: the Logs (list, read, search), Environment, System and Threads pages and routes (including `/api/threads` and the dump) are admin only, and the settings values of `console.access`, `access.proxyPeers` and `console.overridesFile` are hidden from a viewer
 * A local only guard accepts only `localhost`, `127.0.0.1` and `[::1]` as Host names unless `access.allowedHosts` is set (DNS rebinding)
 * The snapshot JSON of a request is built when first needed (the bar is rendered for an allowed caller, or the console opens the request), not for every request. A request that is not kept in the history skips issue analysis, header capture and the snapshot collectors. The bar insert looks only at the last kilobyte of the page
@@ -29,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Editor link scheme allowlist (server and Settings page), `http(s)` only module links, escaped single quotes in Copy as cURL
 * Audit lines for refusals and for log and environment reads; every audit field is sanitized
 * Logs: reads from the end of the file, 8 MB scan window, two reads at once (429 when busy)
-* ORM collector: atomic hook, never affects the application's JDBC call, restores the original connection provider and removes its appender at shutdown; the Hikari metrics tracker is removed at shutdown
+* ORM integration: Lens listens to bx-orm events only (see Added below). No class of another module is reflected into for SQL, the Hikari metrics tracker is removed at shutdown
 * A request older than ten minutes is dropped from the in-flight list
 
 ### Fixed
@@ -40,7 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added (earlier in this release)
 
-* ORM support for bx-orm. The SQL Hibernate runs shows with the other queries, labelled ORM (free), by swapping the Hibernate connection provider for a JDK proxy, with a Logback fallback on `org.hibernate.SQL`. The console ORM page shows Hibernate statistics per session factory (BoxLang+, feature `ormStats`). New settings `collectors.orm.enabled` and `collectors.orm.statistics` (`boxlang.json` only). Harness: `WITH_ORM=1`. See [ORM](docs/panels/orm.md)
+* ORM support for bx-orm, as the first [integration](docs/reference/integrations.md). Lens listens to the `onORMQuery`, `onORMFlush` and `onORMException` events of bx-orm 1.7.2 or later. Each statement is a query span and a query entry labelled ORM with its kind (select, insert, update, delete, ddl, other), shown in the bar, the request, the Timeline and the console Queries page (free). Startup DDL and failed statements are included; a statement outside a request counts in the ORM totals only; parameter values need `announceQueryParams` in the ORM app and `collectors.queries.includeParams`. The console ORM page (BoxLang+, feature `ormStats`) shows the integration state, per datasource totals from the events (statements by kind, failures, flushes), the recent failures and the Hibernate statistics read through `ORMService.getStatistics`; when statistics are off it says so, and an admin can switch them with `ORMService.setStatisticsEnabled` (audited, refused in read-only mode). Harness: `WITH_ORM=1` installs bx-orm 1.7.2-snapshot (`BX_ORM_VERSION`) or builds it from a checkout (`BX_ORM_DIR`). See [ORM](docs/panels/orm.md)
+* Integrations: a small registry (`Integrations`) of module integrations with the status `notInstalled`, `available` or `on`. Every integration is opt in (`collectors.<id>.enabled`, default `false`), needs its module installed and listens to events only. The console Modules page has an Integrations section with a live, admin only switch that is offered only when the module is installed; routes `GET /api/integrations` and `POST /api/integrations/{id}`. Listeners register and unregister without a restart when the setting changes or the module loads (`postModuleLoad`) or unloads (`postModuleUnload`). See [Integrations](docs/reference/integrations.md)
+* The Queries console page shows an ORM label and the kind of ORM statements, and counts a failed ORM statement as a failure
 
 ## [1.0.0] - 2026-10-08
 

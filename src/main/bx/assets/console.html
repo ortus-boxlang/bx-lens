@@ -288,6 +288,9 @@
       <!-- Modules -->
       <section x-show="tab === 'modules'">
         <h1 class="h1">Modules <small>everything loaded into this runtime, including modules nested inside other modules</small></h1>
+        <div class="card" style="margin-bottom:12px" id="integrations" x-show="ints"><h3>Integrations <span>Lens listens to the events of these modules. Off until you turn them on, and they need the module installed.</span></h3>
+          <div class="scroll"><table><thead><tr><th>Integration</th><th>Module</th><th>Status</th><th>Listen</th></tr></thead><tbody>
+            <template x-for="i in (ints ? ints.integrations : [])" :key="i.id"><tr :data-integration="i.id"><td><strong x-text="i.name"></strong><div class="sub" x-text="i.description"></div></td><td class="mono" x-text="i.module"></td><td><span class="chipx" :class="i.status === 'on' ? 'on' : 'hid'" x-text="intStatusText(i)"></span></td><td><label class="sw"><input type="checkbox" :checked="i.enabled" :disabled="!ints.canChange || !i.installed" :aria-label="'Listen to ' + i.name" @change="setIntegration(i, $event.target.checked)"><span></span></label><span class="sub" style="margin-left:8px" x-text="intHint(i)"></span></td></tr></template></tbody></table></div></div>
         <template x-if="modl">
           <div class="split narrow">
             <div class="card"><h3>Loaded <span x-text="modl.modules.length"></span></h3>
@@ -306,23 +309,56 @@
 
       <!-- ORM -->
       <section x-show="tab === 'orm'">
-        <h1 class="h1">ORM <small>Hibernate statistics of bx-orm, since each session factory started</small></h1>
-        <p class="sub">The SQL that bx-orm runs shows with the other queries, labelled ORM, in the bar, in each request and on the Queries page. These are the totals.</p>
-        <div class="msg plusnote" x-show="state && state.plus && !state.plus.ormStats" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> ORM statistics need a BoxLang+ license or trial. The ORM SQL itself is free.</div>
+        <h1 class="h1">ORM <small>what bx-orm reports: SQL, flushes, failures and Hibernate statistics</small></h1>
+        <p class="sub">The SQL that bx-orm runs shows with the other queries, labelled ORM, in the bar, in each request and on the Queries page. Lens listens to the <span class="mono">onORMQuery</span>, <span class="mono">onORMFlush</span> and <span class="mono">onORMException</span> events of bx-orm. These are the totals since Lens started listening.</p>
+        <template x-if="intOf('orm')">
+          <div class="card" style="margin-bottom:12px" id="orm-integration"><h3><span>Integration</span><span class="chipx" :class="intOf('orm').status === 'on' ? 'on' : 'hid'" x-text="intStatusText(intOf('orm'))"></span></h3>
+            <div class="tools"><label class="sw"><input type="checkbox" :checked="intOf('orm').enabled" :disabled="!ints.canChange || !intOf('orm').installed" aria-label="Listen to bx-orm" @change="setIntegration(intOf('orm'), $event.target.checked)"><span></span></label><span class="sub" x-text="intHint(intOf('orm'))"></span></div>
+          </div>
+        </template>
+        <div class="msg plusnote" x-show="state && state.plus && !state.plus.ormStats" style="margin:0 0 10px"><span class="chipx plus">BoxLang+</span> The ORM page needs a BoxLang+ license or trial. The ORM SQL itself is free.</div>
         <template x-if="orml && state && state.plus.ormStats">
           <div>
-            <p class="sub" x-show="!orml.installed">The bx-orm module is not installed.</p>
-            <p class="sub" x-show="orml.installed && !orml.factories.length">No ORM application has started yet. Load a page that uses an entity.</p>
-            <template x-for="f in orml.factories" :key="f.app + f.datasource">
-              <div class="card" style="margin-bottom:12px"><h3><span class="mono" x-text="f.app + ' / ' + f.datasource"></span><span x-text="'SQL capture: ' + f.mode"></span></h3>
+            <p class="sub" x-show="!orml.integration.installed">The bx-orm module is not installed.</p>
+            <template x-if="orml.integration.status === 'on'">
+              <div>
                 <div class="tiles">
-                  <div class="card"><h3>Queries run</h3><div class="big" x-text="f.counts.queryExecutionCount"></div><div class="sub" x-text="'slowest ' + f.slowestMs + ' ms'"></div></div>
-                  <div class="card"><h3>Entities</h3><div class="big" x-text="f.counts.entityLoadCount"></div><div class="sub" x-text="'loaded, ' + f.counts.entityInsertCount + ' inserted, ' + f.counts.entityUpdateCount + ' updated, ' + f.counts.entityDeleteCount + ' deleted'"></div></div>
-                  <div class="card"><h3>Sessions</h3><div class="big" x-text="f.counts.sessionOpenCount"></div><div class="sub" x-text="f.counts.flushCount + ' flushes, ' + f.counts.transactionCount + ' transactions'"></div></div>
-                  <div class="card"><h3>Statements</h3><div class="big" x-text="f.counts.prepareStatementCount"></div><div class="sub" x-text="f.counts.connectCount + ' connections'"></div></div>
+                  <div class="card"><h3>Statements</h3><div class="big" x-text="orml.totals.queries"></div><div class="sub" x-text="orml.totals.unattributed + ' outside a request'"></div></div>
+                  <div class="card"><h3>Flushes</h3><div class="big" x-text="orml.totals.flushes"></div></div>
+                  <div class="card"><h3>Failed</h3><div class="big" :style="orml.totals.errors ? 'color:var(--crit)' : ''" x-text="orml.totals.errors"></div></div>
                 </div>
-                <dl class="kv" style="margin-top:10px"><dt>Second level cache</dt><dd x-text="f.counts.secondLevelCacheHitCount + ' hits, ' + f.counts.secondLevelCacheMissCount + ' misses, ' + f.counts.secondLevelCachePutCount + ' puts'"></dd><dt>Query cache</dt><dd x-text="f.counts.queryCacheHitCount + ' hits, ' + f.counts.queryCacheMissCount + ' misses, ' + f.counts.queryCachePutCount + ' puts'"></dd><dt>Collections</dt><dd x-text="f.counts.collectionLoadCount + ' loaded, ' + f.counts.collectionFetchCount + ' fetched'"></dd><dt x-show="f.slowestQuery">Slowest query</dt><dd class="mono" x-show="f.slowestQuery" x-text="f.slowestQuery"></dd><dt>Entities</dt><dd x-text="f.entities.join(', ')"></dd></dl>
-                <div class="scroll" x-show="f.queries.length" style="margin-top:10px"><table><thead><tr><th>HQL or criteria</th><th class="num">Runs</th><th class="num">Rows</th><th class="num">Avg ms</th><th class="num">Max ms</th><th class="num">Cache hits</th></tr></thead><tbody><template x-for="q in f.queries" :key="q.hql"><tr><td class="mono" style="word-break:break-all" x-text="q.hql"></td><td class="num" x-text="q.executionCount"></td><td class="num" x-text="q.executionRowCount"></td><td class="num" x-text="q.executionAvgTime"></td><td class="num" x-text="q.executionMaxTime"></td><td class="num" x-text="q.cacheHitCount"></td></tr></template></tbody></table></div>
+                <p class="sub" x-show="!orml.totals.datasources.length" style="margin-top:10px">Nothing yet. Load a page that uses an entity. Statements that ran before Lens started listening are not counted.</p>
+                <div class="card" style="margin:12px 0" x-show="orml.totals.datasources.length"><h3>Per datasource <span>from the ORM events</span></h3>
+                  <div class="scroll"><table><thead><tr><th>Application / datasource</th><th class="num">Statements</th><th class="num">Select</th><th class="num">Insert</th><th class="num">Update</th><th class="num">Delete</th><th class="num">DDL</th><th class="num">Failed</th><th class="num">Total ms</th><th class="num">Max ms</th><th class="num">Flushes</th><th class="num">Flush ins / upd / del</th></tr></thead><tbody>
+                    <template x-for="d in orml.totals.datasources" :key="d.app + '/' + d.datasource"><tr><td class="mono" x-text="d.app + ' / ' + d.datasource"></td><td class="num" x-text="d.queries"></td><td class="num" x-text="d.selects"></td><td class="num" x-text="d.inserts"></td><td class="num" x-text="d.updates"></td><td class="num" x-text="d.deletes"></td><td class="num" x-text="d.ddl"></td><td class="num" x-text="d.errors"></td><td class="num" x-text="d.totalMs"></td><td class="num" x-text="d.maxMs"></td><td class="num" x-text="d.flushes"></td><td class="num" x-text="d.flushInserts + ' / ' + d.flushUpdates + ' / ' + d.flushDeletes"></td></tr></template></tbody></table></div></div>
+                <div class="card" style="margin-bottom:12px" x-show="orml.totals.failures.length"><h3>Recent failures <span x-text="orml.totals.failures.length"></span></h3>
+                  <div class="scroll"><table><thead><tr><th>When</th><th>Datasource</th><th>Statement</th><th>Error</th></tr></thead><tbody>
+                    <template x-for="f in orml.totals.failures" :key="f.at + f.sql"><tr><td x-text="new Date(f.at).toLocaleTimeString()"></td><td class="mono" x-text="f.app + ' / ' + f.datasource"></td><td class="mono" style="word-break:break-all" x-text="f.sql"></td><td class="mono" style="color:var(--crit);word-break:break-all" x-text="f.error"></td></tr></template></tbody></table></div></div>
+              </div>
+            </template>
+            <h2 class="h1" x-show="orml.integration.installed" style="font-size:15px;margin:16px 0 6px">Hibernate statistics <small>totals since statistics were switched on, from bx-orm</small></h2>
+            <p class="sub" x-show="orml.serviceFound && !orml.supported">This bx-orm does not offer statistics. Update bx-orm to 1.7.2 or later.</p>
+            <p class="sub" x-show="orml.supported && !orml.apps.length">No ORM application has started yet. Load a page that uses an entity.</p>
+            <template x-for="a in orml.apps" :key="a.app">
+              <div class="card" style="margin-bottom:12px"><h3><span class="mono" x-text="a.app"></span><span x-text="a.enabled ? 'statistics on' : 'statistics off'"></span></h3>
+                <p class="sub" x-show="a.error" x-text="a.error"></p>
+                <div class="tools" x-show="!a.enabled"><span class="sub" x-text="orml.offMessage.charAt(0).toUpperCase() + orml.offMessage.slice(1) + '.'"></span><button class="btn primary" :disabled="!orml.canChange" @click="ormStatistics(a.app, true)">Turn statistics on</button></div>
+                <div class="tools" x-show="a.enabled"><button class="btn" :disabled="!orml.canChange" @click="ormStatistics(a.app, false)">Turn statistics off</button></div>
+                <template x-for="d in a.datasources" :key="a.app + '/' + d.name">
+                  <div style="margin-top:10px"><h3><span class="mono" x-text="d.name"></span><span x-text="d.enabled ? 'since ' + new Date(d.startTime).toLocaleTimeString() : 'off'"></span></h3>
+                    <template x-if="d.enabled">
+                      <div>
+                        <div class="tiles">
+                          <div class="card"><h3>Queries run</h3><div class="big" x-text="d.queryExecutionCount"></div><div class="sub" x-text="'slowest ' + d.queryExecutionMaxTime + ' ms'"></div></div>
+                          <div class="card"><h3>Entities</h3><div class="big" x-text="d.entityLoadCount"></div><div class="sub" x-text="'loaded, ' + d.entityInsertCount + ' inserted, ' + d.entityUpdateCount + ' updated, ' + d.entityDeleteCount + ' deleted'"></div></div>
+                          <div class="card"><h3>Sessions</h3><div class="big" x-text="d.sessionOpenCount"></div><div class="sub" x-text="d.flushCount + ' flushes, ' + d.transactionCount + ' transactions'"></div></div>
+                          <div class="card"><h3>Statements</h3><div class="big" x-text="d.prepareStatementCount"></div><div class="sub" x-text="d.connectCount + ' connections'"></div></div>
+                        </div>
+                        <dl class="kv" style="margin-top:10px"><dt>Second level cache</dt><dd x-text="d.secondLevelCacheHitCount + ' hits, ' + d.secondLevelCacheMissCount + ' misses, ' + d.secondLevelCachePutCount + ' puts'"></dd><dt>Query cache</dt><dd x-text="d.queryCacheHitCount + ' hits, ' + d.queryCacheMissCount + ' misses'"></dd><dt>Collections</dt><dd x-text="d.collectionLoadCount + ' loaded, ' + d.collectionFetchCount + ' fetched'"></dd><dt x-show="d.queryExecutionMaxTimeQueryString">Slowest query</dt><dd class="mono" x-show="d.queryExecutionMaxTimeQueryString" x-text="d.queryExecutionMaxTimeQueryString"></dd></dl>
+                      </div>
+                    </template>
+                  </div>
+                </template>
               </div>
             </template>
           </div>
@@ -397,11 +433,11 @@
               <button class="btn" :disabled="!state || state.readOnly" @click="resetQueries()">Reset</button></div>
             <div class="split wide">
               <div class="card"><div class="scroll" style="max-height:560px"><table><thead><tr><th>Statement</th><th class="num">Runs</th><th class="num">Avg</th><th class="num">Max</th><th class="num">Total</th><th class="num">Failed</th></tr></thead><tbody>
-                <template x-for="q in qrows()" :key="q.datasource + q.sql"><tr class="row" :class="qpick && qpick.sql === q.sql && qpick.datasource === q.datasource ? 'sel' : ''" @click="qpick = q"><td class="mono" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" x-text="q.sql"></td><td class="num" x-text="q.count"></td><td class="num" x-text="q.avgMs"></td><td class="num" :style="q.slow ? 'color:var(--warn)' : ''" x-text="q.maxMs"></td><td class="num" x-text="q.totalMs"></td><td class="num" :style="q.failures ? 'color:var(--crit)' : ''" x-text="q.failures"></td></tr></template></tbody></table></div>
+                <template x-for="q in qrows()" :key="q.datasource + q.sql"><tr class="row" :class="qpick && qpick.sql === q.sql && qpick.datasource === q.datasource ? 'sel' : ''" @click="qpick = q"><td class="mono" style="max-width:380px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><span class="chipx on" x-show="q.orm" x-text="'ORM ' + q.kind"></span><span x-show="q.orm"> </span><span x-text="q.sql"></span></td><td class="num" x-text="q.count"></td><td class="num" x-text="q.avgMs"></td><td class="num" :style="q.slow ? 'color:var(--warn)' : ''" x-text="q.maxMs"></td><td class="num" x-text="q.totalMs"></td><td class="num" :style="q.failures ? 'color:var(--crit)' : ''" x-text="q.failures"></td></tr></template></tbody></table></div>
                 <p class="sub" x-show="!qs.statements.length">No queries yet. Load a page that runs one.</p></div>
               <div class="card" x-show="qpick"><h3>Statement <span x-text="qpick ? qpick.datasource : ''"></span></h3>
                 <pre class="code" style="white-space:pre-wrap;word-break:break-all;max-height:240px;overflow:auto" x-text="qpick ? qpick.sql : ''"></pre>
-                <dl class="kv" x-show="qpick"><dt>Runs</dt><dd x-text="qpick ? qpick.count : ''"></dd><dt>Failed</dt><dd x-text="qpick ? qpick.failures : ''"></dd><dt>Slow</dt><dd x-text="qpick ? qpick.slow : ''"></dd><dt>Min / avg / max</dt><dd x-text="qpick ? qpick.minMs + ' / ' + qpick.avgMs + ' / ' + qpick.maxMs + ' ms' : ''"></dd><dt>Total time</dt><dd x-text="qpick ? qpick.totalMs + ' ms' : ''"></dd><dt>Rows returned</dt><dd x-text="qpick ? qpick.rows : ''"></dd><dt>Called from</dt><dd class="mono" x-text="qpick && qpick.file ? qpick.file + ':' + qpick.line : 'unknown'"></dd><dt x-show="qpick && qpick.lastError">Last error</dt><dd x-show="qpick && qpick.lastError" x-text="qpick ? qpick.lastError : ''"></dd></dl>
+                <dl class="kv" x-show="qpick"><dt x-show="qpick && qpick.orm">Run by</dt><dd x-show="qpick && qpick.orm" x-text="qpick ? 'bx-orm (' + qpick.kind + ')' : ''"></dd><dt>Runs</dt><dd x-text="qpick ? qpick.count : ''"></dd><dt>Failed</dt><dd x-text="qpick ? qpick.failures : ''"></dd><dt>Slow</dt><dd x-text="qpick ? qpick.slow : ''"></dd><dt>Min / avg / max</dt><dd x-text="qpick ? qpick.minMs + ' / ' + qpick.avgMs + ' / ' + qpick.maxMs + ' ms' : ''"></dd><dt>Total time</dt><dd x-text="qpick ? qpick.totalMs + ' ms' : ''"></dd><dt>Rows returned</dt><dd x-text="qpick ? qpick.rows : ''"></dd><dt>Called from</dt><dd class="mono" x-text="qpick && qpick.file ? qpick.file + ':' + qpick.line : 'unknown'"></dd><dt x-show="qpick && qpick.lastError">Last error</dt><dd x-show="qpick && qpick.lastError" x-text="qpick ? qpick.lastError : ''"></dd></dl>
                 <div class="tools"><button class="btn" x-show="qpick && qpick.slowestRequest" @click="openRequest(qpick.slowestRequest)">Open the slowest run</button><button class="btn" x-show="qpick && qpick.lastRequest" @click="openRequest(qpick.lastRequest)">Open the latest run</button></div>
                 <div class="tools" style="margin-top:8px" x-show="aiInfo"><button class="btn" @click="copyPrompt('query', qpick.sql, qpick.datasource)"><svg class="ic"><use href="#ph-copy"/></svg>Copy prompt</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('chatgpt', 'query', qpick.sql, qpick.datasource)">Ask ChatGPT</button><button class="btn" x-show="aiInfo && aiInfo.links" @click="sendPrompt('claude', 'query', qpick.sql, qpick.datasource)">Ask Claude</button><button class="btn primary" x-show="aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy" @click="explain('query', qpick.sql, qpick.datasource)"><svg class="ic"><use href="#ph-sparkle"/></svg>Explain with AI</button></div></div>
             </div>

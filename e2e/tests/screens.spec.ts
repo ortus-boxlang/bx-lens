@@ -304,6 +304,18 @@ test.describe( '@screens documentation screenshots', () => {
 		await consoleShot( page, 'console-orm' );
 	} );
 
+	test( 'console integrations', async ( { page } ) => {
+		const orm = `http://127.0.0.1:${ process.env.ORM_PORT || '8091' }`;
+		await page.goto( `${ orm }/~bxlens/index.bxm` );
+		await page.fill( '#pw', 'lens-demo' );
+		await page.click( '.go' );
+		await page.waitForSelector( '.shell .app' );
+		await page.click( '.nav:has-text("Modules")' );
+		await page.waitForSelector( '#integrations tr[data-integration="orm"] .chipx' );
+		await page.waitForTimeout( 400 );
+		await page.locator( '#integrations' ).screenshot( { path: path.join( OUT, 'console-integrations.png' ) } );
+	} );
+
 	test( 'console on the free tier', async ( { page } ) => {
 		const free = `http://127.0.0.1:${ process.env.FREE_PORT || '8090' }`;
 		await page.goto( `${ free }/~bxlens/index.bxm` );

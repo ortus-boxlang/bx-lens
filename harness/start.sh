@@ -3,6 +3,7 @@
 #   ./start.sh            build the module, then run in the foreground
 #   SKIP_BUILD=1 ./start.sh   reuse build/modules/bx-lens
 #   PORT=8085 BOXLANG_VERSION=1.19.0-snapshot ./start.sh
+#   WITH_ORM=1 [BX_ORM_VERSION=1.7.2-snapshot | BX_ORM_DIR=~/bx-orm] ./start.sh
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -46,11 +47,22 @@ if [ -n "${WITH_AI:-}" ]; then
 	sed -i "s|\"ai\": { \"enabled\": false|\"ai\": { \"enabled\": true|; s|@LENS_AI_PROVIDER@|${LENS_AI_PROVIDER:-ollama}|" "$RUN/home/config/boxlang.json"
 fi
 sed -i "s|@LENS_AI_PROVIDER@||" "$RUN/home/config/boxlang.json"
-# WITH_ORM=1 installs bx-orm (BX_ORM_VERSION, default 1.7.1) and turns the ORM entity in the demo app on
+# WITH_ORM=1 installs bx-orm and turns the ORM entity in the demo app on. Lens listens to its onORMQuery, onORMFlush and onORMException events,
+# which exist from bx-orm 1.7.2 (BX_ORM_VERSION, default 1.7.2-snapshot, the build published on ForgeBox and downloads.ortussolutions.com).
+# BX_ORM_DIR=/path/to/bx-orm builds the module from a checkout instead (./gradlew build) and unzips build/distributions/*.zip.
+# A snapshot is a moving target: delete harness/.cache/bx-orm-*-snapshot.zip to download it again.
 if [ -n "${WITH_ORM:-}" ]; then
-	fetch "$DL/boxlang-modules/bx-orm/${BX_ORM_VERSION:-1.7.1}/bx-orm-${BX_ORM_VERSION:-1.7.1}.zip" "bx-orm-${BX_ORM_VERSION:-1.7.1}.zip"
 	mkdir -p "$RUN/home/modules/bxorm"
-	unzip -q -o "$CACHE/bx-orm-${BX_ORM_VERSION:-1.7.1}.zip" -d "$RUN/home/modules/bxorm"
+	if [ -n "${BX_ORM_DIR:-}" ]; then
+		echo "+ building bx-orm from $BX_ORM_DIR"
+		(cd "$BX_ORM_DIR" && ./gradlew build -x test -q --console=plain)
+		ORM_ZIP="$(ls -t "$BX_ORM_DIR"/build/distributions/*.zip | head -n 1)"
+	else
+		ORM_VERSION="${BX_ORM_VERSION:-1.7.2-snapshot}"
+		fetch "$DL/boxlang-modules/bx-orm/$ORM_VERSION/bx-orm-$ORM_VERSION.zip" "bx-orm-$ORM_VERSION.zip"
+		ORM_ZIP="$CACHE/bx-orm-$ORM_VERSION.zip"
+	fi
+	unzip -q -o "$ORM_ZIP" -d "$RUN/home/modules/bxorm"
 	export LENS_ORM=1
 fi
 mkdir -p "$RUN/home/modules/derby"

@@ -47,6 +47,9 @@ public final class QueryStats {
 		String	lastError		= "";
 		String	slowestRequest	= "";
 		String	lastRequest		= "";
+		/** At least one run came from bx-orm. */
+		boolean	orm;
+		String	kind			= "";
 	}
 
 	private final Map<String, Stat>	stats	= new ConcurrentHashMap<>();
@@ -59,14 +62,18 @@ public final class QueryStats {
 	@SuppressWarnings( "unchecked" )
 	public void record( LensRequest req, int slowMs ) {
 		try {
-			Set<Object> finished = new HashSet<>();
+			Set<Object>	finished	= new HashSet<>();
+			Set<String>	counted		= new HashSet<>();
 			synchronized ( req.queries ) {
 				for ( Map<String, Object> q : req.queries ) {
 					finished.add( q.get( "span" ) );
 					add( req, q, slowMs );
+					if ( q.get( "error" ) != null ) {
+						// Already counted as a failure, the exception of the same statement must not count again
+						counted.add( Text.maskSql( Text.collapseSpaces( String.valueOf( q.getOrDefault( "sql", "" ) ) ) ) );
+					}
 				}
 			}
-			Set<String> counted = new HashSet<>();
 			synchronized ( req.spans ) {
 				for ( Span s : req.spans ) {
 					if ( Span.QUERY.equals( s.type ) && !finished.contains( s.id ) ) {
@@ -119,6 +126,21 @@ public final class QueryStats {
 		Stat	s	= stat( sql, ds );
 		synchronized ( s ) {
 			s.count++;
+			if ( Boolean.TRUE.equals( q.get( "orm" ) ) ) {
+				s.orm = true;
+				if ( q.get( "kind" ) instanceof String k ) {
+					s.kind = k;
+				}
+			}
+			if ( q.get( "error" ) != null ) {
+				// A failed ORM statement: it counts as a failure, not in the timings
+				s.failures++;
+				String safe = Text.maskSql( Secrets.text( String.valueOf( q.get( "error" ) ) ) );
+				s.lastError		= safe.length() > 500 ? safe.substring( 0, 500 ) : safe;
+				s.lastSeen		= System.currentTimeMillis();
+				s.lastRequest	= req.id;
+				return;
+			}
 			s.totalMs	+= ms;
 			s.minMs		= Math.min( s.minMs, ms );
 			if ( ms >= s.maxMs ) {
@@ -187,6 +209,8 @@ public final class QueryStats {
 				m.put( "lastError", s.lastError );
 				m.put( "slowestRequest", s.slowestRequest );
 				m.put( "lastRequest", s.lastRequest );
+				m.put( "orm", s.orm );
+				m.put( "kind", s.kind );
 				rows.add( m );
 				count	+= s.count;
 				failed	+= s.failures;

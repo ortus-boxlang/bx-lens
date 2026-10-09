@@ -13,11 +13,14 @@ class {
 	};
 	this.datasource = "demo";
 
-	// WITH_ORM=1 (harness/start.sh) installs bx-orm and sets LENS_ORM so the entity in ormmodels works
+	// WITH_ORM=1 (harness/start.sh) installs bx-orm (1.7.2 or later: it announces onORMQuery, onORMFlush and onORMException) and sets LENS_ORM so the entity in ormmodels works
 	if ( getSystemSetting( "LENS_ORM", "" ) == "1" ) {
 		this.mappings[ "/ormmodels" ] = getDirectoryFromPath( getCurrentTemplatePath() ) & "ormmodels";
 		this.ormEnabled = true;
-		this.ormSettings = { "datasource" : "demo", "entityPaths" : [ "/ormmodels" ], "dbcreate" : "update", "dialect" : "DerbyTenSevenDialect", "saveMapping" : false };
+		this.ormSettings = { "datasource" : "demo", "entityPaths" : [ "/ormmodels" ], "dbcreate" : "update", "dialect" : "DerbyTenSevenDialect", "saveMapping" : false,
+			// Lens cannot force these: bx-orm reads them from the app. Parameter values stay out of the events, statistics are collected
+			"announceQueryParams" : false, "generateStatistics" : true
+		};
 	}
 
 	function onApplicationStart() {

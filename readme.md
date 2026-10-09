@@ -60,7 +60,7 @@ Upgrading? `enabled` is now `bar.enabled` and `access.allowedIPs` is now `bar.ac
 | **Issues** | Everything suspicious, ranked: exceptions, N+1 queries, slow queries, slow templates, failed HTTP calls |
 | **Timeline** | One waterfall of templates, functions, queries, HTTP calls and transactions. Hover, click for detail, zoom, pan, filter, search, open the file in your editor |
 | **Queries** | Every statement with its parameters, rows, time, datasource and the template line that ran it. Copy SQL |
-| **ORM** | The SQL bx-orm (Hibernate) runs shows in Queries, labelled ORM. **BoxLang+:** Hibernate statistics on the console ORM page. See [ORM](docs/panels/orm.md) |
+| **ORM** | An opt in [integration](docs/reference/integrations.md): with bx-orm 1.7.2 or later installed and `collectors.orm.enabled` on, the SQL it runs shows in Queries, labelled ORM. **BoxLang+:** event totals, failures and Hibernate statistics on the console ORM page. See [ORM](docs/panels/orm.md) |
 | **Templates** | The include and call tree |
 | **HTTP** | Outgoing HTTP calls with status, size and time |
 | **Exceptions** | Caught and uncaught exceptions with BoxLang locations and the Java stack |

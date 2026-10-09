@@ -193,8 +193,9 @@ class {
 				scopes       : { enabled : false, url : true, form : true, cookie : false, session : false, request : false, application : false, variables : false },
 				// The Runtime tab of the bar: versions, system, uptime, heap, cache names and main settings, cached for a few seconds
 				jvm          : { enabled : true },
-				// The SQL of bx-orm (Hibernate), shown like a normal query. Off by default: when off, Lens does not look at bx-orm at all
-				orm          : { enabled : false, statistics : true },
+				// Integration with bx-orm: its onORMQuery, onORMFlush and onORMException events, shown like normal queries. Opt in and needs bx-orm
+				// installed: until both are true Lens registers no listener (see docs/reference/integrations.md)
+				orm          : { enabled : false },
 				// Time per built-in function, from postBIFInvocation. Every BIF call allocates an event while this is on, so it is off by default
 				bifs         : { enabled : false },
 				// Console pages. Turn one off and its page disappears

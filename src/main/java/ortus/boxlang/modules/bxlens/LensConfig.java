@@ -67,7 +67,6 @@ public final class LensConfig {
 	/** Hot reads resolved once when the config is built. */
 	public final boolean														queriesIncludeParams;
 	public final boolean														queriesCaptureCaller;
-	public final boolean														ormEnabled;
 
 	/**
 	 * Parse module settings.
@@ -114,7 +113,6 @@ public final class LensConfig {
 		this.requestMaxMinutes		= Math.max( 1, getInt( "request.maxMinutes", 10 ) );
 		this.queriesIncludeParams	= collectorBool( "queries", "includeParams", false );
 		this.queriesCaptureCaller	= collectorBool( "queries", "captureCaller", true );
-		this.ormEnabled				= isCollectorEnabled( "orm", false );
 	}
 
 	/**

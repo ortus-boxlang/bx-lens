@@ -24,6 +24,7 @@ It downloads the BoxLang, MiniServer, web support and Derby jars into `.cache/` 
 | `/cache.bxm` | Five hits and three misses against the default cache, shown as this request's hit rate |
 | `/timers.bxm` | `lensStart/Stop`, `lensMeasure`, `lensAddMeasure`, `lensMessage` at every level, `lensDump` |
 | `/functions.bxm` | Nested user functions (the functions collector is on in this harness) |
+| `/orm.bxm` | bx-orm entities: `?save=1` inserts a book and flushes, `?fail=1` makes an insert fail. Needs `WITH_ORM=1` (bx-orm 1.7.2 or later: `BX_ORM_VERSION`, or `BX_ORM_DIR` to build a checkout) |
 | `/forms.bxm` | A POST with a password field. The password is masked in the Scopes tab and absent from the page data |
 | `/session.bxm` | Session and request scope snapshots, with a token key masked |
 | `/transaction.bxm` | One committed and one rolled back transaction on the waterfall |
