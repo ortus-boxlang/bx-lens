@@ -98,13 +98,13 @@ public class ExceptionCollector extends BaseCollector {
 			}
 		}
 		m.put( "at", Span.ms( req.now() ) );
-		List<Map<String, Object>> frames = Callers.frames( t, 10 );
+		List<Map<String, Object>> frames = cfg.light ? List.of() : Callers.frames( t, 10 );
 		m.put( "frames", frames );
 		m.put( "file", frames.isEmpty() ? "" : frames.get( 0 ).get( "file" ) );
 		m.put( "line", frames.isEmpty() ? 0 : frames.get( 0 ).get( "line" ) );
 		List<String> java = new ArrayList<>();
 		for ( StackTraceElement e : t.getStackTrace() ) {
-			if ( LensService.getInstance().getConfig().light || java.size() >= 12 ) {
+			if ( cfg.light || java.size() >= 12 ) {
 				break;
 			}
 			java.add( e.toString() );

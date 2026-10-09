@@ -16,7 +16,7 @@ import java.util.Map;
 import ortus.boxlang.modules.bxlens.LensConfig;
 import ortus.boxlang.modules.bxlens.ext.LensPanelBuilder;
 import ortus.boxlang.modules.bxlens.util.Sanitizer;
-import ortus.boxlang.modules.bxlens.web.WebExchange;
+import ortus.boxlang.modules.bxlens.util.Secrets;
 
 /**
  * Builds the JSON-ready snapshot of a finished request. This map is the contract between the Java side and the UI.
@@ -27,9 +27,9 @@ public final class Snapshot {
 	}
 
 	/**
-	 * The full payload of one request.
+	 * The full payload of one request. Built on demand, when the bar is rendered or an API route asks for it, from the finished request.
 	 */
-	public static Map<String, Object> build( LensRequest req, LensConfig cfg, WebExchange exchange ) {
+	public static Map<String, Object> build( LensRequest req, LensConfig cfg ) {
 		Sanitizer			clean	= new Sanitizer( cfg );
 		Map<String, Object>	m		= new LinkedHashMap<>();
 
@@ -38,7 +38,7 @@ public final class Snapshot {
 		r.put( "method", req.method );
 		r.put( "url", req.url );
 		r.put( "uri", req.uri );
-		r.put( "query", req.queryString );
+		r.put( "query", Secrets.redactQuery( req.queryString, cfg, 2000 ) );
 		r.put( "status", req.status );
 		r.put( "contentType", req.contentType );
 		r.put( "type", classify( req.contentType ) );
@@ -52,15 +52,18 @@ public final class Snapshot {
 		r.put( "severity", IssueEngine.severity( req ) );
 		m.put( "request", r );
 
-		Map<String, Object> headers = new LinkedHashMap<>();
-		if ( exchange != null && !cfg.light ) {
-			try {
-				exchange.requestHeaders().forEach( ( k, v ) -> headers.put( k, clean.cleanKeyed( k, v ) ) );
-			} catch ( Throwable t ) {
-				// Exchange already recycled
-			}
+		Map<String, Object>	headers	= new LinkedHashMap<>();
+		Map<String, String>	raw		= req.requestHeaders;
+		if ( raw != null && !cfg.light ) {
+			raw.forEach( ( k, v ) -> headers.put( k, clean.cleanKeyed( k, v ) ) );
 		}
 		m.put( "headers", headers );
+		Map<String, String> rawOut = req.responseHeaders;
+		if ( rawOut != null ) {
+			Map<String, Object> rh = new LinkedHashMap<>();
+			rawOut.forEach( ( k, v ) -> rh.put( k, clean.cleanKeyed( k, v ) ) );
+			m.put( "responseHeaders", rh );
+		}
 
 		// Spans, with spans contributed by custom panels appended
 		List<Map<String, Object>>	spans	= new ArrayList<>();
@@ -105,7 +108,7 @@ public final class Snapshot {
 		m.put( "logs", new ArrayList<>( req.logs ) );
 		m.put( "issues", new ArrayList<>( req.issues ) );
 
-		for ( String key : List.of( "scopes", "jvm", "cache", "modules", "bifs", "cost", "slowSample", "responseHeaders" ) ) {
+		for ( String key : List.of( "scopes", "jvm", "cache", "modules", "bifs", "cost", "slowSample" ) ) {
 			Object v = req.data.get( key );
 			if ( v != null ) {
 				m.put( key, v );
@@ -138,11 +141,11 @@ public final class Snapshot {
 	/**
 	 * One-line summary for the History list.
 	 */
-	public static Map<String, Object> summary( LensRequest req ) {
+	public static Map<String, Object> summary( LensRequest req, LensConfig cfg ) {
 		Map<String, Object> s = new LinkedHashMap<>();
 		s.put( "id", req.id );
 		s.put( "method", req.method );
-		s.put( "url", req.uri + ( req.queryString.isEmpty() ? "" : "?" + req.queryString ) );
+		s.put( "url", req.uri + ( req.queryString.isEmpty() ? "" : "?" + Secrets.redactQuery( req.queryString, cfg, 500 ) ) );
 		s.put( "status", req.status );
 		s.put( "type", classify( req.contentType ) );
 		s.put( "ms", Span.ms( req.durationNs() ) );

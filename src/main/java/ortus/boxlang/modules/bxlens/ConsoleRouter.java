@@ -64,7 +64,10 @@ public final class ConsoleRouter {
 		LensConfig cfg = service.getConfig();
 		if ( !cfg.consoleEnabled
 		    || !service.getConsoleGuard().isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( service.getConsoleGuard().requiredHeader() ) ) ) {
-			// Do not reveal that a console exists
+			// Do not reveal that a console exists. The refusal is written to the audit log, at most once a minute per address
+			if ( cfg.consoleEnabled ) {
+				auditRefusal( "denied.access", ex.remoteAddr(), ex.method() + " " + ex.pathInfo() );
+			}
 			send( context, ex, 404, "text/plain; charset=UTF-8", "Not found", true );
 			return;
 		}
@@ -195,11 +198,13 @@ public final class ConsoleRouter {
 			return;
 		}
 		if ( !method.equals( "GET" ) && !service.getAuth().csrfOk( s, ex.requestHeader( "X-Lens-CSRF" ) ) ) {
+			service.getAudit().log( "denied.csrf", s.role, ex.remoteAddr(), method + " " + route );
 			json( context, ex, 403, Map.of( "error", "Bad CSRF token" ) );
 			return;
 		}
 		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && !route.startsWith( "ai/" ) && !route.endsWith( "/test" )
 		    && service.getConfig().getBool( "console.readOnly", false ) ) {
+			service.getAudit().log( "denied.readonly", s.role, ex.remoteAddr(), method + " " + route );
 			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
 			return;
 		}
@@ -279,6 +284,7 @@ public final class ConsoleRouter {
 			}
 			json( context, ex, 200, service.getOrm().stats() );
 		} else if ( route.equals( "environment" ) && method.equals( "GET" ) && panelOn( "environment" ) ) {
+			service.getAudit().log( "environment.read", s.role, ex.remoteAddr(), "" );
 			json( context, ex, 200, service.getEnvironment().environment() );
 		} else if ( route.equals( "bundle" ) && method.equals( "GET" ) ) {
 			if ( plusOnly( context, ex, "bundle", "The diagnostic bundle" ) ) {
@@ -357,7 +363,33 @@ public final class ConsoleRouter {
 		}
 	}
 
-	private static final List<String> ADMIN_ONLY = List.of( "threads/dump", "heapdump", "logfiles/download", "bundle", "cachevalue" );
+	/**
+	 * Routes only an admin may call, even with GET: files, secrets, and everything that shows the inside of the server. A viewer keeps the
+	 * overview, requests, in flight, queries, errors, reports, executors, tasks, datasources, cache statistics and modules.
+	 */
+	static final List<String>											ADMIN_ONLY		= List.of( "threads", "heapdump", "logfiles", "bundle", "cachevalue",
+	    "environment", "system" );
+
+	/** Console pages a viewer does not get. */
+	static final Set<String>											ADMIN_PAGES		= Set.of( "logfiles", "environment", "system", "threads" );
+
+	/** Settings whose value a viewer does not see. */
+	static final Set<String>											ADMIN_SETTINGS	= Set.of( "console.access", "access.proxypeers" );
+
+	private final java.util.concurrent.ConcurrentHashMap<String, Long>	refusals		= new java.util.concurrent.ConcurrentHashMap<>();
+
+	private void auditRefusal( String event, String ip, String detail ) {
+		long	now		= System.currentTimeMillis();
+		Long	last	= refusals.get( ip );
+		if ( last != null && now - last < 60_000L ) {
+			return;
+		}
+		if ( refusals.size() > 1000 ) {
+			refusals.clear();
+		}
+		refusals.put( ip, now );
+		service.getAudit().log( event, "none", ip, detail );
+	}
 
 	private static boolean isAdmin( ConsoleAuth.Session s ) {
 		return s != null && "admin".equals( s.role );
@@ -370,6 +402,7 @@ public final class ConsoleRouter {
 		if ( service.getLicensing().has( feature ) ) {
 			return false;
 		}
+		service.getAudit().log( "denied.plus", "none", ex.remoteAddr(), feature );
 		json( context, ex, 403, Map.of( "ok", false, "plus", true, "error", what + " is a BoxLang+ feature. A license or trial is needed." ) );
 		return true;
 	}
@@ -396,7 +429,7 @@ public final class ConsoleRouter {
 		m.put( "idleSeconds", service.getAuth().idleSeconds() );
 		m.put( "collectLevel", cfg.collectLevel );
 		m.put( "barEnabled", cfg.barEnabled );
-		m.put( "tabs", tabs() );
+		m.put( "tabs", tabs( s ) );
 		m.put( "actions", cfg.getBool( "console.actions", true ) && canChange( s ) );
 		m.put( "readOnly", !canChange( s ) );
 		m.put( "role", s.role );
@@ -412,7 +445,7 @@ public final class ConsoleRouter {
 	/**
 	 * The pages the console offers, minus the ones hidden in the settings.
 	 */
-	private List<Map<String, Object>> tabs() {
+	private List<Map<String, Object>> tabs( ConsoleAuth.Session s ) {
 		LensConfig					cfg		= service.getConfig();
 		List<Map<String, Object>>	out		= new ArrayList<>();
 		String[][]					catalog	= {
@@ -437,6 +470,9 @@ public final class ConsoleRouter {
 		    { "settings", "Settings", "gear", "Config" }
 		};
 		for ( String[] t : catalog ) {
+			if ( !isAdmin( s ) && ADMIN_PAGES.contains( t[ 0 ] ) ) {
+				continue;
+			}
 			if ( t[ 0 ].equals( "settings" ) ) {
 				// Always there, so the settings can always be read
 			} else if ( cfg.hiddenTabs.contains( t[ 0 ] ) || !cfg.isCollectorEnabled( t[ 0 ], true ) ) {
@@ -480,6 +516,11 @@ public final class ConsoleRouter {
 				if ( plusOnly( context, ex, "cacheActions", "Evicting, reaping and clearing a cache" ) ) {
 					return;
 				}
+				if ( !service.getConfig().getBool( "console.actions", true ) ) {
+					service.getAudit().log( "denied.actions", s.role, ex.remoteAddr(), "cache." + parts[ 2 ] );
+					json( context, ex, 403, Map.of( "ok", false, "message", "Actions are turned off in the settings" ) );
+					return;
+				}
 				String key = ex.formParam( "key" );
 				service.getAudit().log( "cache." + parts[ 2 ], s.role, ex.remoteAddr(), "cache=" + name + ( key == null ? "" : " key=" + key ) );
 				Map<String, Object> r = service.getCaches().action( name, parts[ 2 ], key );
@@ -506,7 +547,10 @@ public final class ConsoleRouter {
 				} catch ( NumberFormatException e ) {
 					// Default
 				}
-				Map<String, Object> r = logs.read( ex.urlParam( "file" ), lines, ex.urlParam( "q" ), ex.urlParam( "level" ) );
+				String q = ex.urlParam( "q" );
+				service.getAudit().log( "logfile.read", s.role, ex.remoteAddr(),
+				    "file=" + ex.urlParam( "file" ) + " lines=" + lines + ( q == null || q.isEmpty() ? "" : " search=" + q.length() + " chars" ) );
+				Map<String, Object> r = logs.read( ex.urlParam( "file" ), lines, q, ex.urlParam( "level" ) );
 				json( context, ex, r == null ? 404 : 200, r == null ? Map.of( "error", "No such log file" ) : r );
 			} else if ( route.equals( "logfiles/download" ) ) {
 				if ( plusOnly( context, ex, "logDownload", "Downloading a log file" ) ) {
@@ -527,6 +571,9 @@ public final class ConsoleRouter {
 			} else {
 				json( context, ex, 404, Map.of( "error", "Unknown route" ) );
 			}
+		} catch ( LogData.Busy e ) {
+			ex.setResponseHeader( "Retry-After", "2" );
+			json( context, ex, 429, Map.of( "error", e.getMessage() ) );
 		} catch ( java.io.IOException e ) {
 			json( context, ex, 500, Map.of( "error", "Could not read the log file" ) );
 		}
@@ -544,6 +591,11 @@ public final class ConsoleRouter {
 		}
 		try {
 			if ( route.equals( "ai/prompt" ) && method.equals( "GET" ) ) {
+				if ( "deadlock".equals( ex.urlParam( "kind" ) ) && !isAdmin( s ) ) {
+					service.getAudit().log( "denied", s.role, ex.remoteAddr(), "ai/prompt deadlock" );
+					json( context, ex, 403, Map.of( "ok", false, "error", "Thread stacks are for the admin role" ) );
+					return;
+				}
 				String p = promptFor( ex, true );
 				json( context, ex, p == null ? 404 : 200, p == null ? Map.of( "error", "Nothing to explain" ) : Map.of( "prompt", p ) );
 			} else if ( route.equals( "ai/explain" ) && method.equals( "POST" ) ) {
@@ -678,8 +730,23 @@ public final class ConsoleRouter {
 		m.put( "readOnly", !canChange( s ) );
 		m.put( "viewer", !isAdmin( s ) );
 		m.put( "groups", SettingsRegistry.GROUPS );
-		m.put( "settings", service.settingsView() );
-		m.put( "overridesFile", String.valueOf( service.getSettingsStore().file() ) );
+		List<Map<String, Object>> view = service.settingsView();
+		if ( !isAdmin( s ) ) {
+			// Where the console is reachable from, which proxies are trusted and where overrides are saved are for admins
+			List<Map<String, Object>> masked = new ArrayList<>();
+			for ( Map<String, Object> row : view ) {
+				Map<String, Object>	r	= new LinkedHashMap<>( row );
+				String				key	= String.valueOf( r.get( "key" ) ).toLowerCase( java.util.Locale.ROOT );
+				if ( ADMIN_SETTINGS.contains( key ) || key.equals( "console.overridesfile" ) ) {
+					r.put( "value", "admin only" );
+					r.put( "configured", "admin only" );
+				}
+				masked.add( r );
+			}
+			view = masked;
+		}
+		m.put( "settings", view );
+		m.put( "overridesFile", isAdmin( s ) ? String.valueOf( service.getSettingsStore().file() ) : "" );
 		m.put( "overridden", service.getSettingsStore().get().size() );
 		return m;
 	}
@@ -893,13 +960,15 @@ public final class ConsoleRouter {
 			return;
 		}
 		int max = Math.max( 1, service.getConfig().getInt( "console.maxStreams", 10 ) );
-		if ( service.getStreams().get() >= max ) {
+		// Take the place first and give it back when over the limit, so two streams that start together cannot both slip under it
+		if ( service.getStreams().incrementAndGet() > max ) {
+			service.getStreams().decrementAndGet();
 			json( context, ex, 429, Map.of( "error", "Too many live streams" ) );
 			return;
 		}
 		String		topics	= ex.urlParam( "topics" ) == null ? "executors,tasks,system" : ex.urlParam( "topics" );
 		Set<String>	want	= new java.util.HashSet<>( List.of( topics.split( "," ) ) );
-		String		logFile	= want.contains( "log" ) ? ex.urlParam( "logfile" ) : null;
+		String		logFile	= want.contains( "log" ) && isAdmin( s ) ? ex.urlParam( "logfile" ) : null;
 		long		logPos	= 0;
 		try {
 			logPos = Long.parseLong( String.valueOf( ex.urlParam( "logoffset" ) ) );
@@ -915,7 +984,6 @@ public final class ConsoleRouter {
 			}
 		}
 		int mine = s.streamGen.incrementAndGet();
-		service.getStreams().incrementAndGet();
 		try {
 			ex.setStatus( 200 );
 			ex.setResponseHeader( "Content-Type", "text/event-stream; charset=UTF-8" );
@@ -926,7 +994,7 @@ public final class ConsoleRouter {
 			context.flushBuffer( true );
 			long end = System.currentTimeMillis() + 5 * 60_000L;
 			while ( System.currentTimeMillis() < end && !Thread.currentThread().isInterrupted() ) {
-				if ( service.getAuth().find( s.id ) == null || s.streamGen.get() != mine ) {
+				if ( service.getAuth().peek( s.id ) == null || s.streamGen.get() != mine ) {
 					break;
 				}
 				Map<String, Object> tick = new LinkedHashMap<>();
@@ -946,7 +1014,7 @@ public final class ConsoleRouter {
 				if ( want.contains( "queries" ) && panelOn( "queries" ) ) {
 					tick.put( "queries", service.getQueryStats().snapshot() );
 				}
-				if ( want.contains( "system" ) && panelOn( "system" ) ) {
+				if ( want.contains( "system" ) && panelOn( "system" ) && isAdmin( s ) ) {
 					tick.put( "system", service.getData().system() );
 				}
 				if ( logFile != null && panelOn( "logfiles" ) ) {

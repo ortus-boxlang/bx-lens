@@ -82,4 +82,71 @@ public class ConsoleAuthTest {
 		assertThat( a.login( "view-pw", "1.1.1.1" ).ok() ).isFalse();
 	}
 
+	private ConsoleAuth both( int max ) {
+		return new ConsoleAuth( new LensConfig( Map.of( "console", Map.of( "password", "admin-pw", "viewerPassword", "view-pw", "maxLoginAttempts", max ) ) ) );
+	}
+
+	@Test
+	@DisplayName( "a viewer sign in does not clear the failures counted against the admin password" )
+	void viewerDoesNotResetAdminCounter() {
+		ConsoleAuth a = both( 3 );
+		assertThat( a.login( "guess1", "5.5.5.5" ).attemptsLeft() ).isEqualTo( 2 );
+		assertThat( a.login( "guess2", "5.5.5.5" ).attemptsLeft() ).isEqualTo( 1 );
+		// The attacker knows the viewer password. This must not give the admin guesses back
+		assertThat( a.login( "view-pw", "5.5.5.5" ).ok() ).isTrue();
+		ConsoleAuth.LoginResult third = a.login( "guess3", "5.5.5.5" );
+		assertThat( third.lockedSeconds() ).isGreaterThan( 0L );
+		assertThat( a.login( "admin-pw", "5.5.5.5" ).ok() ).isFalse();
+	}
+
+	@Test
+	@DisplayName( "an admin sign in clears the admin counter" )
+	void adminResets() {
+		ConsoleAuth a = auth( Map.of( "password", "admin-pw", "maxLoginAttempts", 3 ) );
+		a.login( "x", "6.6.6.6" );
+		a.login( "x", "6.6.6.6" );
+		assertThat( a.login( "admin-pw", "6.6.6.6" ).ok() ).isTrue();
+		assertThat( a.login( "x", "6.6.6.6" ).attemptsLeft() ).isEqualTo( 2 );
+	}
+
+	@Test
+	@DisplayName( "IPv6 addresses of one /64 share their failures, IPv4 addresses stay apart" )
+	void ipv6Network() {
+		assertThat( ConsoleAuth.clientKey( "2001:db8:1:2:aaaa::1" ) ).isEqualTo( ConsoleAuth.clientKey( "2001:db8:1:2:bbbb::9" ) );
+		assertThat( ConsoleAuth.clientKey( "2001:db8:1:3::1" ) ).isNotEqualTo( ConsoleAuth.clientKey( "2001:db8:1:2::1" ) );
+		assertThat( ConsoleAuth.clientKey( "1.2.3.4" ) ).isEqualTo( "1.2.3.4" );
+		assertThat( ConsoleAuth.clientKey( null ) ).isEqualTo( "?" );
+		ConsoleAuth a = auth( Map.of( "password", "p", "maxLoginAttempts", 2 ) );
+		a.login( "x", "2001:db8:1:2::1" );
+		assertThat( a.login( "x", "2001:db8:1:2::2" ).lockedSeconds() ).isGreaterThan( 0L );
+	}
+
+	@Test
+	@DisplayName( "attempts and sessions are capped and pruned on every login" )
+	void capped() {
+		ConsoleAuth a = auth( Map.of( "password", "p" ) );
+		for ( int i = 0; i < 6000; i++ ) {
+			a.login( "x", "10." + ( i / 250 ) + "." + ( i % 250 ) + ".1" );
+		}
+		assertThat( a.attemptCount() ).isAtMost( 5001 );
+		for ( int i = 0; i < 400; i++ ) {
+			assertThat( a.login( "p", "7.7.7.7" ).ok() ).isTrue();
+		}
+		assertThat( a.sessionCount() ).isAtMost( 200 );
+	}
+
+	@Test
+	@DisplayName( "peek checks a session without refreshing its idle timer" )
+	void peek() throws Exception {
+		ConsoleAuth			a	= auth( Map.of( "password", "p" ) );
+		ConsoleAuth.Session	s	= a.login( "p", "1.1.1.1" ).session();
+		long				t	= s.lastSeen;
+		Thread.sleep( 15 );
+		assertThat( a.peek( s.id ) ).isSameInstanceAs( s );
+		assertThat( s.lastSeen ).isEqualTo( t );
+		a.find( s.id );
+		assertThat( s.lastSeen ).isGreaterThan( t );
+		assertThat( a.peek( "nope" ) ).isNull();
+	}
+
 }

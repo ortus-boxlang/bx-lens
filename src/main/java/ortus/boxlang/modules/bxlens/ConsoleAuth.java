@@ -9,7 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -61,15 +60,24 @@ public final class ConsoleAuth {
 		}
 	}
 
+	/**
+	 * Failed attempts of one client. A wrong password counts against both roles, because it could have been a guess at either. A success
+	 * clears only the counter of the role it signed in as, so the viewer password can never be used to reset the admin counter.
+	 */
 	private static final class Attempts {
 
-		int				failures;
-		long			firstAt;
+		int				adminFailures;
+		int				viewerFailures;
+		long			adminSince;
+		long			viewerSince;
 		volatile long	lockedUntil;
+		volatile long	touched;
 	}
 
 	private static final long			WINDOW_MS		= 10 * 60_000L;
 	private static final long			ABSOLUTE_MAX_MS	= 12 * 3_600_000L;
+	private static final int			MAX_ATTEMPTS	= 5000;
+	private static final int			MAX_SESSIONS	= 200;
 	private static final SecureRandom	RANDOM			= new SecureRandom();
 
 	private final Map<String, Session>	sessions		= new ConcurrentHashMap<>();
@@ -101,36 +109,96 @@ public final class ConsoleAuth {
 	 * Try to sign in.
 	 */
 	public LoginResult login( String password, String remoteAddr ) {
-		long		now	= System.currentTimeMillis();
-		String		key	= remoteAddr == null ? "?" : remoteAddr;
-		Attempts	a	= attempts.computeIfAbsent( key, k -> new Attempts() );
+		long	now	= System.currentTimeMillis();
+		String	key	= clientKey( remoteAddr );
+		// Old sessions and attempts are dropped on every login, and both tables have a hard cap
+		prune( now );
+		Attempts a = attempts.computeIfAbsent( key, k -> new Attempts() );
 		synchronized ( a ) {
+			a.touched = now;
 			if ( a.lockedUntil > now ) {
 				return new LoginResult( null, ( a.lockedUntil - now + 999 ) / 1000, 0 );
 			}
-			if ( a.failures > 0 && now - a.firstAt > WINDOW_MS ) {
-				a.failures = 0;
+			if ( a.adminFailures > 0 && now - a.adminSince > WINDOW_MS ) {
+				a.adminFailures = 0;
+			}
+			if ( a.viewerFailures > 0 && now - a.viewerSince > WINDOW_MS ) {
+				a.viewerFailures = 0;
 			}
 			byte[]	given		= password == null ? null : sha256( password );
 			boolean	isAdmin		= passwordHash != null && given != null && MessageDigest.isEqual( passwordHash, given );
-			boolean	isViewer	= viewerHash != null && given != null && MessageDigest.isEqual( viewerHash, given );
+			boolean	isViewer	= !isAdmin && viewerHash != null && given != null && MessageDigest.isEqual( viewerHash, given );
 			if ( isAdmin || isViewer ) {
-				attempts.remove( key );
+				if ( isAdmin ) {
+					a.adminFailures = 0;
+				} else {
+					a.viewerFailures = 0;
+				}
 				Session s = new Session( token(), token(), key, isAdmin ? "admin" : "viewer", now );
+				if ( sessions.size() >= MAX_SESSIONS ) {
+					dropOldestSession();
+				}
 				sessions.put( s.id, s );
-				prune( now );
 				return new LoginResult( s, 0, maxAttempts );
 			}
-			if ( a.failures == 0 ) {
-				a.firstAt = now;
+			if ( a.adminFailures == 0 ) {
+				a.adminSince = now;
 			}
-			a.failures++;
-			if ( a.failures >= maxAttempts ) {
-				a.lockedUntil	= now + lockoutMs;
-				a.failures		= 0;
+			a.adminFailures++;
+			int worst = a.adminFailures;
+			if ( viewerHash != null ) {
+				if ( a.viewerFailures == 0 ) {
+					a.viewerSince = now;
+				}
+				a.viewerFailures++;
+				worst = Math.max( worst, a.viewerFailures );
+			}
+			if ( worst >= maxAttempts ) {
+				a.lockedUntil		= now + lockoutMs;
+				a.adminFailures		= 0;
+				a.viewerFailures	= 0;
 				return new LoginResult( null, lockoutMs / 1000, 0 );
 			}
-			return new LoginResult( null, 0, maxAttempts - a.failures );
+			return new LoginResult( null, 0, maxAttempts - worst );
+		}
+	}
+
+	/**
+	 * The key failures are counted under: the address, and for IPv6 the /64 network, because one client holds a whole /64 and could otherwise
+	 * try a new address for every guess.
+	 */
+	static String clientKey( String remoteAddr ) {
+		if ( remoteAddr == null || remoteAddr.isBlank() ) {
+			return "?";
+		}
+		String a = remoteAddr.trim();
+		if ( a.indexOf( ':' ) < 0 ) {
+			return a;
+		}
+		try {
+			int pct = a.indexOf( '%' );
+			if ( pct > 0 ) {
+				a = a.substring( 0, pct );
+			}
+			if ( a.startsWith( "[" ) && a.contains( "]" ) ) {
+				a = a.substring( 1, a.indexOf( ']' ) );
+			}
+			for ( int i = 0; i < a.length(); i++ ) {
+				if ( Character.digit( a.charAt( i ), 16 ) < 0 && a.charAt( i ) != ':' && a.charAt( i ) != '.' ) {
+					return a;
+				}
+			}
+			byte[] b = java.net.InetAddress.getByName( a ).getAddress();
+			if ( b.length != 16 ) {
+				return java.net.InetAddress.getByAddress( b ).getHostAddress();
+			}
+			StringBuilder sb = new StringBuilder( 24 );
+			for ( int i = 0; i < 8; i++ ) {
+				sb.append( Character.forDigit( b[ i ] >> 4 & 15, 16 ) ).append( Character.forDigit( b[ i ] & 15, 16 ) );
+			}
+			return sb.append( "/64" ).toString();
+		} catch ( Exception e ) {
+			return a;
 		}
 	}
 
@@ -156,6 +224,34 @@ public final class ConsoleAuth {
 		return s;
 	}
 
+	/**
+	 * Is the session still valid? Unlike {@link #find} this does not refresh the idle timer, so a live stream cannot keep a session alive for
+	 * ever on its own.
+	 */
+	public Session peek( String sessionId ) {
+		if ( sessionId == null || sessionId.isEmpty() ) {
+			return null;
+		}
+		Session	s	= sessions.get( sessionId );
+		long	now	= System.currentTimeMillis();
+		if ( s == null ) {
+			return null;
+		}
+		if ( now - s.lastSeen > idleMs || now - s.createdAt > ABSOLUTE_MAX_MS ) {
+			sessions.remove( sessionId );
+			return null;
+		}
+		return s;
+	}
+
+	public int attemptCount() {
+		return attempts.size();
+	}
+
+	private void dropOldestSession() {
+		sessions.values().stream().min( java.util.Comparator.comparingLong( x -> x.lastSeen ) ).ifPresent( x -> sessions.remove( x.id ) );
+	}
+
 	public void logout( String sessionId ) {
 		if ( sessionId != null ) {
 			sessions.remove( sessionId );
@@ -178,15 +274,11 @@ public final class ConsoleAuth {
 	}
 
 	private void prune( long now ) {
-		Iterator<Session> it = sessions.values().iterator();
-		while ( it.hasNext() ) {
-			Session s = it.next();
-			if ( now - s.lastSeen > idleMs || now - s.createdAt > ABSOLUTE_MAX_MS ) {
-				it.remove();
-			}
-		}
-		if ( attempts.size() > 5000 ) {
-			attempts.entrySet().removeIf( e -> e.getValue().lockedUntil < now && now - e.getValue().firstAt > WINDOW_MS );
+		sessions.values().removeIf( s -> now - s.lastSeen > idleMs || now - s.createdAt > ABSOLUTE_MAX_MS );
+		attempts.entrySet().removeIf( e -> e.getValue().lockedUntil < now && now - e.getValue().touched > WINDOW_MS );
+		while ( attempts.size() > MAX_ATTEMPTS ) {
+			attempts.entrySet().stream().min( java.util.Comparator.comparingLong( e -> e.getValue().touched ) )
+			    .ifPresent( e -> attempts.remove( e.getKey() ) );
 		}
 	}
 

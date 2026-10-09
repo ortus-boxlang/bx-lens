@@ -53,8 +53,18 @@ import ortus.boxlang.runtime.types.IStruct;
 public class OrmCollector extends BaseCollector {
 
 	/** Session factories that were hooked (weak, so an ORM reload does not keep the old one alive) and how. */
-	public static final Map<Object, Map<String, Object>>	FACTORIES	= Collections.synchronizedMap( new WeakHashMap<>() );
-	private static volatile boolean							logbackOn;
+	public static final Map<Object, Map<String, Object>>									FACTORIES	= Collections.synchronizedMap( new WeakHashMap<>() );
+	private static volatile boolean															logbackOn;
+	/** How to put each hooked session factory back as it was. Weak keys, so a reloaded ORM application is not kept alive. */
+	private static final Map<Object, Runnable>												RESTORE		= Collections.synchronizedMap( new WeakHashMap<>() );
+	private static ch.qos.logback.classic.Logger											sqlLogger;
+	private static ch.qos.logback.core.Appender<ch.qos.logback.classic.spi.ILoggingEvent>	sqlAppender;
+	private static ch.qos.logback.classic.Level												sqlLevel;
+
+	@Override
+	public boolean enabledByDefault() {
+		return false;
+	}
 
 	@Override
 	public String id() {
@@ -82,6 +92,10 @@ public class OrmCollector extends BaseCollector {
 	 */
 	@SuppressWarnings( "unchecked" )
 	public void install() {
+		// Off by default: do nothing at all, not even a lookup by reflection
+		if ( !config().ormEnabled ) {
+			return;
+		}
 		try {
 			Object		svc	= BoxRuntime.getInstance().getGlobalService( Key.of( "ORMService" ) );
 			IBoxContext	ctx	= RequestBoxContext.getCurrent();
@@ -95,8 +109,19 @@ public class OrmCollector extends BaseCollector {
 				}
 				for ( Object ds : ( List<Object> ) app.getClass().getMethod( "getDatasources" ).invoke( app ) ) {
 					Object sf = sessionFactory( app, ds, ctx );
-					if ( sf != null && !FACTORIES.containsKey( sf ) ) {
-						hook( sf, name, String.valueOf( ds ) );
+					if ( sf != null ) {
+						Map<String, Object> info = new LinkedHashMap<>();
+						info.put( "app", name );
+						info.put( "datasource", String.valueOf( ds ) );
+						info.put( "mode", "none" );
+						// One thread hooks a session factory, whatever the number of requests that arrive together
+						synchronized ( FACTORIES ) {
+							if ( FACTORIES.containsKey( sf ) ) {
+								continue;
+							}
+							FACTORIES.put( sf, info );
+							hook( sf, name, String.valueOf( ds ), info );
+						}
 					}
 				}
 			}
@@ -119,12 +144,7 @@ public class OrmCollector extends BaseCollector {
 		}
 	}
 
-	private void hook( Object sf, String appName, String dsName ) {
-		Map<String, Object> info = new LinkedHashMap<>();
-		info.put( "app", appName );
-		info.put( "datasource", dsName );
-		info.put( "mode", "none" );
-		FACTORIES.put( sf, info );
+	private void hook( Object sf, String appName, String dsName, Map<String, Object> info ) {
 		LensConfig cfg = config();
 		try {
 			if ( cfg.collectorBool( "orm", "statistics", true ) ) {
@@ -141,6 +161,17 @@ public class OrmCollector extends BaseCollector {
 			Object		orig	= cp.get( fast );
 			Class<?>	iface	= Class.forName( "org.hibernate.engine.jdbc.connections.spi.ConnectionProvider", true, orig.getClass().getClassLoader() );
 			cp.set( fast, Proxy.newProxyInstance( orig.getClass().getClassLoader(), new Class<?>[] { iface }, new ProviderHandler( orig, dsName ) ) );
+			final java.lang.ref.WeakReference<Object> fastRef = new java.lang.ref.WeakReference<>( fast );
+			RESTORE.put( sf, () -> {
+				try {
+					Object f = fastRef.get();
+					if ( f != null ) {
+						cp.set( f, orig );
+					}
+				} catch ( Throwable t ) {
+					// Already gone
+				}
+			} );
 			info.put( "mode", "proxy" );
 			LensService.getInstance().getLogger().info( "bx-lens: showing the SQL of bx-orm app [{}], datasource [{}]", appName, dsName );
 		} catch ( Throwable t ) {
@@ -180,12 +211,41 @@ public class OrmCollector extends BaseCollector {
 			app.setContext( lc );
 			app.start();
 			ch.qos.logback.classic.Logger l = lc.getLogger( "org.hibernate.SQL" );
+			sqlLevel = l.getLevel();
 			l.addAppender( app );
 			l.setLevel( ch.qos.logback.classic.Level.DEBUG );
-			logbackOn = true;
+			sqlLogger	= l;
+			sqlAppender	= app;
+			logbackOn	= true;
 		} catch ( Throwable t ) {
 			// No fallback available
 		}
+	}
+
+	/**
+	 * Put everything back as it was: the original connection provider of every hooked session factory, and no Logback appender. Called when
+	 * the module stops.
+	 */
+	public static synchronized void shutdownAll() {
+		List<Runnable> all;
+		synchronized ( RESTORE ) {
+			all = new ArrayList<>( RESTORE.values() );
+			RESTORE.clear();
+		}
+		all.forEach( Runnable::run );
+		FACTORIES.clear();
+		try {
+			if ( sqlLogger != null && sqlAppender != null ) {
+				sqlLogger.detachAppender( sqlAppender );
+				sqlAppender.stop();
+				sqlLogger.setLevel( sqlLevel );
+			}
+		} catch ( Throwable t ) {
+			// Nothing else to undo
+		}
+		sqlLogger	= null;
+		sqlAppender	= null;
+		logbackOn	= false;
 	}
 
 	// ---------------------------------------------------------------------------------------------
@@ -223,25 +283,36 @@ public class OrmCollector extends BaseCollector {
 				return null;
 			}
 			LensConfig cfg = LensService.getInstance().getConfig();
-			if ( !cfg.isCollectorEnabled( "orm", true ) ) {
+			if ( !cfg.ormEnabled ) {
 				return null;
 			}
 			Span span = req.begin( Span.QUERY, "orm", cfg.collectorInt( "queries", "max", 200 ) );
 			return span == null ? null : new Recorder( req, span, ds, cfg );
 		}
 
+		/**
+		 * Record the statement. Never throws: the application's own JDBC call must not be affected by Lens.
+		 */
 		void finish( String sql, List<Object> params, int rows, Throwable error ) {
+			try {
+				finishUnsafe( sql, params, rows, error );
+			} catch ( Throwable t ) {
+				// Recording is optional
+			}
+		}
+
+		private void finishUnsafe( String sql, List<Object> params, int rows, Throwable error ) {
 			req.end( span );
 			Sanitizer	clean	= new Sanitizer( cfg );
 			String		text	= clean.text( sql );
 			span.detail.put( "sql", text );
 			span.detail.put( "orm", true );
 			boolean	full	= !cfg.light;
-			Object	bound	= full && cfg.collectorBool( "queries", "includeParams", true ) && !params.isEmpty() ? clean.clean( params ) : null;
+			Object	bound	= full && cfg.queriesIncludeParams && !params.isEmpty() ? clean.clean( params ) : null;
 			if ( bound != null ) {
 				span.detail.put( "params", bound );
 			}
-			if ( full && cfg.collectorBool( "queries", "captureCaller", true ) ) {
+			if ( full && cfg.queriesCaptureCaller ) {
 				Callers.Location where = Callers.current();
 				span.file	= where.file();
 				span.line	= where.line();
@@ -372,12 +443,20 @@ public class OrmCollector extends BaseCollector {
 				return Proxy.newProxyInstance( Connection.class.getClassLoader(), new Class<?>[] { ResultSet.class }, ( pp, mm, aa ) -> {
 					Object v = call( mm, rs, aa );
 					if ( mm.getName().equals( "next" ) && Boolean.TRUE.equals( v ) ) {
-						r.entry.put( "rows", counted.incrementAndGet() );
+						try {
+							r.entry.put( "rows", counted.incrementAndGet() );
+						} catch ( Throwable t ) {
+							// Counting is optional
+						}
 					}
 					return v;
 				} );
 			} else if ( out instanceof Boolean b && !b ) {
-				rows = real.getUpdateCount();
+				try {
+					rows = real.getUpdateCount();
+				} catch ( Throwable t ) {
+					rows = 0;
+				}
 			}
 			rec.finish( text, bound, rows, null );
 			return out;

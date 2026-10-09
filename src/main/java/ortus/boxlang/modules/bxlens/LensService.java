@@ -34,6 +34,7 @@ import ortus.boxlang.modules.bxlens.interceptors.collectors.TemplateCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.TransactionCollector;
 import ortus.boxlang.modules.bxlens.model.IssueEngine;
 import ortus.boxlang.modules.bxlens.model.LensRequest;
+import ortus.boxlang.modules.bxlens.model.SecurityChecks;
 import ortus.boxlang.modules.bxlens.model.Snapshot;
 import ortus.boxlang.modules.bxlens.render.BarRenderer;
 import ortus.boxlang.modules.bxlens.store.RequestStore;
@@ -45,6 +46,7 @@ import ortus.boxlang.runtime.BoxRuntime;
 import ortus.boxlang.runtime.context.IBoxContext;
 import ortus.boxlang.runtime.context.RequestBoxContext;
 import ortus.boxlang.runtime.logging.BoxLangLogger;
+import ortus.boxlang.runtime.scopes.Key;
 import ortus.boxlang.runtime.types.IStruct;
 import ortus.boxlang.runtime.types.Struct;
 
@@ -243,6 +245,22 @@ public final class LensService {
 		}
 		store.clear();
 		registry.clear();
+		// Put back what Lens changed in other modules and pools
+		try {
+			OrmCollector.shutdownAll();
+		} catch ( Throwable t ) {
+			// Nothing to undo
+		}
+		try {
+			ai.shutdown();
+		} catch ( Throwable t ) {
+			// Nothing to stop
+		}
+		try {
+			datasources.shutdown();
+		} catch ( Throwable t ) {
+			// Nothing to undo
+		}
 	}
 
 	/**
@@ -361,6 +379,11 @@ public final class LensService {
 				if ( configured == null && d.key().startsWith( "collectors." ) && d.key().endsWith( ".enabled" ) ) {
 					configured = baseConfig.isCollectorEnabled( d.key().split( "\\." )[ 1 ], ( Boolean ) d.def() );
 				}
+				if ( "history.trackNonHtml".equals( d.key() ) ) {
+					// The effective value depends on the collect level
+					value		= config.trackNonHtml;
+					configured	= baseConfig.trackNonHtml;
+				}
 				m.put( "value", value == null ? d.def() : value );
 				m.put( "configured", configured == null ? d.def() : configured );
 			}
@@ -434,12 +457,13 @@ public final class LensService {
 		active.put( req.id, req );
 		rc.putAttachment( Keys.requestAttach, req );
 		try {
-			if ( showBar ) {
+			if ( showBar || config.getBool( "history.headerAlways", true ) ) {
 				ex.setResponseHeader( config.idHeader, req.id );
 			}
 		} catch ( Throwable t ) {
 			// Headers already sent
 		}
+		tie( rc, req );
 		synchronized ( collectors ) {
 			for ( ILensCollector c : collectors ) {
 				try {
@@ -454,12 +478,37 @@ public final class LensService {
 	}
 
 	/**
-	 * Finish a request: stop timing, let collectors gather final data, find issues, store it in the history and, for HTML responses, inject the bar.
+	 * Make the request id available to the application and to log lines: <code>request.bxlens.id</code>, and the logging context key
+	 * <code>requestId</code> (SLF4J MDC) on the request thread, so a log pattern with <code>%X{requestId}</code> prints it.
+	 */
+	private void tie( RequestBoxContext rc, LensRequest req ) {
+		try {
+			rc.getScopeNearby( ortus.boxlang.runtime.scopes.RequestScope.name ).put( Key.of( "bxlens" ), Struct.of( "id", req.id ) );
+		} catch ( Throwable t ) {
+			// The request scope is optional
+		}
+		try {
+			org.slf4j.MDC.put( "requestId", req.id );
+		} catch ( Throwable t ) {
+			// No logging context
+		}
+	}
+
+	/**
+	 * Finish a request: stop timing, let collectors gather final data, record the totals for the console and, for requests that belong in the
+	 * history, find issues and keep the request. The JSON for the page is not built here. It is built when the bar is rendered for a caller
+	 * who may see it, or when the console opens the request.
 	 */
 	public void finish( RequestBoxContext rc, Trigger trigger ) {
 		LensRequest req = rc.getAttachment( Keys.requestAttach );
 		if ( req == null || !req.finished.compareAndSet( false, true ) ) {
 			return;
+		}
+		final LensConfig cfg = this.config;
+		try {
+			org.slf4j.MDC.remove( "requestId" );
+		} catch ( Throwable t ) {
+			// No logging context
 		}
 		req.endNanos = System.nanoTime();
 		active.remove( req.id );
@@ -484,53 +533,63 @@ public final class LensService {
 		if ( trigger == Trigger.ERROR && req.status < 400 ) {
 			req.status = 500;
 		}
-		req.html = config.isInjectable( req.contentType );
+		req.html = cfg.isInjectable( req.contentType );
 		try {
 			req.appName = rc.getApplicationListener().getAppName().getName();
 		} catch ( Throwable t ) {
 			req.appName = "";
 		}
+		// A request that will not be kept in the history and will not show the bar needs none of the work that only feeds the page
+		final boolean keep = req.html || cfg.trackNonHtml;
 		synchronized ( collectors ) {
 			for ( ILensCollector c : collectors ) {
+				if ( !keep && c.snapshotOnly() ) {
+					continue;
+				}
 				try {
 					c.onRequestFinish( req );
 				} catch ( Throwable t ) {
-					getLogger().debug( "Collector [{}] failed on request finish: {}", c.id(), t.toString() );
+					getLogger().debug( "Collector [{}] failed on request finish [{}]: {}", c.id(), req.id, t.toString() );
 				}
 			}
 		}
 		announce( Keys.onLensCollect, Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
-		IssueEngine.analyze( req, config );
-		queryStats.record( req, config.slowQueryMs );
-		errors.record( req, config );
-		reports.record( req, config.slowRequestMs );
-		if ( ex != null ) {
-			try {
-				ortus.boxlang.modules.bxlens.model.SecurityChecks.analyze( req, config, ex.responseHeaders(), ex.responseCookies(), ex.secure() );
-				Map<String, Object>							rh		= new LinkedHashMap<>();
-				ortus.boxlang.modules.bxlens.util.Sanitizer	clean	= new ortus.boxlang.modules.bxlens.util.Sanitizer( config );
-				ex.responseHeaders().forEach( ( k, v ) -> rh.put( k, clean.cleanKeyed( k, v ) ) );
-				req.data.put( "responseHeaders", rh );
-			} catch ( Throwable t ) {
-				getLogger().debug( "Security checks failed: {}", t.toString() );
-			}
-		}
-		applySlowSample( req );
+		// The console totals read the finished request directly
+		queryStats.record( req, cfg.slowQueryMs );
+		errors.record( req, cfg );
+		reports.record( req, cfg.slowRequestMs );
 		stats.recordRequest( Math.round( req.durationNs() / 1_000_000.0 ) );
 
-		Map<String, Object>	snapshot	= Snapshot.build( req, config, ex );
-		String				json		= Json.write( snapshot );
-		if ( req.html || config.trackNonHtml ) {
-			store.add( new RequestStore.Entry( req.id, Snapshot.summary( req ), json ) );
+		RequestStore.Entry entry = null;
+		if ( keep ) {
+			IssueEngine.analyze( req, cfg );
+			if ( ex != null ) {
+				try {
+					if ( !cfg.light ) {
+						req.requestHeaders = ex.requestHeaders();
+					}
+					req.responseHeaders = ex.responseHeaders();
+					if ( SecurityChecks.applies( req, cfg ) ) {
+						SecurityChecks.analyze( req, cfg, req.responseHeaders, ex.responseCookies(), ex.secure() );
+					}
+				} catch ( Throwable t ) {
+					getLogger().debug( "Security checks failed: {}", t.toString() );
+				}
+			}
+			applySlowSample( req );
+			entry = new RequestStore.Entry( req.id, Snapshot.summary( req, cfg ), () -> snapshotJson( req, cfg ) );
+			store.add( entry );
 		}
-		if ( trigger == Trigger.END && req.showBar && req.html && renderer != null && renderer.isComplete() && ex != null && !ex.responseStarted() ) {
+		if ( entry != null && trigger == Trigger.END && req.showBar && req.html && renderer != null && renderer.isComplete() && ex != null
+		    && !ex.responseStarted() ) {
 			try {
 				StringBuffer	buffer		= rc.getBuffer();
 				int				markerAt	= buffer.indexOf( MARKER );
-				if ( ( config.inject || markerAt >= 0 ) && req.injected.compareAndSet( false, true ) ) {
-					boolean	consoleOk	= config.consoleEnabled && ex != null
+				if ( ( cfg.inject || markerAt >= 0 ) && req.injected.compareAndSet( false, true ) ) {
+					boolean	consoleOk	= cfg.consoleEnabled
 					    && consoleGuard.isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( consoleGuard.requiredHeader() ) );
-					String	block		= renderer.render( pagePayload( json, consoleOk ? "/~bxlens/index.bxm" : "" ) );
+					// The page is built here, and only here, for a caller who is allowed to see the bar
+					String	block		= renderer.render( pagePayload( entry.json(), consoleOk ? "/~bxlens/index.bxm" : "" ) );
 					if ( markerAt >= 0 ) {
 						buffer.replace( markerAt, markerAt + MARKER.length(), block );
 					} else {
@@ -538,19 +597,31 @@ public final class LensService {
 					}
 				}
 			} catch ( Throwable t ) {
-				getLogger().warn( "bx-lens could not inject the bar: {}", t.toString() );
+				getLogger().warn( "bx-lens could not inject the bar for request [{}]: {}", req.id, t.toString() );
 			}
 		}
 		announce( Keys.onLensRequestFinish, Struct.of( "context", rc, "requestId", req.id ) );
+		req.release();
+	}
+
+	private String snapshotJson( LensRequest req, LensConfig cfg ) {
+		try {
+			return Json.write( Snapshot.build( req, cfg ) );
+		} catch ( Throwable t ) {
+			getLogger().warn( "bx-lens could not build the request [{}]: {}", req.id, t.toString() );
+			return Json.write( Map.of( "error", "This request could not be built" ) );
+		}
 	}
 
 	/**
 	 * Once a request runs longer than the slow request limit, take one stack sample of its thread, so the issue can say where it was stuck.
 	 */
 	/** Requests kept in memory without a Plus license. */
-	public static final int	FREE_HISTORY	= 25;
+	public static final int		FREE_HISTORY		= 25;
 
-	private int				tick;
+	private int					tick;
+	/** How long a request may be listed as running before it is dropped from the list: ten minutes. */
+	private static final long	ACTIVE_TTL_NANOS	= 10 * 60_000_000_000L;
 
 	private void startWatchdog() {
 		watchdog = java.util.concurrent.Executors.newSingleThreadScheduledExecutor( r -> {
@@ -560,6 +631,11 @@ public final class LensService {
 		} );
 		watchdog.scheduleWithFixedDelay( () -> {
 			try {
+				if ( tick % 300 == 299 ) {
+					// A request that never finished (a killed thread, a lost event) must not stay in the list for ever
+					long cut = System.nanoTime() - ACTIVE_TTL_NANOS;
+					active.values().removeIf( r -> r.startNanos < cut );
+				}
 				if ( ++tick % 25 == 0 ) {
 					if ( config.consoleEnabled ) {
 						datasources.attachAll();
@@ -635,6 +711,11 @@ public final class LensService {
 		}
 	}
 
+	private static boolean isBoxLangFile( String name ) {
+		return name.indexOf( '(' ) < 0 && name.indexOf( ')' ) < 0
+		    && ( name.endsWith( ".bxm" ) || name.endsWith( ".bxs" ) || name.endsWith( ".bx" ) || name.endsWith( ".cfc" ) || name.endsWith( ".cfm" ) );
+	}
+
 	/**
 	 * The tracked request for a context, or null when this request is not tracked.
 	 */
@@ -663,7 +744,7 @@ public final class LensService {
 		ui.put( "height", config.getInt( "ui.height", 360 ) );
 		ui.put( "allowDetach", config.getBool( "ui.allowDetach", true ) );
 		ui.put( "hotkey", config.getString( "ui.hotkey", "Ctrl+`" ) );
-		ui.put( "editorLink", config.getString( "editor.linkPattern", "vscode://file/{path}:{line}" ) );
+		ui.put( "editorLink", config.editorLink() );
 		ui.put( "remoteBase", config.getString( "editor.remoteBase", "" ) );
 		ui.put( "localBase", config.getString( "editor.localBase", "" ) );
 		ui.put( "maxRequests", config.maxRequests );
@@ -883,7 +964,7 @@ public final class LensService {
 			m.put( "id", r.id );
 			m.put( "method", r.method );
 			m.put( "uri", r.uri );
-			m.put( "queryString", r.queryString );
+			m.put( "queryString", ortus.boxlang.modules.bxlens.util.Secrets.redactQuery( r.queryString, config, 500 ) );
 			m.put( "app", r.appName );
 			m.put( "remoteAddr", r.remoteAddr );
 			m.put( "startedAt", r.startMillis );

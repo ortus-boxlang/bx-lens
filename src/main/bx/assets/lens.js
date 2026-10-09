@@ -262,6 +262,11 @@
 				f = f.replace( /\\/g, "/" );
 				return pattern.replace( "{path}", f ).replace( "{line}", line || 1 );
 			},
+			// A command for a shell: every part is single quoted, a single quote inside it is closed, escaped and reopened
+			curl: function ( method, url, query ) {
+				var q = function ( s ) { return "'" + String( s ).replace( /'/g, "'\\''" ) + "'"; };
+				return "curl -X " + q( method ) + " " + q( url + ( query ? "?" + query : "" ) );
+			},
 			sqlWithParams: function ( q ) { return q.sql + ( q.params && q.params.length ? "\n-- params " + JSON.stringify( q.params ) : "" ); },
 			cellsOf: function ( row, columns ) {
 				if ( Array.isArray( row ) ) { return row; }

@@ -14,6 +14,7 @@ import ortus.boxlang.modules.bxlens.model.LensRequest;
 import ortus.boxlang.modules.bxlens.model.Span;
 import ortus.boxlang.modules.bxlens.util.Callers;
 import ortus.boxlang.modules.bxlens.util.Keys;
+import ortus.boxlang.modules.bxlens.util.Secrets;
 import ortus.boxlang.runtime.events.InterceptionPoint;
 import ortus.boxlang.runtime.scopes.Key;
 import ortus.boxlang.runtime.types.IStruct;
@@ -42,13 +43,18 @@ public class HttpCollector extends BaseCollector {
 				method	= hr.method();
 				url		= hr.uri().toString();
 			}
+			// Credentials in the URL (user info, secret parameters) never reach the page, so Copy as cURL cannot expose them
+			url = Secrets.text( url );
 			Span span = req.begin( Span.HTTP, method + " " + stripQuery( url ), config().collectorInt( id(), "max", 100 ) );
 			if ( span != null ) {
-				Callers.Location where = Callers.current();
-				span.file	= where.file();
-				span.line	= where.line();
+				if ( !config().light ) {
+					Callers.Location where = Callers.current();
+					span.file	= where.file();
+					span.line	= where.line();
+				}
 				span.detail.put( "method", method );
 				span.detail.put( "url", url );
+				propagate( event, req );
 			}
 		} catch ( Throwable t ) {
 			fail( "onHTTPRequest", t );
@@ -123,6 +129,20 @@ public class HttpCollector extends BaseCollector {
 			}
 		} catch ( Throwable t ) {
 			fail( "onHTTPError", t );
+		}
+	}
+
+	/**
+	 * Opt in (<code>collectors.http.propagateId</code>): add the request id as <code>X-Request-Id</code> to the outgoing call. Core hands the
+	 * collector an immutable request, so this only works when the event carries a request builder. Nothing is added by default.
+	 */
+	private void propagate( IStruct event, LensRequest req ) {
+		try {
+			if ( config().collectorBool( id(), "propagateId", false ) && event.get( Key.of( "httpRequestBuilder" ) ) instanceof HttpRequest.Builder b ) {
+				b.setHeader( "X-Request-Id", req.id );
+			}
+		} catch ( Throwable t ) {
+			fail( "propagate", t );
 		}
 	}
 

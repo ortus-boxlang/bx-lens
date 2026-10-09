@@ -64,4 +64,24 @@ public class ReportsTest {
 		assertThat( life.get( "runs" ) ).isEqualTo( 2L );
 	}
 
+	@Test
+	@DisplayName( "URLs that differ only by an id are one entry, and the table is bounded" )
+	@SuppressWarnings( "unchecked" )
+	void collapsesPaths() {
+		Reports reports = new Reports();
+		for ( int i = 0; i < 500; i++ ) {
+			reports.record( request( "/orders/" + i, 200 ), 500 );
+		}
+		reports.record( request( "/orders/123e4567-e89b-12d3-a456-426614174000", 200 ), 500 );
+		java.util.List<Map<String, Object>> busiest = ( java.util.List<Map<String, Object>> ) reports.snapshot( false ).get( "busiestUrls" );
+		assertThat( busiest ).hasSize( 1 );
+		assertThat( busiest.get( 0 ).get( "url" ) ).isEqualTo( "GET /orders/:id" );
+		assertThat( busiest.get( 0 ).get( "count" ) ).isEqualTo( 501L );
+		Reports many = new Reports();
+		for ( int i = 0; i < 1000; i++ ) {
+			many.record( request( "/page" + i + "/x", 200 ), 500 );
+		}
+		assertThat( ( ( java.util.List<?> ) many.snapshot( false ).get( "busiestUrls" ) ) ).hasSize( 10 );
+	}
+
 }

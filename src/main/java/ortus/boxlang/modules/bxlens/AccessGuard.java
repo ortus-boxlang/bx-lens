@@ -27,6 +27,8 @@ public final class AccessGuard {
 	private final boolean		allowAll;
 	private final boolean		downgraded;
 	private final List<String>	allowedHosts;
+	/** The rule is exactly "local": then only a loopback Host name is accepted unless access.allowedHosts says otherwise. */
+	private final boolean		localOnly;
 	private final String		requireHeaderName;
 	private final String		requireHeaderValue;
 
@@ -64,6 +66,7 @@ public final class AccessGuard {
 			this.allowAll	= all;
 			this.rules		= list;
 		}
+		this.localOnly = !this.allowAll && this.rules.size() == 1 && "local".equalsIgnoreCase( this.rules.get( 0 ) );
 		List<String> hosts = new ArrayList<>();
 		for ( String h : config.getList( "access.allowedHosts", List.of() ) ) {
 			hosts.add( h.toLowerCase( Locale.ROOT ) );
@@ -109,12 +112,14 @@ public final class AccessGuard {
 			}
 		}
 		if ( !allowedHosts.isEmpty() ) {
-			String	h		= host == null ? "" : host.toLowerCase( Locale.ROOT );
-			int		colon	= h.lastIndexOf( ':' );
-			if ( colon > 0 && h.indexOf( ':' ) == colon ) {
-				h = h.substring( 0, colon );
+			if ( !allowedHosts.contains( hostName( host ) ) ) {
+				return false;
 			}
-			if ( !allowedHosts.contains( h ) ) {
+		} else if ( localOnly ) {
+			// DNS rebinding: a page on another site can point its own name at 127.0.0.1. The Host header still carries that name, so a
+			// local-only guard accepts only a loopback name. Widen it with access.allowedHosts.
+			String h = hostName( host );
+			if ( !h.isEmpty() && !h.equals( "localhost" ) && !h.equals( "127.0.0.1" ) && !h.equals( "[::1]" ) ) {
 				return false;
 			}
 		}
@@ -126,6 +131,22 @@ public final class AccessGuard {
 			return false;
 		}
 		return matchesAny( rules, addr );
+	}
+
+	/**
+	 * The host name of a Host header: lower case, without the port. An IPv6 literal keeps its brackets.
+	 */
+	static String hostName( String host ) {
+		String h = host == null ? "" : host.trim().toLowerCase( Locale.ROOT );
+		if ( h.startsWith( "[" ) ) {
+			int close = h.indexOf( ']' );
+			return close > 0 ? h.substring( 0, close + 1 ) : h;
+		}
+		int colon = h.lastIndexOf( ':' );
+		if ( colon > 0 && h.indexOf( ':' ) == colon ) {
+			h = h.substring( 0, colon );
+		}
+		return h;
 	}
 
 	/**
@@ -154,6 +175,13 @@ public final class AccessGuard {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Is the text an IP address literal (IPv4 or IPv6)? No name lookup is ever made.
+	 */
+	public static boolean isIpLiteral( String text ) {
+		return parse( text ) != null;
 	}
 
 	/**
@@ -189,8 +217,25 @@ public final class AccessGuard {
 			t = t.substring( 0, pct );
 		}
 		// Only literal IPs, never trigger a DNS lookup
-		if ( !t.matches( "[0-9a-fA-F:.]+" ) ) {
+		for ( int i = 0; i < t.length(); i++ ) {
+			char c = t.charAt( i );
+			if ( Character.digit( c, 16 ) < 0 && c != ':' && c != '.' ) {
+				return null;
+			}
+		}
+		if ( t.isEmpty() ) {
 			return null;
+		}
+		if ( t.indexOf( ':' ) < 0 ) {
+			// IPv4 only: digits and dots. A bare word of hex letters could otherwise be looked up as a host name
+			if ( t.indexOf( '.' ) < 0 ) {
+				return null;
+			}
+			for ( int i = 0; i < t.length(); i++ ) {
+				if ( t.charAt( i ) != '.' && !Character.isDigit( t.charAt( i ) ) ) {
+					return null;
+				}
+			}
 		}
 		try {
 			return InetAddress.getByName( t );

@@ -48,14 +48,15 @@ public final class SettingsRegistry {
 	 */
 	public SettingsRegistry( List<String> collectorIds ) {
 		add( "bar.enabled", "bool", "Bar", "Show the bar", true, false );
-		add( "collect.level", "enum", "Collection", "Collect level", true, "full", List.of( "off", "light", "full" ) );
+		add( "collect.level", "enum", "Collection", "Collect level", true, "light", List.of( "off", "light", "full" ) );
 		add( "tabs.hide", "list", "Collection", "Hidden tabs", true, List.of() );
 		add( "inject", "bool", "Bar", "Inject the bar into HTML pages", true, true );
-		add( "history.trackNonHtml", "bool", "Collection", "Track JSON and SSE requests", true, true );
+		add( "history.trackNonHtml", "bool", "Collection", "Track JSON and SSE requests (default: off in light, on in full)", true, false );
+		add( "history.headerAlways", "bool", "Collection", "Send the request id header on every tracked request", true, true );
 		for ( String id : collectorIds ) {
-			add( "collectors." + id + ".enabled", "bool", "Collectors", id, true, !List.of( "functions", "logs", "bifs" ).contains( id ) );
+			add( "collectors." + id + ".enabled", "bool", "Collectors", id, true, !List.of( "functions", "logs", "bifs", "orm" ).contains( id ) );
 		}
-		add( "collectors.queries.includeParams", "bool", "Collectors", "queries: keep parameter values", true, true );
+		add( "collectors.queries.includeParams", "bool", "Collectors", "queries: keep parameter values", true, false );
 		add( "collectors.queries.captureCaller", "bool", "Collectors", "queries: find the calling line", true, true );
 		add( "thresholds.slowRequestMs", "int", "Thresholds", "Slow request (ms)", true, 500, 0, 600000 );
 		add( "thresholds.slowQueryMs", "int", "Thresholds", "Slow query (ms)", true, 25, 0, 600000 );
@@ -99,6 +100,7 @@ public final class SettingsRegistry {
 		add( "ai.apiKey", "secret", "Console", "AI API key", false, "" );
 		add( "ai.links", "bool", "Console", "AI: show copy and chat links", false, true );
 		add( "collectors.orm.statistics", "bool", "Collectors", "ORM: turn on Hibernate statistics", false, true );
+		add( "collectors.http.propagateId", "bool", "Collectors", "HTTP: add X-Request-Id to outgoing calls", false, false );
 		add( "bar.access", "string", "Access", "Who sees the bar", false, "local" );
 		add( "bar.allowAllIPs", "bool", "Access", "Confirm bar.access all", false, false );
 		add( "history.maxRequests", "int", "Access", "Requests kept in memory", false, 50 );
@@ -192,6 +194,10 @@ public final class SettingsRegistry {
 				String str = value == null ? "" : value.toString();
 				if ( str.length() > 500 ) {
 					throw new IllegalArgumentException( d.key() + " is too long" );
+				}
+				if ( "editor.linkPattern".equalsIgnoreCase( d.key() ) && !LensConfig.isSafeEditorLink( str ) ) {
+					throw new IllegalArgumentException(
+					    d.key() + " must start with one of vscode:, vscode-insiders:, idea:, phpstorm:, subl:, file:, http:, https:, cursor: or zed:" );
 				}
 				return str;
 		}

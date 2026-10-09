@@ -11,10 +11,10 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import ortus.boxlang.modules.bxlens.ext.LensPanelBuilder;
 import ortus.boxlang.runtime.context.RequestBoxContext;
@@ -25,9 +25,12 @@ import ortus.boxlang.runtime.context.RequestBoxContext;
  */
 public final class LensRequest {
 
-	public final String								id				= UUID.randomUUID().toString().replace( "-", "" ).substring( 0, 10 );
-	public final long								startNanos		= System.nanoTime();
+	private static final AtomicLong					SEQ				= new AtomicLong();
+
 	public final long								startMillis		= System.currentTimeMillis();
+	/** Unique and cheap: the start time and a counter, both in base 36. It is not a secret. Sessions and CSRF tokens use a secure random. */
+	public final String								id				= newId( this.startMillis );
+	public final long								startNanos		= System.nanoTime();
 	public final AtomicBoolean						finished		= new AtomicBoolean( false );
 	public final AtomicBoolean						injected		= new AtomicBoolean( false );
 
@@ -51,6 +54,11 @@ public final class LensRequest {
 	/** The thread that handles the request, sampled by the slow request watchdog. */
 	public volatile Thread							thread;
 
+	/** Request headers as received, copied when the request ends and sanitized only when a snapshot is built. Null when not captured. */
+	public volatile Map<String, String>				requestHeaders;
+	/** Response headers as sent, copied when the request ends. Null when not captured. */
+	public volatile Map<String, String>				responseHeaders;
+
 	public final List<Span>							spans			= Collections.synchronizedList( new ArrayList<>() );
 	public final List<Map<String, Object>>			queries			= Collections.synchronizedList( new ArrayList<>() );
 	public final List<Map<String, Object>>			exceptions		= Collections.synchronizedList( new ArrayList<>() );
@@ -66,6 +74,18 @@ public final class LensRequest {
 	private final AtomicInteger						spanSeq			= new AtomicInteger( 0 );
 	private final Map<String, AtomicInteger>		typeCounts		= new ConcurrentHashMap<>();
 	private final Map<Long, ArrayDeque<Span>>		stacks			= new ConcurrentHashMap<>();
+
+	private static String newId( long millis ) {
+		return Long.toString( millis, 36 ) + Long.toString( SEQ.incrementAndGet(), 36 );
+	}
+
+	/**
+	 * Let go of the request context and the thread, so a finished request kept in the history does not keep the whole web request alive.
+	 */
+	public void release() {
+		this.requestContext	= null;
+		this.thread			= null;
+	}
 
 	/**
 	 * Nanoseconds since the request started.

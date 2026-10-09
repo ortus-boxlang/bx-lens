@@ -79,4 +79,33 @@ public class QueryStatsTest {
 		assertThat( stats.snapshot().get( "executed" ) ).isEqualTo( 0L );
 	}
 
+	@Test
+	@DisplayName( "literals written into the SQL never reach the statistics" )
+	@SuppressWarnings( "unchecked" )
+	void masksLiterals() {
+		QueryStats	stats	= new QueryStats();
+		LensRequest	req		= new LensRequest();
+		req.queries.add( q( 1, "SELECT * FROM users WHERE email = 'bob@example.com' AND id = 42", 5 ) );
+		req.queries.add( q( 2, "SELECT * FROM users WHERE email = 'amy@example.com' AND id = 7", 5 ) );
+		stats.record( req, 25 );
+		List<Map<String, Object>> rows = ( List<Map<String, Object>> ) stats.snapshot().get( "statements" );
+		assertThat( rows ).hasSize( 1 );
+		assertThat( rows.get( 0 ).get( "sql" ) ).isEqualTo( "SELECT * FROM users WHERE email = ? AND id = ?" );
+		assertThat( rows.get( 0 ).get( "count" ) ).isEqualTo( 2L );
+	}
+
+	@Test
+	@DisplayName( "the table stays near its cap and drops the least recently seen statements in a batch" )
+	void bounded() {
+		QueryStats stats = new QueryStats();
+		for ( int i = 0; i < QueryStats.MAX_STATEMENTS * 3; i++ ) {
+			LensRequest req = new LensRequest();
+			req.queries.add( q( 1, "SELECT col" + i + " FROM t" + i, 1 ) );
+			stats.record( req, 25 );
+		}
+		int size = ( ( List<?> ) stats.snapshot().get( "statements" ) ).size();
+		assertThat( size ).isAtMost( QueryStats.MAX_STATEMENTS + QueryStats.MAX_STATEMENTS / 10 );
+		assertThat( size ).isAtLeast( QueryStats.MAX_STATEMENTS );
+	}
+
 }

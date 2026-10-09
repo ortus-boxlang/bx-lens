@@ -38,6 +38,11 @@ public class ScopesCollector extends BaseCollector {
 	}
 
 	@Override
+	public boolean snapshotOnly() {
+		return true;
+	}
+
+	@Override
 	public String id() {
 		return "scopes";
 	}

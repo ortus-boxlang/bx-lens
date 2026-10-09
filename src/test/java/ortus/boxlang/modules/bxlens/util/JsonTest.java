@@ -49,4 +49,14 @@ public class JsonTest {
 		assertThat( Json.write( List.of( Double.NaN, Double.POSITIVE_INFINITY ) ) ).isEqualTo( "[null,null]" );
 	}
 
+	@Test
+	@DisplayName( "Control characters and line separators are written as lower case unicode escapes without String.format" )
+	public void unicode() {
+		assertThat( Json.write( "\u0000\u001f\u007f\u2028\u2029é" ) ).isEqualTo( "\"\\u0000\\u001f\u007f\\u2028\\u2029é\"" );
+		assertThat( Json.write( "<>&" ) ).isEqualTo( "\"\\u003c\\u003e\\u0026\"" );
+		assertThat( Json.write( "" ) ).isEqualTo( "\"\"" );
+		String big = "ab\"c".repeat( 100_000 );
+		assertThat( Json.write( big ).length() ).isEqualTo( 2 + 100_000 * 5 );
+	}
+
 }

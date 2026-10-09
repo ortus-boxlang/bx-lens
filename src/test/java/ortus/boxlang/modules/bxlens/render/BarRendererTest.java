@@ -36,4 +36,33 @@ public class BarRendererTest {
 		assertThat( buf.toString() ).isEqualTo( "<p>fragment</p>[BAR]" );
 	}
 
+	@Test
+	@DisplayName( "A closing body tag far from the end is not searched for: the block is appended" )
+	public void notInTail() {
+		StringBuffer buf = new StringBuffer( "<body>x</body>" + "y".repeat( BarRenderer.TAIL + 10 ) );
+		BarRenderer.insert( buf, "[BAR]" );
+		assertThat( buf.toString() ).endsWith( "y[BAR]" );
+		assertThat( buf.toString() ).startsWith( "<body>x</body>y" );
+	}
+
+	@Test
+	@DisplayName( "A closing body tag inside the last kilobyte is found in any case" )
+	public void inTail() {
+		StringBuffer	buf	= new StringBuffer( "z".repeat( 50_000 ) + "</BoDy>\n</html>" );
+		int				at	= BarRenderer.insert( buf, "[BAR]" );
+		assertThat( at ).isEqualTo( 50_000 );
+		assertThat( buf.toString() ).contains( "[BAR]</BoDy>" );
+	}
+
+	@Test
+	@DisplayName( "Short and empty pages are handled" )
+	public void tiny() {
+		StringBuffer empty = new StringBuffer();
+		BarRenderer.insert( empty, "[BAR]" );
+		assertThat( empty.toString() ).isEqualTo( "[BAR]" );
+		StringBuffer two = new StringBuffer( "</body>" );
+		BarRenderer.insert( two, "[BAR]" );
+		assertThat( two.toString() ).isEqualTo( "[BAR]</body>" );
+	}
+
 }

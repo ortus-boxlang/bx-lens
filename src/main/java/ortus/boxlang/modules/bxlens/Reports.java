@@ -17,7 +17,9 @@ import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.concurrent.atomic.LongAdder;
 
 import ortus.boxlang.modules.bxlens.model.LensRequest;
+import ortus.boxlang.modules.bxlens.util.Bounded;
 import ortus.boxlang.modules.bxlens.util.Plain;
+import ortus.boxlang.modules.bxlens.util.Text;
 
 /**
  * Totals for the whole server: requests, errors, status classes, latency, queries, the busiest, slowest and most failing URLs, and a minute by
@@ -53,6 +55,7 @@ public final class Reports {
 	private final AtomicLongArray						status			= new AtomicLongArray( 6 );
 	private final AtomicLongArray						latency			= new AtomicLongArray( BUCKETS.length + 1 );
 	private final Map<String, Url>						urls			= new ConcurrentHashMap<>();
+	private final Bounded								bounded			= new Bounded();
 	/** minute (epoch minutes) to { requests, errors, totalMs }. */
 	private final ConcurrentSkipListMap<Long, long[]>	minutes			= new ConcurrentSkipListMap<>();
 	private volatile long								baseRequests, baseErrors, baseSlow, baseQueries, baseExceptions, baseRuns;
@@ -123,15 +126,17 @@ public final class Reports {
 	}
 
 	private void url( LensRequest req, long ms, boolean failed ) {
-		String	key	= req.method + " " + req.uri;
+		// Numbers and ids in the path are one URL, so /orders/1 and /orders/2 do not fill the table
+		String	key	= req.method + " " + Text.collapsePath( req.uri );
 		Url		u	= urls.get( key );
 		if ( u == null ) {
-			if ( urls.size() >= MAX_URLS ) {
-				urls.entrySet().stream().min( Comparator.comparingLong( e -> e.getValue().lastSeen ) ).ifPresent( e -> urls.remove( e.getKey() ) );
-			}
-			Url prior = urls.putIfAbsent( key, u = new Url() );
+			u			= new Url();
+			u.lastSeen	= System.currentTimeMillis();
+			Url prior = urls.putIfAbsent( key, u );
 			if ( prior != null ) {
 				u = prior;
+			} else {
+				bounded.trim( urls, MAX_URLS, x -> x.lastSeen );
 			}
 		}
 		u.count.increment();

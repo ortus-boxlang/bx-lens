@@ -8,7 +8,6 @@ package ortus.boxlang.modules.bxlens;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,8 +74,10 @@ public final class DatasourceData {
 		}
 	}
 
-	private final Map<String, Tracker>	trackers	= new ConcurrentHashMap<>();
-	private final Set<String>			attached	= java.util.Collections.newSetFromMap( new ConcurrentHashMap<>() );
+	private final Map<String, Tracker>											trackers	= new ConcurrentHashMap<>();
+	private final Set<String>													attached	= java.util.Collections.newSetFromMap( new ConcurrentHashMap<>() );
+	/** The pools Lens put its tracker on, so it can take it off again when the module stops. */
+	private final Map<String, java.lang.ref.WeakReference<HikariDataSource>>	ours		= new ConcurrentHashMap<>();
 
 	/**
 	 * Put a tracker on every started pool that has none. Cheap enough to call every few seconds.
@@ -93,12 +94,32 @@ public final class DatasourceData {
 				if ( h.getMetricsTrackerFactory() == null ) {
 					MetricsTrackerFactory f = ( poolName, stats ) -> trackers.computeIfAbsent( id, k -> new Tracker() );
 					h.setMetricsTrackerFactory( f );
+					ours.put( id + "@" + System.identityHashCode( h ), new java.lang.ref.WeakReference<>( h ) );
 					trackers.computeIfAbsent( id, k -> new Tracker() );
 				}
 			}
 		} catch ( Throwable t ) {
 			// Metrics are a bonus, never a problem
 		}
+	}
+
+	/**
+	 * Take the tracker off every pool it was put on, so the pools are as they were before Lens.
+	 */
+	public void shutdown() {
+		for ( java.lang.ref.WeakReference<HikariDataSource> ref : ours.values() ) {
+			try {
+				HikariDataSource h = ref.get();
+				if ( h != null && h.isRunning() ) {
+					h.setMetricsTrackerFactory( null );
+				}
+			} catch ( Throwable t ) {
+				// The pool does not allow it any more
+			}
+		}
+		ours.clear();
+		attached.clear();
+		trackers.clear();
 	}
 
 	/**
@@ -237,25 +258,10 @@ public final class DatasourceData {
 	}
 
 	/**
-	 * Remove credentials and secret-looking parameters from a JDBC URL.
+	 * Remove credentials and secret-looking parameters from a JDBC URL, with the shared secret-name matcher.
 	 */
 	static String maskUrl( String url ) {
-		if ( url == null ) {
-			return "";
-		}
-		String			u		= url.replaceAll( "//[^/@]+@", "//" );
-		Set<String>		secret	= new HashSet<>( List.of( "password", "pwd", "pass", "secret", "token", "apikey", "key" ) );
-		StringBuilder	out		= new StringBuilder();
-		for ( String part : u.split( "(?=[;?&])" ) ) {
-			String	body	= part.replaceAll( "^[;?&]", "" );
-			int		eq		= body.indexOf( '=' );
-			if ( eq > 0 && secret.contains( body.substring( 0, eq ).toLowerCase() ) ) {
-				out.append( part, 0, part.length() - body.length() ).append( body, 0, eq ).append( "=[hidden]" );
-			} else {
-				out.append( part );
-			}
-		}
-		return out.toString();
+		return url == null ? "" : ortus.boxlang.modules.bxlens.util.Secrets.url( url );
 	}
 
 }

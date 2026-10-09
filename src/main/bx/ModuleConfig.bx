@@ -60,8 +60,9 @@ class {
 				maxStreams       : 10
 			},
 
-			// off | light | full. Light is for production: no bindings, scopes, headers, stack traces, function or log collectors
-			collect : { level : "full" },
+			// off | light | full. Light is the default and is for production: no bindings, scopes, headers, stack traces or caller lookups,
+			// and no function, log or bif collectors. Use full while you develop
+			collect : { level : "light" },
 
 			// Tabs to hide in the bar and the console. A disabled collector hides its tab too
 			tabs : { hide : [] },
@@ -118,8 +119,11 @@ class {
 
 			// In-memory history ring buffer. The oldest request is recycled when full. Nothing is written to disk
 			history : {
-				trackNonHtml : true,
+				// Keep JSON, SSE and other non HTML requests in the history. Empty means off in light and on in full
+				trackNonHtml : "",
 				header       : "X-BxLens-Id",
+				// Send the id header on every tracked request, not only when the bar is shown
+				headerAlways : true,
 				maxRequests  : 50
 			},
 
@@ -169,8 +173,10 @@ class {
 				templates    : { enabled : true, max : 300 },
 				// Hot path, off by default
 				functions    : { enabled : false, max : 1000, minMs : 0 },
-				queries      : { enabled : true, max : 200, includeParams : true, captureCaller : true },
-				http         : { enabled : true, max : 100 },
+				// includeParams keeps the values bound to a query. Off by default: values can be personal data
+				queries      : { enabled : true, max : 200, includeParams : false, captureCaller : true },
+				// propagateId adds X-Request-Id to outgoing calls when core lets a listener change the call. Off by default
+				http         : { enabled : true, max : 100, propagateId : false },
 				exceptions   : { enabled : true, max : 50 },
 				messages     : { enabled : true, max : 200 },
 				timers       : { enabled : true, max : 200 },
@@ -180,8 +186,8 @@ class {
 				jvm          : { enabled : true },
 				cache        : { enabled : true },
 				modules      : { enabled : true },
-				// The SQL of bx-orm (Hibernate), shown like a normal query. Does nothing when bx-orm is not installed
-				orm          : { enabled : true, statistics : true },
+				// The SQL of bx-orm (Hibernate), shown like a normal query. Off by default: when off, Lens does not look at bx-orm at all
+				orm          : { enabled : false, statistics : true },
 				// Time per built-in function, from postBIFInvocation. Every BIF call allocates an event while this is on, so it is off by default
 				bifs         : { enabled : false },
 				// Console pages. Turn one off and its page disappears

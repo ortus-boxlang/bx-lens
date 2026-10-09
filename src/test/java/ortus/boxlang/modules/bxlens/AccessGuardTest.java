@@ -112,4 +112,27 @@ public class AccessGuardTest {
 		assertThat( valued.isAllowed( "127.0.0.1", null, "nope" ) ).isFalse();
 	}
 
+	@Test
+	@DisplayName( "A local only guard accepts only loopback Host names, which stops DNS rebinding" )
+	public void rebinding() {
+		AccessGuard g = new AccessGuard( LensConfig.defaults(), "bar.access", false );
+		assertThat( g.isAllowed( "127.0.0.1", "localhost:8080", null ) ).isTrue();
+		assertThat( g.isAllowed( "127.0.0.1", "127.0.0.1", null ) ).isTrue();
+		assertThat( g.isAllowed( "::1", "[::1]:8080", null ) ).isTrue();
+		assertThat( g.isAllowed( "127.0.0.1", "LOCALHOST", null ) ).isTrue();
+		assertThat( g.isAllowed( "127.0.0.1", "evil.example.com", null ) ).isFalse();
+		assertThat( g.isAllowed( "127.0.0.1", "evil.example.com:80", null ) ).isFalse();
+		assertThat( g.isAllowed( "127.0.0.1", "localhost.evil.com", null ) ).isFalse();
+	}
+
+	@Test
+	@DisplayName( "access.allowedHosts widens a local guard, and other rules are not limited to loopback names" )
+	public void widen() {
+		AccessGuard widened = bar( Map.of( "access", Map.of( "allowedHosts", List.of( "dev.local" ) ) ), false );
+		assertThat( widened.isAllowed( "127.0.0.1", "dev.local", null ) ).isTrue();
+		assertThat( widened.isAllowed( "127.0.0.1", "localhost", null ) ).isFalse();
+		AccessGuard lan = rule( List.of( "private" ) );
+		assertThat( lan.isAllowed( "192.168.1.5", "intranet.corp", null ) ).isTrue();
+	}
+
 }

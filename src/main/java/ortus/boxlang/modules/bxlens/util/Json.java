@@ -82,10 +82,19 @@ public final class Json {
 		}
 	}
 
+	private static final char[] HEX = "0123456789abcdef".toCharArray();
+
 	private static void string( StringBuilder sb, CharSequence s ) {
 		sb.append( '"' );
-		for ( int i = 0; i < s.length(); i++ ) {
+		int	n		= s.length();
+		int	copied	= 0;
+		for ( int i = 0; i < n; i++ ) {
 			char c = s.charAt( i );
+			if ( c >= 0x20 && c != '"' && c != '\\' && c != '<' && c != '>' && c != '&' && c != '\u2028' && c != '\u2029' ) {
+				continue;
+			}
+			sb.append( s, copied, i );
+			copied = i + 1;
 			switch ( c ) {
 				case '"' :
 					sb.append( "\\\"" );
@@ -102,22 +111,11 @@ public final class Json {
 				case '\t' :
 					sb.append( "\\t" );
 					break;
-				case '<' :
-				case '>' :
-				case '&' :
-				case ' ' :
-				case ' ' :
-					sb.append( String.format( "\\u%04x", ( int ) c ) );
-					break;
 				default :
-					if ( c < 0x20 ) {
-						sb.append( String.format( "\\u%04x", ( int ) c ) );
-					} else {
-						sb.append( c );
-					}
+					sb.append( "\\u" ).append( HEX[ c >> 12 & 15 ] ).append( HEX[ c >> 8 & 15 ] ).append( HEX[ c >> 4 & 15 ] ).append( HEX[ c & 15 ] );
 			}
 		}
-		sb.append( '"' );
+		sb.append( s, copied, n ).append( '"' );
 	}
 
 }

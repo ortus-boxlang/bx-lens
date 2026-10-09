@@ -45,11 +45,9 @@ import ortus.boxlang.runtime.types.IStruct;
  */
 public final class ConsoleData {
 
-	private static final String[]	SENSITIVE	= { "password", "secret", "token", "apikey", "credential" };
-
-	private final LensService		service;
-	private volatile long			defsStamp	= -1;
-	private volatile IStruct[]		defsCache	= new IStruct[ 0 ];
+	private final LensService	service;
+	private volatile long		defsStamp	= -1;
+	private volatile IStruct[]	defsCache	= new IStruct[ 0 ];
 
 	public ConsoleData( LensService service ) {
 		this.service = service;
@@ -218,7 +216,8 @@ public final class ConsoleData {
 				if ( v == null || ( v instanceof String s && s.isBlank() ) ) {
 					continue;
 				}
-				dm.put( k, isSensitive( k ) ? "••••••" : clean().clean( v ) );
+				dm.put( k, ortus.boxlang.modules.bxlens.util.Secrets.isSecretName( k ) ? "••••••"
+				    : v instanceof String str ? ortus.boxlang.modules.bxlens.util.Secrets.text( str ) : clean().clean( v ) );
 			}
 			m.put( "definition", dm );
 		}
@@ -330,16 +329,6 @@ public final class ConsoleData {
 
 	private static String defKey( String scheduler, String task ) {
 		return scheduler + "\u0000" + task;
-	}
-
-	private static boolean isSensitive( String key ) {
-		String k = key.toLowerCase( Locale.ROOT );
-		for ( String s : SENSITIVE ) {
-			if ( k.contains( s ) ) {
-				return true;
-			}
-		}
-		return false;
 	}
 
 	/**
@@ -580,7 +569,8 @@ public final class ConsoleData {
 	private List<String> redactArgs( List<String> args ) {
 		List<String> out = new ArrayList<>();
 		for ( String a : args ) {
-			out.add( isSensitive( a ) ? a.replaceAll( "=.*$", "=•••" ) : a );
+			// Hides the value of -Dname=value and --flag=value pairs whose name looks secret, wherever they stand in the argument
+			out.add( ortus.boxlang.modules.bxlens.util.Secrets.text( a ) );
 		}
 		return out;
 	}

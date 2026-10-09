@@ -6,7 +6,6 @@
 package ortus.boxlang.modules.bxlens;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,6 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import ortus.boxlang.modules.bxlens.model.LensRequest;
 import ortus.boxlang.modules.bxlens.model.Span;
+import ortus.boxlang.modules.bxlens.util.Bounded;
+import ortus.boxlang.modules.bxlens.util.Secrets;
+import ortus.boxlang.modules.bxlens.util.Text;
 
 /**
  * Query statistics across requests, in memory: one entry per distinct statement (with its placeholders, so the same statement with other
@@ -48,6 +50,7 @@ public final class QueryStats {
 	}
 
 	private final Map<String, Stat>	stats	= new ConcurrentHashMap<>();
+	private final Bounded			bounded	= new Bounded();
 	private volatile long			since	= System.currentTimeMillis();
 
 	/**
@@ -68,7 +71,7 @@ public final class QueryStats {
 				for ( Span s : req.spans ) {
 					if ( Span.QUERY.equals( s.type ) && !finished.contains( s.id ) ) {
 						String sql = String.valueOf( s.detail.getOrDefault( "sql", s.label ) );
-						counted.add( sql.trim().replaceAll( "\\s+", " " ) );
+						counted.add( Text.maskSql( Text.collapseSpaces( sql ) ) );
 						fail( req, sql, "The query did not finish" );
 					}
 				}
@@ -78,7 +81,7 @@ public final class QueryStats {
 				for ( Map<String, Object> e : req.exceptions ) {
 					Object sql = e.get( "sql" );
 					if ( sql != null && !sql.toString().isBlank() && !"null".equals( sql.toString() )
-					    && counted.add( sql.toString().trim().replaceAll( "\\s+", " " ) ) ) {
+					    && counted.add( Text.maskSql( Text.collapseSpaces( sql.toString() ) ) ) ) {
 						fail( req, sql.toString(), String.valueOf( e.getOrDefault( "message", "" ) ) );
 					}
 				}
@@ -89,19 +92,21 @@ public final class QueryStats {
 	}
 
 	private Stat stat( String sql, String ds ) {
-		String	key	= ds + "\u0000" + sql.trim().replaceAll( "\\s+", " " );
-		Stat	s	= stats.get( key );
+		// The statement is kept without its literals, so a value written into the SQL never reaches the statistics
+		String	masked	= Text.maskSql( Text.collapseSpaces( sql ) );
+		String	key		= ds + "\u0000" + masked;
+		Stat	s		= stats.get( key );
 		if ( s == null ) {
-			if ( stats.size() >= MAX_STATEMENTS ) {
-				stats.entrySet().stream().min( Comparator.comparingLong( e -> e.getValue().lastSeen ) ).ifPresent( e -> stats.remove( e.getKey() ) );
-			}
 			s				= new Stat();
-			s.sql			= sql.length() > 4000 ? sql.substring( 0, 4000 ) + "..." : sql;
+			s.sql			= masked.length() > 4000 ? masked.substring( 0, 4000 ) + "..." : masked;
 			s.datasource	= ds;
 			s.firstSeen		= System.currentTimeMillis();
+			s.lastSeen		= s.firstSeen;
 			Stat prior = stats.putIfAbsent( key, s );
 			if ( prior != null ) {
 				s = prior;
+			} else {
+				bounded.trim( stats, MAX_STATEMENTS, st -> st.lastSeen );
 			}
 		}
 		return s;
@@ -139,7 +144,8 @@ public final class QueryStats {
 		synchronized ( s ) {
 			s.count++;
 			s.failures++;
-			s.lastError		= error.length() > 500 ? error.substring( 0, 500 ) : error;
+			String safe = Text.maskSql( Secrets.text( error ) );
+			s.lastError		= safe.length() > 500 ? safe.substring( 0, 500 ) : safe;
 			s.lastSeen		= System.currentTimeMillis();
 			s.lastRequest	= req.id;
 		}

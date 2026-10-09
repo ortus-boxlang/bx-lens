@@ -34,9 +34,14 @@ public class AiPromptsTest {
 		sample.put( "lastQueries", List.of( "SELECT * FROM orders WHERE id = ?" ) );
 		String p = AiPrompts.error( group, sample );
 		assertThat( p ).contains( "KeyNotFoundException" );
-		assertThat( p ).contains( "GET /orders.bxm?id=5&password=[" );
+		assertThat( p ).contains( "GET /orders.bxm" );
+		assertThat( p ).doesNotContain( "id=5" );
+		assertThat( p ).doesNotContain( "password" );
 		assertThat( p ).contains( "bx  /app/orders.bxm:9" );
 		assertThat( p ).contains( "SELECT * FROM orders WHERE id = ?" );
+		sample.put( "lastQueries", List.of( "SELECT * FROM users WHERE email = 'bob@example.com' AND id = 42" ) );
+		assertThat( AiPrompts.error( group, sample ) ).doesNotContain( "bob@example.com" );
+		assertThat( AiPrompts.error( group, sample ) ).doesNotContain( "42" );
 		assertThat( p ).doesNotContain( "hunter2" );
 		sample.put( "message", "x".repeat( 20_000 ) );
 		assertThat( AiPrompts.error( group, sample ).length() ).isAtMost( AiPrompts.MAX + 10 );
@@ -52,9 +57,9 @@ public class AiPromptsTest {
 		t.put( "lockOwner", "worker-2" );
 		assertThat( AiPrompts.deadlock( List.of( t ) ) ).contains( "worker-1" );
 		Map<String, Object> q = new LinkedHashMap<>();
-		q.put( "sql", "SELECT 1" );
+		q.put( "sql", "SELECT name FROM t WHERE id = 99" );
 		q.put( "datasource", "app" );
-		assertThat( AiPrompts.query( q ) ).contains( "SELECT 1" );
+		assertThat( AiPrompts.query( q ) ).contains( "SELECT name FROM t WHERE id = ?" );
 		assertThat( AiPrompts.ask( "why slow?", "Requests 5" ) ).contains( "why slow?" );
 	}
 

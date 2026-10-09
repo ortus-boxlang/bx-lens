@@ -100,6 +100,12 @@ public final class HeapDumper {
 		if ( "ready".equals( state ) ) {
 			return "A heap dump is waiting to be downloaded. Download or discard it first";
 		}
+		if ( this.dir != null ) {
+			cleanup();
+			if ( this.dir != null ) {
+				return "The previous heap dump file could not be deleted yet. It is tried again soon";
+			}
+		}
 		long used = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed();
 		if ( tempRoot().toFile().getUsableSpace() < ( long ) ( used * DISK_FACTOR ) ) {
 			return "Not enough free disk space in " + tempRoot();
@@ -170,19 +176,41 @@ public final class HeapDumper {
 		}
 	}
 
+	private int cleanupTries;
+
+	/**
+	 * Delete the dump folder. The folder stays remembered until it is really gone, and a failed delete is tried again, so a dump file is never
+	 * left behind and forgotten.
+	 */
 	private synchronized void cleanup() {
 		Path d = this.dir;
 		this.state		= "idle";
 		this.file		= null;
-		this.dir		= null;
 		this.bytes		= 0;
 		this.expiresAt	= 0;
-		if ( d != null ) {
-			try ( Stream<Path> walk = Files.walk( d ) ) {
-				walk.sorted( Comparator.reverseOrder() ).forEach( p -> p.toFile().delete() );
+		if ( d == null ) {
+			return;
+		}
+		try ( Stream<Path> walk = Files.walk( d ) ) {
+			walk.sorted( Comparator.reverseOrder() ).forEach( p -> p.toFile().delete() );
+		} catch ( Throwable t ) {
+			// Checked below
+		}
+		if ( !Files.exists( d ) ) {
+			this.dir			= null;
+			this.cleanupTries	= 0;
+		} else if ( ++cleanupTries <= 10 ) {
+			try {
+				timer.schedule( this::retryCleanup, 30, TimeUnit.SECONDS );
 			} catch ( Throwable t ) {
-				// Best effort
+				// The timer is stopped: shutdown tries once more
 			}
+		}
+	}
+
+	private synchronized void retryCleanup() {
+		if ( this.dir != null && !"running".equals( state ) && !"ready".equals( state ) ) {
+			cleanup();
 		}
 	}
 
@@ -192,6 +220,11 @@ public final class HeapDumper {
 	public void shutdown() {
 		discard();
 		timer.shutdownNow();
+		synchronized ( this ) {
+			if ( this.dir != null ) {
+				cleanup();
+			}
+		}
 	}
 
 }

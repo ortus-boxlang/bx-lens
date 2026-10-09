@@ -16,8 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Stream;
 
 import ortus.boxlang.runtime.BoxRuntime;
@@ -31,12 +30,34 @@ public final class LogData {
 
 	public static final int				MAX_LINES	= 2000;
 	private static final long			MAX_TAIL	= 8L * 1024 * 1024;
-	private static final long			MAX_SCAN	= 64L * 1024 * 1024;
+	private static final long			MAX_SCAN	= 8L * 1024 * 1024;
+	private static final int			BLOCK		= 64 * 1024;
+	/** How many reads of a log file may run at once. A search can touch up to {@link #MAX_SCAN} bytes, so a few are enough. */
+	public static final int				MAX_READS	= 2;
 	private static final int			MAX_LINE	= 4000;
-	private static final Pattern		LEVEL		= Pattern.compile( "\\[\\s*(TRACE|DEBUG|INFO|WARN|ERROR)\\s*]" );
 	private static final List<String>	LEVELS		= List.of( "TRACE", "DEBUG", "INFO", "WARN", "ERROR" );
 
 	private final Path					fixed;
+	private final Semaphore				reads		= new Semaphore( MAX_READS );
+
+	/**
+	 * Thrown when too many reads are running. The console answers 429.
+	 */
+	public static final class Busy extends RuntimeException {
+
+		private static final long serialVersionUID = 1L;
+
+		public Busy() {
+			super( "Too many log reads are running. Try again in a moment.", null, false, false );
+		}
+	}
+
+	/**
+	 * The permits for reads, for tests that need to hold them.
+	 */
+	Semaphore reads() {
+		return reads;
+	}
 
 	public LogData() {
 		this( null );
@@ -110,63 +131,123 @@ public final class LogData {
 	}
 
 	/**
-	 * The last lines of a file that match.
+	 * The last lines of a file that match. The file is read from its end in blocks, line by line, and reading stops as soon as enough lines
+	 * were found or {@link #MAX_SCAN} bytes were looked at, so a search never loads a whole file.
 	 *
 	 * @param lines how many lines at most (up to {@link #MAX_LINES})
 	 * @param query text a line must contain, case insensitive, or empty
 	 * @param level the lowest level to show (TRACE to ERROR), or empty for all. A line without a level (a stack trace) follows the line before it
+	 *
+	 * @throws Busy when {@link #MAX_READS} reads are already running
 	 */
 	public Map<String, Object> read( String name, int lines, String query, String level ) throws IOException {
 		Path p = resolve( name );
 		if ( p == null ) {
 			return null;
 		}
-		int		max		= Math.max( 1, Math.min( lines, MAX_LINES ) );
-		String	q		= query == null ? "" : query.toLowerCase( Locale.ROOT );
-		int		min		= levelIndex( level );
-		boolean	filter	= !q.isEmpty() || min > 0;
-		long	size	= Files.size( p );
-		// Read a window from the end: more when searching, so a match further back can be found
-		long	window	= Math.min( size, filter ? MAX_SCAN : MAX_TAIL );
-		String	text;
+		if ( !reads.tryAcquire() ) {
+			throw new Busy();
+		}
+		try {
+			return readTail( p, name, lines, query, level );
+		} finally {
+			reads.release();
+		}
+	}
+
+	private Map<String, Object> readTail( Path p, String name, int lines, String query, String level ) throws IOException {
+		int				max		= Math.max( 1, Math.min( lines, MAX_LINES ) );
+		String			q		= query == null ? "" : query.toLowerCase( Locale.ROOT );
+		int				min		= levelIndex( level );
+		boolean			filter	= !q.isEmpty() || min > 0;
+		long			size	= Files.size( p );
+		long			budget	= Math.min( size, filter ? MAX_SCAN : MAX_TAIL );
+		long			stop	= size - budget;
+		// Lines are collected newest first; a group is a line with a level and the lines under it that have none
+		List<String>	found	= new ArrayList<>();
+		List<String>	group	= new ArrayList<>();
+		boolean			full	= false;
+		boolean			first	= true;
 		try ( RandomAccessFile f = new RandomAccessFile( p.toFile(), "r" ) ) {
-			f.seek( size - window );
-			byte[] buf = new byte[ ( int ) Math.min( window, Integer.MAX_VALUE - 16 ) ];
-			f.readFully( buf );
-			text = new String( buf, StandardCharsets.UTF_8 );
+			long	pos		= size;
+			byte[]	carry	= new byte[ 0 ];
+			while ( pos > stop && !full ) {
+				int		len		= ( int ) Math.min( BLOCK, pos - stop );
+				byte[]	block	= new byte[ len + carry.length ];
+				f.seek( pos - len );
+				f.readFully( block, 0, len );
+				System.arraycopy( carry, 0, block, len, carry.length );
+				pos -= len;
+				int end = block.length;
+				for ( int i = block.length - 1; i >= 0 && !full; i-- ) {
+					if ( block[ i ] != '\n' ) {
+						continue;
+					}
+					if ( first && i == end - 1 ) {
+						// The newline that ends the file
+						first	= false;
+						end		= i;
+						continue;
+					}
+					first	= false;
+					full	= line( block, i + 1, end, group, found, q, min, max );
+					end		= i;
+				}
+				carry = java.util.Arrays.copyOfRange( block, 0, end );
+				if ( carry.length > 4 * MAX_LINE ) {
+					carry = java.util.Arrays.copyOfRange( carry, carry.length - 4 * MAX_LINE, carry.length );
+				}
+			}
+			if ( !full && size > 0 && pos <= stop && stop == 0 ) {
+				// The first line of the file
+				full = line( carry, 0, carry.length, group, found, q, min, max );
+			}
+			if ( !full && size > 0 && stop == 0 ) {
+				flush( group, found, q, min, 0, max );
+			}
 		}
-		String[]		all		= text.split( "\r?\n", -1 );
-		int				start	= window < size ? 1 : 0;
-		List<String>	out		= new ArrayList<>();
-		int				cur		= 0;
-		for ( int i = start; i < all.length; i++ ) {
-			String l = all[ i ];
-			if ( l.isEmpty() && i == all.length - 1 ) {
-				continue;
-			}
-			Matcher m = LEVEL.matcher( l );
-			if ( m.find() ) {
-				cur = LEVELS.indexOf( m.group( 1 ) );
-			}
-			if ( min > 0 && cur < min ) {
-				continue;
-			}
-			if ( !q.isEmpty() && !l.toLowerCase( Locale.ROOT ).contains( q ) ) {
-				continue;
-			}
-			out.add( l.length() > MAX_LINE ? l.substring( 0, MAX_LINE ) + "..." : l );
-		}
-		boolean more = out.size() > max;
-		if ( more ) {
-			out = out.subList( out.size() - max, out.size() );
-		}
-		Map<String, Object> m = new LinkedHashMap<>();
+		boolean more = found.size() > max || stop > 0 || full;
+		java.util.Collections.reverse( found );
+		List<String>		out	= found.size() > max ? new ArrayList<>( found.subList( found.size() - max, found.size() ) ) : found;
+		Map<String, Object>	m	= new LinkedHashMap<>();
 		m.put( "name", name );
 		m.put( "lines", out );
 		m.put( "offset", size );
 		m.put( "size", size );
-		m.put( "cut", more || window < size );
+		m.put( "cut", more );
 		return m;
+	}
+
+	/**
+	 * Take one line (bytes from to end, going backwards). A line without a level joins the group under the line above it, which is not read
+	 * yet; a line with a level closes the group.
+	 *
+	 * @return true when enough lines were found
+	 */
+	private boolean line( byte[] b, int from, int end, List<String> group, List<String> found, String q, int min, int max ) {
+		if ( end > from && b[ end - 1 ] == '\r' ) {
+			end--;
+		}
+		String	l	= new String( b, from, Math.max( 0, end - from ), StandardCharsets.UTF_8 );
+		int		lv	= levelOf( l );
+		group.add( l.length() > MAX_LINE ? l.substring( 0, MAX_LINE ) + "..." : l );
+		if ( lv < 0 ) {
+			return false;
+		}
+		return flush( group, found, q, min, lv, max );
+	}
+
+	/** The group holds the lines of one entry, last line first. */
+	private boolean flush( List<String> group, List<String> found, String q, int min, int level, int max ) {
+		if ( level >= min ) {
+			for ( String l : group ) {
+				if ( q.isEmpty() || l.toLowerCase( Locale.ROOT ).contains( q ) ) {
+					found.add( l );
+				}
+			}
+		}
+		group.clear();
+		return found.size() > max;
 	}
 
 	/**
@@ -186,7 +267,7 @@ public final class LogData {
 				f.seek( from );
 				byte[] buf = new byte[ ( int ) ( size - from ) ];
 				f.readFully( buf );
-				for ( String l : new String( buf, StandardCharsets.UTF_8 ).split( "\r?\n" ) ) {
+				for ( String l : splitLines( new String( buf, StandardCharsets.UTF_8 ) ) ) {
 					lines.add( l.length() > MAX_LINE ? l.substring( 0, MAX_LINE ) + "..." : l );
 				}
 			}
@@ -196,6 +277,50 @@ public final class LogData {
 		m.put( "offset", size );
 		m.put( "rotated", reset );
 		return m;
+	}
+
+	/** Split on line breaks (\n or \r\n), dropping the empty text after a final break. */
+	static List<String> splitLines( String text ) {
+		List<String>	out		= new ArrayList<>();
+		int				start	= 0;
+		int				n		= text.length();
+		while ( start < n ) {
+			int end = text.indexOf( '\n', start );
+			if ( end < 0 ) {
+				end = n;
+			}
+			int e = end > start && text.charAt( end - 1 ) == '\r' ? end - 1 : end;
+			out.add( text.substring( start, e ) );
+			start = end + 1;
+		}
+		return out;
+	}
+
+	/**
+	 * The level index of a log line that has <code>[LEVEL]</code> in it (blanks allowed inside the brackets), or -1.
+	 */
+	static int levelOf( String l ) {
+		int at = l.indexOf( '[' );
+		while ( at >= 0 ) {
+			int i = at + 1;
+			while ( i < l.length() && Character.isWhitespace( l.charAt( i ) ) ) {
+				i++;
+			}
+			for ( int k = 0; k < LEVELS.size(); k++ ) {
+				String lv = LEVELS.get( k );
+				if ( l.startsWith( lv, i ) ) {
+					int j = i + lv.length();
+					while ( j < l.length() && Character.isWhitespace( l.charAt( j ) ) ) {
+						j++;
+					}
+					if ( j < l.length() && l.charAt( j ) == ']' ) {
+						return k;
+					}
+				}
+			}
+			at = l.indexOf( '[', at + 1 );
+		}
+		return -1;
 	}
 
 	private static int levelIndex( String level ) {

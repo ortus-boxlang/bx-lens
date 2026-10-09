@@ -59,4 +59,14 @@ public class ClientIpTest {
 		assertThat( ClientIp.resolve( cfg, "10.0.0.5", "[2001:db8::1]:443" ) ).isEqualTo( "2001:db8::1" );
 	}
 
+	@Test
+	@DisplayName( "a forwarded value that is not an IP literal is ignored and the peer is used" )
+	void notAnIp() {
+		assertThat( ClientIp.resolve( cfg, "10.0.0.5", "evil.example.com" ) ).isEqualTo( "10.0.0.5" );
+		assertThat( ClientIp.resolve( cfg, "10.0.0.5", "203.0.113.9, <script>" ) ).isEqualTo( "10.0.0.5" );
+		assertThat( ClientIp.resolve( cfg, "10.0.0.5", "dead" ) ).isEqualTo( "10.0.0.5" );
+		assertThat( ClientIp.resolve( cfg, "10.0.0.5", "unknown" ) ).isEqualTo( "10.0.0.5" );
+		assertThat( ClientIp.resolve( cfg, "10.0.0.5", "203.0.113.9\r\nX: y" ) ).isEqualTo( "10.0.0.5" );
+	}
+
 }

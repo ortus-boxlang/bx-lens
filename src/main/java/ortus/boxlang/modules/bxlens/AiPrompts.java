@@ -10,6 +10,7 @@ import java.util.Map;
 
 import ortus.boxlang.modules.bxlens.util.Plain;
 import ortus.boxlang.modules.bxlens.util.Secrets;
+import ortus.boxlang.modules.bxlens.util.Text;
 
 /**
  * Builds the text sent to a model, or copied by the user to paste into one. Only data Lens already redacted goes in: stack frames, statement
@@ -30,19 +31,20 @@ public final class AiPrompts {
 	 */
 	public static String error( Map<String, Object> group, Map<String, Object> sample ) {
 		StringBuilder sb = new StringBuilder( INTRO );
-		sb.append( "ERROR: " ).append( Plain.str( group.get( "type" ) ) ).append( ": " ).append( Plain.str( sample.get( "message" ) ) ).append( '\n' );
+		sb.append( "ERROR: " ).append( Plain.str( group.get( "type" ) ) ).append( ": " ).append( safe( sample.get( "message" ) ) ).append( '\n' );
 		if ( !Plain.str( sample.get( "detail" ) ).isEmpty() ) {
-			sb.append( "DETAIL: " ).append( Plain.str( sample.get( "detail" ) ) ).append( '\n' );
+			sb.append( "DETAIL: " ).append( safe( sample.get( "detail" ) ) ).append( '\n' );
+		}
+		if ( !Plain.str( sample.get( "requestId" ) ).isEmpty() ) {
+			sb.append( "REQUEST ID: " ).append( Plain.str( sample.get( "requestId" ) ) ).append( '\n' );
 		}
 		sb.append( "SEEN: " ).append( Plain.str( group.get( "count" ) ) ).append( " times\n" );
-		sb.append( "REQUEST: " ).append( Plain.str( sample.get( "method" ) ) ).append( ' ' ).append( Plain.str( sample.get( "uri" ) ) );
-		if ( !Plain.str( sample.get( "query" ) ).isEmpty() ) {
-			sb.append( '?' ).append( Plain.str( sample.get( "query" ) ) );
-		}
+		// The path only: numbers and ids in it are replaced, and there is no host and no query string
+		sb.append( "REQUEST: " ).append( Plain.str( sample.get( "method" ) ) ).append( ' ' ).append( Text.collapsePath( Plain.str( sample.get( "uri" ) ) ) );
 		sb.append( " -> status " ).append( Plain.str( sample.get( "status" ) ) ).append( " after " ).append( Plain.str( sample.get( "ms" ) ) )
 		    .append( " ms\n" );
 		if ( !Plain.str( sample.get( "sql" ) ).isEmpty() ) {
-			sb.append( "STATEMENT: " ).append( Plain.str( sample.get( "sql" ) ) ).append( '\n' );
+			sb.append( "STATEMENT: " ).append( safe( sample.get( "sql" ) ) ).append( '\n' );
 		}
 		sb.append( "\nSTACK:\n" );
 		for ( Object f : Plain.list( sample.get( "frames" ) ) ) {
@@ -52,8 +54,8 @@ public final class AiPrompts {
 		for ( Object j : Plain.list( sample.get( "java" ) ) ) {
 			sb.append( "    " ).append( Plain.str( j ) ).append( '\n' );
 		}
-		list( sb, "\nLAST QUERIES:\n", Plain.list( sample.get( "lastQueries" ) ) );
-		list( sb, "\nMESSAGES BEFORE IT FAILED:\n", Plain.list( sample.get( "messages" ) ) );
+		list( sb, "\nLAST QUERIES:\n", masked( Plain.list( sample.get( "lastQueries" ) ) ) );
+		list( sb, "\nMESSAGES BEFORE IT FAILED:\n", masked( Plain.list( sample.get( "messages" ) ) ) );
 		return cap( sb );
 	}
 
@@ -84,14 +86,14 @@ public final class AiPrompts {
 	public static String query( Map<String, Object> q ) {
 		StringBuilder sb = new StringBuilder( INTRO ).append( "This SQL statement is slow or failing. Say why, and how to make it faster or fix it. " )
 		    .append( "Suggest an index if it would help.\n\n" );
-		sb.append( "STATEMENT (placeholders, no values):\n" ).append( Plain.str( q.get( "sql" ) ) ).append( "\n\n" );
+		sb.append( "STATEMENT (placeholders, no values):\n" ).append( safe( q.get( "sql" ) ) ).append( "\n\n" );
 		sb.append( "DATASOURCE: " ).append( Plain.str( q.get( "datasource" ) ) ).append( '\n' );
 		sb.append( "RUNS: " ).append( Plain.str( q.get( "count" ) ) ).append( ", FAILED: " ).append( Plain.str( q.get( "failures" ) ) ).append( ", SLOW: " )
 		    .append( Plain.str( q.get( "slow" ) ) ).append( '\n' );
 		sb.append( "TIME: min " ).append( Plain.str( q.get( "minMs" ) ) ).append( " ms, avg " ).append( Plain.str( q.get( "avgMs" ) ) ).append( " ms, max " )
 		    .append( Plain.str( q.get( "maxMs" ) ) ).append( " ms, rows returned " ).append( Plain.str( q.get( "rows" ) ) ).append( '\n' );
 		if ( !Plain.str( q.get( "lastError" ) ).isEmpty() ) {
-			sb.append( "LAST ERROR: " ).append( Plain.str( q.get( "lastError" ) ) ).append( '\n' );
+			sb.append( "LAST ERROR: " ).append( safe( q.get( "lastError" ) ) ).append( '\n' );
 		}
 		if ( !Plain.str( q.get( "file" ) ).isEmpty() ) {
 			sb.append( "CALLED FROM: " ).append( Plain.str( q.get( "file" ) ) ).append( ':' ).append( Plain.str( q.get( "line" ) ) ).append( '\n' );
@@ -105,6 +107,21 @@ public final class AiPrompts {
 	public static String ask( String question, String context ) {
 		return cap( new StringBuilder( "You are an assistant for operators of a BoxLang server. Answer from the summary below and say when it does not contain "
 		    + "the answer. Be concise.\n\nSERVER SUMMARY (redacted):\n" ).append( context ).append( "\n\nQUESTION: " ).append( question ) );
+	}
+
+	/**
+	 * Text for a prompt: credentials hidden, and the string and number literals of any SQL in it replaced.
+	 */
+	public static String safe( Object value ) {
+		return Text.maskSql( Secrets.text( Plain.str( value ) ) );
+	}
+
+	private static List<Object> masked( List<Object> in ) {
+		List<Object> out = new java.util.ArrayList<>();
+		for ( Object o : in ) {
+			out.add( safe( o ) );
+		}
+		return out;
 	}
 
 	private static void list( StringBuilder sb, String title, List<Object> items ) {

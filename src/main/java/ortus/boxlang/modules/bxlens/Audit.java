@@ -29,16 +29,41 @@ public final class Audit {
 		try {
 			BoxLangLogger l = service.auditLogger();
 			if ( l != null ) {
-				l.info( "event={} role={} ip={} {}", event, role == null ? "none" : role, ip, detail == null ? "" : clean( detail ) );
+				l.info( "event={} role={} ip={} {}", clean( event, 64 ), clean( role == null ? "none" : role, 16 ), clean( ip, 64 ),
+				    clean( detail, 500 ) );
 			}
 		} catch ( Throwable t ) {
 			// Auditing never breaks a request
 		}
 	}
 
-	private static String clean( String s ) {
-		String t = s.replaceAll( "[\\r\\n]+", " " );
-		return t.length() > 500 ? t.substring( 0, 500 ) + "..." : t;
+	/**
+	 * Make a value safe for one log line: control characters (a line break most of all) become spaces, runs of them collapse, and the
+	 * value is cut to a length. A client controls several of these fields, so none is written as it came.
+	 */
+	public static String clean( String s, int max ) {
+		if ( s == null ) {
+			return "";
+		}
+		int				n		= Math.min( s.length(), max + 64 );
+		StringBuilder	sb		= new StringBuilder( Math.min( n, max ) + 3 );
+		boolean			space	= false;
+		for ( int i = 0; i < n && sb.length() < max; i++ ) {
+			char c = s.charAt( i );
+			if ( c < 0x20 || c == 0x7f || c == 0x85 || c == '\u2028' || c == '\u2029' ) {
+				space = sb.length() > 0;
+				continue;
+			}
+			if ( space ) {
+				sb.append( ' ' );
+				space = false;
+			}
+			sb.append( c );
+		}
+		if ( s.length() > n || sb.length() >= max && n < s.length() ) {
+			sb.append( "..." );
+		}
+		return sb.toString();
 	}
 
 }

@@ -38,10 +38,11 @@ public final class Sanitizer {
 	}
 
 	/**
-	 * Clean a value that sits under a key, masking it when the key is on the redact list.
+	 * Clean a value that sits under a key, masking it when the key is on the redact list or looks like the name of a secret. This is for
+	 * headers and other named values; the keys inside a structure follow the redact list only, so ordinary fields stay readable.
 	 */
 	public Object cleanKeyed( String key, Object value ) {
-		if ( config.shouldRedact( key ) ) {
+		if ( config.shouldRedact( key ) || Secrets.isSecretName( key ) ) {
 			return config.redactMask;
 		}
 		return clean( value );

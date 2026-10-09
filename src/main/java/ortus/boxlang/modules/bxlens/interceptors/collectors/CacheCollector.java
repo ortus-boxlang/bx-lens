@@ -31,6 +31,25 @@ public class CacheCollector extends BaseCollector {
 		return "cache";
 	}
 
+	private static final long												TTL		= 60_000L;
+	/** The sanitized configuration of each cache, with the time it was read. It rarely changes, so it is not rebuilt for every request. */
+	private final java.util.concurrent.ConcurrentHashMap<String, Object[]>	configs	= new java.util.concurrent.ConcurrentHashMap<>();
+
+	@Override
+	public boolean snapshotOnly() {
+		return true;
+	}
+
+	private Object configOf( String name, ICacheProvider c, Sanitizer clean ) {
+		long		now	= System.currentTimeMillis();
+		Object[]	hit	= configs.get( name );
+		if ( hit == null || now - ( Long ) hit[ 0 ] > TTL ) {
+			hit = new Object[] { now, c.getConfig() == null ? null : clean.clean( c.getConfig().properties ) };
+			configs.put( name, hit );
+		}
+		return hit[ 1 ];
+	}
+
 	@Override
 	public void onRequestStart( LensRequest req ) {
 		Map<String, long[]> before = new LinkedHashMap<>();
@@ -75,8 +94,9 @@ public class CacheCollector extends BaseCollector {
 				m.put( "requestHitRate", dh + dm == 0 ? -1 : Math.round( dh * 100.0 / ( dh + dm ) ) );
 				m.put( "requestEvictions", Math.max( 0, s.evictionCount() - b[ 2 ] ) );
 				m.put( "started", s.started() == null ? "" : s.started().toString() );
-				if ( c.getConfig() != null ) {
-					m.put( "config", clean.clean( c.getConfig().properties ) );
+				Object cfg = configOf( e.getKey(), c, clean );
+				if ( cfg != null ) {
+					m.put( "config", cfg );
 				}
 				out.add( m );
 			} catch ( Throwable t ) {

@@ -17,6 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import ortus.boxlang.modules.bxlens.model.LensRequest;
 import ortus.boxlang.modules.bxlens.util.Plain;
 import ortus.boxlang.modules.bxlens.util.Secrets;
+import ortus.boxlang.modules.bxlens.util.Text;
 
 /**
  * Requests that went wrong, grouped by what went wrong. An error is the same error when its type, message pattern (numbers, ids and
@@ -27,11 +28,12 @@ import ortus.boxlang.modules.bxlens.util.Secrets;
  */
 public final class ErrorStore {
 
-	public static final int							MAX_GROUPS	= 200;
-	public static final int							MAX_SAMPLES	= 5;
+	public static final int									MAX_GROUPS	= 200;
+	public static final int									MAX_SAMPLES	= 5;
 
-	private final Map<String, Map<String, Object>>	groups		= new ConcurrentHashMap<>();
-	private volatile boolean						dirty;
+	private final Map<String, Map<String, Object>>			groups		= new ConcurrentHashMap<>();
+	private final ortus.boxlang.modules.bxlens.util.Bounded	bounded		= new ortus.boxlang.modules.bxlens.util.Bounded();
+	private volatile boolean								dirty;
 
 	/**
 	 * Look at a finished request and file every error it had.
@@ -124,12 +126,12 @@ public final class ErrorStore {
 		s.put( "frames", e.get( "frames" ) );
 		s.put( "java", e.get( "java" ) );
 		if ( e.get( "sql" ) != null ) {
-			s.put( "sql", e.get( "sql" ) );
+			s.put( "sql", Text.maskSql( Secrets.text( Plain.str( e.get( "sql" ) ) ) ) );
 		}
 		List<String> sql = new ArrayList<>();
 		synchronized ( req.queries ) {
 			for ( int i = Math.max( 0, req.queries.size() - 3 ); i < req.queries.size(); i++ ) {
-				sql.add( cut( Plain.str( req.queries.get( i ).get( "sql" ) ), 300 ) );
+				sql.add( cut( Text.maskSql( Plain.str( req.queries.get( i ).get( "sql" ) ) ), 300 ) );
 			}
 		}
 		s.put( "lastQueries", sql );
@@ -147,30 +149,14 @@ public final class ErrorStore {
 	 * Query string with the values of secret-looking parameters hidden.
 	 */
 	static String redactQuery( String q, LensConfig cfg ) {
-		if ( q == null || q.isEmpty() ) {
-			return "";
-		}
-		StringBuilder out = new StringBuilder();
-		for ( String part : q.split( "&" ) ) {
-			int eq = part.indexOf( '=' );
-			if ( out.length() > 0 ) {
-				out.append( '&' );
-			}
-			if ( eq > 0 && ( Secrets.isSecretName( part.substring( 0, eq ) ) || cfg.shouldRedact( part.substring( 0, eq ) ) ) ) {
-				out.append( part, 0, eq + 1 ).append( cfg.redactMask );
-			} else {
-				out.append( part );
-			}
-		}
-		return cut( out.toString(), 500 );
+		return Secrets.redactQuery( q, cfg, 500 );
 	}
 
 	/**
 	 * The same error gets the same id: type, message with numbers and quoted values removed, and the top three frames.
 	 */
 	static String fingerprint( String type, String message, List<Map<String, Object>> frames, LensRequest req ) {
-		String			norm	= message.replaceAll( "'[^']*'|\"[^\"]*\"", "?" ).replaceAll( "[0-9a-fA-F]{8}-[0-9a-fA-F-]{27}", "#" ).replaceAll( "\\d+", "#" )
-		    .toLowerCase();
+		String			norm	= Text.generalizeMessage( message );
 		StringBuilder	sb		= new StringBuilder( type ).append( '|' ).append( cut( norm, 200 ) );
 		int				n		= 0;
 		for ( Map<String, Object> f : frames ) {
@@ -183,12 +169,14 @@ public final class ErrorStore {
 			sb.append( '|' ).append( req.uri );
 		}
 		try {
-			byte[]			d	= MessageDigest.getInstance( "SHA-1" ).digest( sb.toString().getBytes( StandardCharsets.UTF_8 ) );
-			StringBuilder	hex	= new StringBuilder();
+			byte[]	d		= MessageDigest.getInstance( "SHA-1" ).digest( sb.toString().getBytes( StandardCharsets.UTF_8 ) );
+			char[]	hex		= new char[ 12 ];
+			String	digits	= "0123456789abcdef";
 			for ( int i = 0; i < 6; i++ ) {
-				hex.append( String.format( "%02x", d[ i ] ) );
+				hex[ i * 2 ]		= digits.charAt( d[ i ] >> 4 & 15 );
+				hex[ i * 2 + 1 ]	= digits.charAt( d[ i ] & 15 );
 			}
-			return hex.toString();
+			return new String( hex );
 		} catch ( Exception ex ) {
 			return Integer.toHexString( sb.toString().hashCode() );
 		}

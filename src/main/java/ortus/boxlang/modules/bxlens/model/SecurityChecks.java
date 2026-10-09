@@ -28,13 +28,20 @@ public final class SecurityChecks {
 	}
 
 	/**
+	 * Will {@link #analyze} look at this response? Lets the caller skip reading the cookies of a response that is not checked.
+	 */
+	public static boolean applies( LensRequest req, LensConfig cfg ) {
+		return cfg.getBool( "checks.securityHeaders", true ) && req.html && req.status >= 200 && req.status < 400;
+	}
+
+	/**
 	 * Add issues for a finished HTML response.
 	 *
 	 * @param headers response headers, any case
 	 * @param cookies cookies the response sets
 	 * @param secure  was the request made over HTTPS
 	 */
-	public static void analyze( LensRequest req, LensConfig cfg, Map<String, Object> headers, List<Cookie> cookies, boolean secure ) {
+	public static void analyze( LensRequest req, LensConfig cfg, Map<String, ?> headers, List<Cookie> cookies, boolean secure ) {
 		if ( !cfg.getBool( "checks.securityHeaders", true ) || !req.html || req.status < 200 || req.status >= 400 ) {
 			return;
 		}

@@ -64,19 +64,52 @@ public final class BarRenderer {
 		return sb.toString();
 	}
 
+	private static final String	BODY_CLOSE	= "</body>";
+	/** How much of the end of the page is searched for the closing body tag. */
+	static final int			TAIL		= 1024;
+
 	/**
-	 * Insert a block before the last closing body tag, or append when the page has none.
+	 * Insert a block before the closing body tag (any case) when it is in the last kilobyte of the page, else append at the end. The page is
+	 * never scanned or copied as a whole.
 	 *
 	 * @return the index it was inserted at
 	 */
 	public static int insert( StringBuffer buffer, String block ) {
-		String	lower	= buffer.toString().toLowerCase( java.util.Locale.ROOT );
-		int		idx		= lower.lastIndexOf( "</body>" );
+		int idx = lastBodyClose( buffer );
 		if ( idx < 0 ) {
 			idx = buffer.length();
 		}
 		buffer.insert( idx, block );
 		return idx;
+	}
+
+	/**
+	 * Index of the last case insensitive closing body tag within the tail of the buffer, or -1.
+	 */
+	static int lastBodyClose( StringBuffer b ) {
+		int	n		= b.length();
+		int	tagLen	= BODY_CLOSE.length();
+		int	from	= Math.max( 0, n - TAIL );
+		if ( n - from < tagLen ) {
+			return -1;
+		}
+		char[] buf = new char[ n - from ];
+		b.getChars( from, n, buf, 0 );
+		for ( int at = buf.length - tagLen; at >= 0; at-- ) {
+			if ( buf[ at ] == '<' && closes( buf, at ) ) {
+				return from + at;
+			}
+		}
+		return -1;
+	}
+
+	private static boolean closes( char[] buf, int at ) {
+		for ( int i = 1; i < BODY_CLOSE.length(); i++ ) {
+			if ( Character.toLowerCase( buf[ at + i ] ) != BODY_CLOSE.charAt( i ) ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**

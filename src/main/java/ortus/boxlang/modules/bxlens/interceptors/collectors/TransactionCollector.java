@@ -32,9 +32,11 @@ public class TransactionCollector extends BaseCollector {
 			}
 			Span span = req.begin( Span.TX, "transaction", config().collectorInt( id(), "max", 50 ) );
 			if ( span != null ) {
-				Callers.Location where = Callers.current();
-				span.file	= where.file();
-				span.line	= where.line();
+				if ( !config().light ) {
+					Callers.Location where = Callers.current();
+					span.file	= where.file();
+					span.line	= where.line();
+				}
 				span.detail.put( "outcome", "open" );
 			}
 		} catch ( Throwable t ) {

@@ -8,7 +8,6 @@ package ortus.boxlang.modules.bxlens.model;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 
 import ortus.boxlang.modules.bxlens.LensConfig;
@@ -176,7 +175,7 @@ public final class IssueEngine {
 	 * Collapse whitespace and case so equivalent statements group together.
 	 */
 	public static String normalize( String sql ) {
-		return sql == null ? "" : sql.trim().replaceAll( "\\s+", " " ).toLowerCase( Locale.ROOT );
+		return ortus.boxlang.modules.bxlens.util.Text.normalizeSql( sql );
 	}
 
 	private static Span spanById( LensRequest req, Object id ) {

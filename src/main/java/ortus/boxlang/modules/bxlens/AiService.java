@@ -9,7 +9,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -29,12 +31,14 @@ import ortus.boxlang.runtime.types.Struct;
  */
 public final class AiService {
 
-	private static final Key	AI_CHAT	= Key.of( "aiChat" );
+	private static final Key			AI_CHAT	= Key.of( "aiChat" );
 
-	private final LensService	service;
-	private final AtomicInteger	running	= new AtomicInteger();
-	private volatile long		windowStart;
-	private volatile int		windowCount;
+	private final LensService			service;
+	private final AtomicInteger			running	= new AtomicInteger();
+	/** Its own small pool, so a slow model never takes threads from the shared pool of the server. One call runs at a time. */
+	private volatile ThreadPoolExecutor	pool	= newPool();
+	private volatile long				windowStart;
+	private volatile int				windowCount;
 
 	public AiService( LensService service ) {
 		this.service = service;
@@ -109,10 +113,19 @@ public final class AiService {
 			if ( !key.isBlank() ) {
 				options.put( Key.of( "apiKey" ), key );
 			}
-			BoxRuntime	rt		= BoxRuntime.getInstance();
-			Object		answer	= CompletableFuture.supplyAsync( () -> rt.getFunctionService().getGlobalFunction( AI_CHAT ).invoke( rt.getRuntimeContext(),
-			    new Object[] { prompt, params, options }, false, AI_CHAT ) ).get( 90, TimeUnit.SECONDS );
-			return answer == null ? "" : answer.toString();
+			BoxRuntime		rt		= BoxRuntime.getInstance();
+			Future<Object>	call	= pool.submit( () -> rt.getFunctionService().getGlobalFunction( AI_CHAT ).invoke( rt.getRuntimeContext(),
+			    new Object[] { prompt, params, options }, false, AI_CHAT ) );
+			try {
+				Object answer = call.get( 90, TimeUnit.SECONDS );
+				return answer == null ? "" : answer.toString();
+			} catch ( java.util.concurrent.TimeoutException e ) {
+				// Stop the call, do not leave it running in the background
+				call.cancel( true );
+				throw e;
+			}
+		} catch ( java.util.concurrent.RejectedExecutionException e ) {
+			throw new IllegalStateException( "An AI request is already running." );
 		} catch ( java.util.concurrent.TimeoutException e ) {
 			throw new IllegalStateException( "The model did not answer in time." );
 		} catch ( Exception e ) {
@@ -125,6 +138,22 @@ public final class AiService {
 		} finally {
 			running.set( 0 );
 		}
+	}
+
+	/**
+	 * Stop the pool when the module stops.
+	 */
+	public void shutdown() {
+		pool.shutdownNow();
+		pool = newPool();
+	}
+
+	private static ThreadPoolExecutor newPool() {
+		return new ThreadPoolExecutor( 1, 1, 30, TimeUnit.SECONDS, new ArrayBlockingQueue<>( 1 ), r -> {
+			Thread t = new Thread( r, "bxlens-ai" );
+			t.setDaemon( true );
+			return t;
+		}, new ThreadPoolExecutor.AbortPolicy() );
 	}
 
 	/**
@@ -148,7 +177,7 @@ public final class AiService {
 			sb.append( "Requests " ).append( s.get( "requests" ) ).append( ", errors " ).append( s.get( "errors" ) ).append( ", avg ms " )
 			    .append( s.get( "avgMs" ) )
 			    .append( ", p95 ms " ).append( s.get( "p95" ) ).append( ", slow " ).append( s.get( "slow" ) ).append( '\n' );
-			sb.append( "Slowest URLs: " ).append( rep.get( "slowestUrls" ) ).append( '\n' );
+			// No URLs and no query strings are sent to a model
 		} catch ( Throwable t ) {
 			// Skip
 		}
@@ -156,7 +185,7 @@ public final class AiService {
 			List<String> errs = new ArrayList<>();
 			for ( Object g : ( List<?> ) service.getErrors().list().get( "groups" ) ) {
 				Map<?, ?> m = ( Map<?, ?> ) g;
-				errs.add( m.get( "type" ) + ": " + m.get( "message" ) + " (x" + m.get( "count" ) + ")" );
+				errs.add( m.get( "type" ) + ": " + AiPrompts.safe( m.get( "message" ) ) + " (x" + m.get( "count" ) + ")" );
 				if ( errs.size() >= 8 ) {
 					break;
 				}
@@ -170,7 +199,8 @@ public final class AiService {
 			for ( Object q : ( List<?> ) service.getQueryStats().snapshot().get( "statements" ) ) {
 				Map<?, ?> m = ( Map<?, ?> ) q;
 				if ( ( ( Number ) m.get( "maxMs" ) ).doubleValue() >= service.getConfig().slowQueryMs || ( ( Number ) m.get( "failures" ) ).longValue() > 0 ) {
-					qs.add( m.get( "sql" ).toString().substring( 0, Math.min( 120, m.get( "sql" ).toString().length() ) ) + " max " + m.get( "maxMs" )
+					String stmt = AiPrompts.safe( m.get( "sql" ) );
+					qs.add( stmt.substring( 0, Math.min( 120, stmt.length() ) ) + " max " + m.get( "maxMs" )
 					    + " ms, failed "
 					    + m.get( "failures" ) );
 				}

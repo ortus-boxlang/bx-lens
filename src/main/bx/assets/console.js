@@ -377,8 +377,9 @@
 					a.download = "lens-request-" + this.detail.request.id + ".json"; document.body.appendChild(a); a.click(); a.remove();
 				},
 				copyCurl: async function () {
-					var r = this.detail.request, h = this.detail.headers || {}, parts = ["curl -X " + r.method + " '" + r.url + (r.query ? "?" + r.query : "") + "'"];
-					Object.keys(h).filter(function (k) { return ["host", "content-length", "connection"].indexOf(k.toLowerCase()) < 0 && h[k] !== "[redacted]"; }).forEach(function (k) { parts.push("-H '" + k + ": " + String(h[k]).replace(/'/g, "'\\''") + "'"); });
+					var q = function (s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; };
+					var r = this.detail.request, h = this.detail.headers || {}, parts = ["curl -X " + q(r.method) + " " + q(r.url + (r.query ? "?" + r.query : ""))];
+					Object.keys(h).filter(function (k) { return ["host", "content-length", "connection"].indexOf(k.toLowerCase()) < 0 && h[k] !== "[redacted]"; }).forEach(function (k) { parts.push("-H " + q(k + ": " + h[k])); });
 					try { await navigator.clipboard.writeText(parts.join(" \\\n  ")); this.toast("cURL copied. Redacted headers are left out."); } catch (e) { this.toast("Could not copy"); }
 				},
 				wfHeight: function () { return Math.min(40, this.bars().length) * 16 + 8; },

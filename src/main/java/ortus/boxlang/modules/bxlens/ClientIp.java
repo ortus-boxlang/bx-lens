@@ -43,6 +43,10 @@ public final class ClientIp {
 			if ( ip.isEmpty() ) {
 				continue;
 			}
+			if ( !AccessGuard.isIpLiteral( ip ) ) {
+				// Not an address (a name, text, an injection attempt): believe nothing from this header
+				return peer;
+			}
 			leftmost = ip;
 			if ( !AccessGuard.matchesAny( trusted, ip ) ) {
 				return accept( peer, ip );

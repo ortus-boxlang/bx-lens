@@ -70,7 +70,7 @@ public final class EnvironmentData {
 		List<String> args = new ArrayList<>();
 		for ( String a : ManagementFactory.getRuntimeMXBean().getInputArguments() ) {
 			int eq = a.indexOf( '=' );
-			args.add( eq > 0 ? a.substring( 0, eq + 1 ) + Secrets.show( a.substring( 0, eq ), a.substring( eq + 1 ) ) : a );
+			args.add( eq > 0 ? a.substring( 0, eq + 1 ) + Secrets.show( a.substring( 0, eq ), a.substring( eq + 1 ) ) : Secrets.text( a ) );
 		}
 		m.put( "jvmArgs", args );
 		m.put( "env", pairs( new TreeMap<>( System.getenv() ) ) );
@@ -101,7 +101,7 @@ public final class EnvironmentData {
 				m.put( "version", r.version );
 				m.put( "author", r.author );
 				m.put( "description", r.description );
-				m.put( "webURL", r.webURL );
+				m.put( "webURL", ortus.boxlang.modules.bxlens.interceptors.collectors.ModulesCollector.webUrl( r.webURL ) );
 				m.put( "enabled", r.enabled );
 				m.put( "activated", r.activated );
 				m.put( "activationMs", r.activationTime );

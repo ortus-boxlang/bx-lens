@@ -30,6 +30,33 @@ public class JvmCollector extends BaseCollector {
 		return "jvm";
 	}
 
+	/** Facts that never change while the JVM runs, read once. */
+	private static volatile Map<String, Object> constants;
+
+	@Override
+	public boolean snapshotOnly() {
+		return true;
+	}
+
+	private static Map<String, Object> constants() {
+		Map<String, Object> c = constants;
+		if ( c == null ) {
+			c = new LinkedHashMap<>();
+			c.put( "cores", Runtime.getRuntime().availableProcessors() );
+			c.put( "javaVersion", System.getProperty( "java.version", "" ) );
+			c.put( "javaVendor", System.getProperty( "java.vendor", "" ) );
+			c.put( "os", System.getProperty( "os.name", "" ) + " " + System.getProperty( "os.arch", "" ) );
+			try {
+				IStruct v = BoxRuntime.getInstance().getVersionInfo();
+				c.put( "boxlangVersion", String.valueOf( v.getOrDefault( Key.of( "version" ), "" ) ) );
+			} catch ( Throwable t ) {
+				c.put( "boxlangVersion", "" );
+			}
+			constants = c;
+		}
+		return c;
+	}
+
 	@Override
 	public void onRequestStart( LensRequest req ) {
 		req.data.put( "jvm.heap0", ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed() );
@@ -51,17 +78,8 @@ public class JvmCollector extends BaseCollector {
 		m.put( "gcCount", gc1[ 0 ] - gc0[ 0 ] );
 		m.put( "gcTimeMs", gc1[ 1 ] - gc0[ 1 ] );
 		m.put( "threads", ManagementFactory.getThreadMXBean().getThreadCount() );
-		m.put( "cores", Runtime.getRuntime().availableProcessors() );
 		m.put( "uptimeMs", ManagementFactory.getRuntimeMXBean().getUptime() );
-		m.put( "javaVersion", System.getProperty( "java.version", "" ) );
-		m.put( "javaVendor", System.getProperty( "java.vendor", "" ) );
-		m.put( "os", System.getProperty( "os.name", "" ) + " " + System.getProperty( "os.arch", "" ) );
-		try {
-			IStruct v = BoxRuntime.getInstance().getVersionInfo();
-			m.put( "boxlangVersion", String.valueOf( v.getOrDefault( Key.of( "version" ), "" ) ) );
-		} catch ( Throwable t ) {
-			m.put( "boxlangVersion", "" );
-		}
+		m.putAll( constants() );
 		m.put( "requests", service().getStats().snapshot() );
 		req.data.put( "jvm", m );
 	}

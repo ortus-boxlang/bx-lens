@@ -44,10 +44,10 @@ public class QueryCollector extends BaseCollector {
 			if ( span != null ) {
 				Sanitizer clean = new Sanitizer( config() );
 				span.detail.put( "sql", clean.text( sql ) );
-				if ( !config().light && config().collectorBool( id(), "includeParams", true ) ) {
+				if ( !config().light && config().queriesIncludeParams ) {
 					span.detail.put( "params", clean.clean( event.get( Keys.bindings ) ) );
 				}
-				if ( !config().light && config().collectorBool( id(), "captureCaller", true ) ) {
+				if ( !config().light && config().queriesCaptureCaller ) {
 					Callers.Location where = Callers.current();
 					span.file	= where.file();
 					span.line	= where.line();
@@ -107,7 +107,7 @@ public class QueryCollector extends BaseCollector {
 	}
 
 	private String oneLine( String sql ) {
-		String s = sql.trim().replaceAll( "\\s+", " " );
+		String s = ortus.boxlang.modules.bxlens.util.Text.collapseSpaces( sql );
 		return s.length() > 160 ? s.substring( 0, 160 ) + "..." : s;
 	}
 

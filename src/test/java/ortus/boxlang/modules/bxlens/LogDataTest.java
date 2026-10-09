@@ -71,4 +71,50 @@ public class LogDataTest {
 		assertThat( logs.since( "app.log", 100 ).get( "rotated" ) ).isEqualTo( true );
 	}
 
+	@Test
+	@DisplayName( "a big file is read from its end, and only as much as needed" )
+	void bigFile( @TempDir Path dir ) throws Exception {
+		StringBuilder sb = new StringBuilder();
+		for ( int i = 0; i < 200_000; i++ ) {
+			sb.append( "[2026-10-08] [t] [" ).append( i % 50 == 0 ? "ERROR" : "INFO " ).append( "] [APP] line " ).append( i ).append( '\n' );
+		}
+		Files.writeString( dir.resolve( "big.log" ), sb.toString() );
+		LogData				logs	= new LogData( dir );
+		Map<String, Object>	r		= logs.read( "big.log", 3, "", "" );
+		assertThat( ( List<?> ) r.get( "lines" ) ).hasSize( 3 );
+		assertThat( ( ( List<?> ) r.get( "lines" ) ).get( 2 ).toString() ).endsWith( "line 199999" );
+		assertThat( r.get( "cut" ) ).isEqualTo( true );
+		Map<String, Object> hit = logs.read( "big.log", 5, "line 150000", "" );
+		assertThat( ( List<?> ) hit.get( "lines" ) ).hasSize( 1 );
+		Map<String, Object> errs = logs.read( "big.log", 2, "", "ERROR" );
+		assertThat( ( ( List<?> ) errs.get( "lines" ) ).get( 1 ).toString() ).endsWith( "line 199950" );
+		// Something older than the scan window is not found, and the answer says the file was cut
+		Map<String, Object> old = logs.read( "big.log", 5, "line 1 ", "" );
+		assertThat( ( List<?> ) old.get( "lines" ) ).isEmpty();
+		assertThat( old.get( "cut" ) ).isEqualTo( true );
+	}
+
+	@Test
+	@DisplayName( "only two reads run at once, the next one is refused" )
+	void busy( @TempDir Path dir ) throws Exception {
+		Files.writeString( dir.resolve( "app.log" ), LOG );
+		LogData logs = new LogData( dir );
+		assertThat( logs.reads().tryAcquire( LogData.MAX_READS ) ).isTrue();
+		org.junit.jupiter.api.Assertions.assertThrows( LogData.Busy.class, () -> logs.read( "app.log", 10, "", "" ) );
+		logs.reads().release( LogData.MAX_READS );
+		assertThat( ( List<?> ) logs.read( "app.log", 10, "", "" ).get( "lines" ) ).hasSize( 5 );
+		assertThat( logs.reads().availablePermits() ).isEqualTo( LogData.MAX_READS );
+	}
+
+	@Test
+	@DisplayName( "level markers are found without a regular expression, and an empty file reads as empty" )
+	void levels( @TempDir Path dir ) throws Exception {
+		assertThat( LogData.levelOf( "x [ WARN ] y" ) ).isEqualTo( 3 );
+		assertThat( LogData.levelOf( "[INFO] a [ERROR] b" ) ).isEqualTo( 2 );
+		assertThat( LogData.levelOf( "[WARNING] none" ) ).isEqualTo( -1 );
+		assertThat( LogData.levelOf( "no brackets" ) ).isEqualTo( -1 );
+		Files.writeString( dir.resolve( "e.log" ), "" );
+		assertThat( ( List<?> ) new LogData( dir ).read( "e.log", 10, "", "" ).get( "lines" ) ).isEmpty();
+	}
+
 }

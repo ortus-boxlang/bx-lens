@@ -92,8 +92,8 @@ public final class WebExchange {
 	/**
 	 * Request headers with multiple values joined by comma.
 	 */
-	public Map<String, Object> requestHeaders() {
-		Map<String, Object>		out	= new LinkedHashMap<>();
+	public Map<String, String> requestHeaders() {
+		Map<String, String>		out	= new LinkedHashMap<>();
 		Map<String, String[]>	map	= exchange.getRequestHeaderMap();
 		if ( map != null ) {
 			map.forEach( ( k, v ) -> out.put( k, v == null ? "" : String.join( ", ", v ) ) );
@@ -104,8 +104,8 @@ public final class WebExchange {
 	/**
 	 * Response headers with multiple values joined by comma.
 	 */
-	public Map<String, Object> responseHeaders() {
-		Map<String, Object>		out	= new LinkedHashMap<>();
+	public Map<String, String> responseHeaders() {
+		Map<String, String>		out	= new LinkedHashMap<>();
 		Map<String, String[]>	map	= exchange.getResponseHeaderMap();
 		if ( map != null ) {
 			map.forEach( ( k, v ) -> out.put( k, v == null ? "" : String.join( ", ", v ) ) );

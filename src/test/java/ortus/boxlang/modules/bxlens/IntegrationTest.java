@@ -43,8 +43,12 @@ public class IntegrationTest extends BaseIntegrationTest {
 		for ( Object c : all ) {
 			ids.add( ( String ) c.getClass().getMethod( "id" ).invoke( c ) );
 		}
-		assertThat( ids ).containsAtLeast( "request", "templates", "queries", "http", "exceptions", "scopes", "jvm", "cache", "modules" );
+		assertThat( ids ).containsAtLeast( "request", "templates", "queries", "http", "exceptions", "jvm", "cache", "modules" );
 		assertThat( ids ).doesNotContain( "functions" );
+		assertThat( ids ).doesNotContain( "bifs" );
+		assertThat( ids ).doesNotContain( "orm" );
+		// Scopes are heavy: not at the default light level
+		assertThat( ids ).doesNotContain( "scopes" );
 		assertThat( ids ).doesNotContain( "logs" );
 	}
 

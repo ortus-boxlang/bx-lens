@@ -35,6 +35,14 @@ public interface ILensCollector {
 	}
 
 	/**
+	 * Does this collector only add data to the page (the request snapshot)? Such a collector is skipped at the end of a request that is not kept
+	 * in the history and shows no bar, because nobody would ever see what it gathers.
+	 */
+	default boolean snapshotOnly() {
+		return false;
+	}
+
+	/**
 	 * Called when a tracked request starts.
 	 */
 	default void onRequestStart( LensRequest request ) {
