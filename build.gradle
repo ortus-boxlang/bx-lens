@@ -238,6 +238,9 @@ task zipModuleStructure( type: Zip ) {
 }
 createModuleStructure.finalizedBy( zipModuleStructure )
 shadowJar.finalizedBy( createModuleStructure )
+// The integration tests load the packaged module from build/modules, so a clean checkout must have it built before they run
+createModuleStructure.dependsOn( shadowJar )
+test.dependsOn( createModuleStructure )
 
 test {
     useJUnitPlatform()
