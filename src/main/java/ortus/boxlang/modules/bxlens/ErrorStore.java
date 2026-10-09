@@ -28,12 +28,21 @@ import ortus.boxlang.modules.bxlens.util.Text;
  */
 public final class ErrorStore {
 
-	public static final int									MAX_GROUPS	= 200;
-	public static final int									MAX_SAMPLES	= 5;
+	public static final int												MAX_GROUPS		= 200;
+	public static final int												MAX_SAMPLES		= 5;
 
-	private final Map<String, Map<String, Object>>			groups		= new ConcurrentHashMap<>();
-	private final ortus.boxlang.modules.bxlens.util.Bounded	bounded		= new ortus.boxlang.modules.bxlens.util.Bounded();
-	private volatile boolean								dirty;
+	private final Map<String, Map<String, Object>>						groups			= new ConcurrentHashMap<>();
+	private final ortus.boxlang.modules.bxlens.util.Bounded				bounded			= new ortus.boxlang.modules.bxlens.util.Bounded();
+	private volatile boolean											dirty;
+	/** Which server these groups belong to. */
+	private volatile java.util.function.Supplier<Map<String, Object>>	serverSource	= Map::of;
+
+	/**
+	 * Where the identity of this server comes from, so the list says which machine it describes.
+	 */
+	public void identify( java.util.function.Supplier<Map<String, Object>> source ) {
+		this.serverSource = source;
+	}
 
 	/**
 	 * Look at a finished request and file every error it had.
@@ -78,6 +87,7 @@ public final class ErrorStore {
 			g.put( "message", cut( message, 400 ) );
 			g.put( "count", 0L );
 			g.put( "firstSeen", now );
+			g.put( "serverId", req.serverId );
 			g.put( "urls", new LinkedHashMap<String, Object>() );
 			g.put( "samples", new ArrayList<Object>() );
 			Map<String, Object> prior = groups.putIfAbsent( id, g );
@@ -88,6 +98,7 @@ public final class ErrorStore {
 		synchronized ( g ) {
 			g.put( "count", Plain.num( g.get( "count" ), 0 ) + 1 );
 			g.put( "lastSeen", now );
+			g.put( "serverId", req.serverId );
 			g.put( "lastStatus", req.status );
 			g.put( "handled", ! ( "uncaught".equals( e.get( "origin" ) ) || "status".equals( e.get( "origin" ) ) ) );
 			g.put( "file", Plain.str( e.get( "file" ) ) );
@@ -116,6 +127,9 @@ public final class ErrorStore {
 		s.put( "query", redactQuery( req.queryString, cfg ) );
 		s.put( "status", req.status );
 		s.put( "remoteAddr", req.remoteAddr );
+		s.put( "serverHost", req.serverHost );
+		s.put( "serverIp", req.serverIp );
+		s.put( "serverId", req.serverId );
 		s.put( "userAgent", cut( req.userAgent, 200 ) );
 		s.put( "app", req.appName );
 		s.put( "template", req.template );
@@ -207,6 +221,7 @@ public final class ErrorStore {
 		out.put( "groups", rows );
 		out.put( "occurrences", total );
 		out.put( "max", MAX_GROUPS );
+		out.put( "server", this.serverSource.get() );
 		return out;
 	}
 
@@ -257,6 +272,23 @@ public final class ErrorStore {
 	@SuppressWarnings( "unchecked" )
 	private static Map<String, Object> deepCopy( Map<String, Object> g ) {
 		return ( Map<String, Object> ) Plain.parse( ortus.boxlang.modules.bxlens.util.Json.write( g ) );
+	}
+
+	/**
+	 * The content of <code>errors.json</code>: the server that wrote it and its groups. Every group and sample also carries its own server id.
+	 */
+	public static Map<String, Object> fileOf( Map<String, Object> server, List<Map<String, Object>> groups ) {
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put( "server", server );
+		m.put( "groups", groups );
+		return m;
+	}
+
+	/**
+	 * The groups in a parsed <code>errors.json</code>, in the current format ({ server, groups }) or the older one (a plain list).
+	 */
+	public static List<?> groupsOf( Object parsed ) {
+		return parsed instanceof Map<?, ?> m ? Plain.list( m.get( "groups" ) ) : Plain.list( parsed );
 	}
 
 	/**

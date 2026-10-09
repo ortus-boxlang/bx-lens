@@ -41,26 +41,35 @@ public final class Reports {
 		volatile long		lastSeen;
 	}
 
-	private final long									startedAt		= System.currentTimeMillis();
-	private volatile long								firstInstall	= startedAt;
-	private final LongAdder								requests		= new LongAdder();
-	private final LongAdder								errors			= new LongAdder();
-	private final LongAdder								slow			= new LongAdder();
-	private final LongAdder								totalMs			= new LongAdder();
-	private final AtomicLong							maxMs			= new AtomicLong();
-	private final LongAdder								queries			= new LongAdder();
-	private final LongAdder								queryMs			= new LongAdder();
-	private final LongAdder								httpCalls		= new LongAdder();
-	private final LongAdder								exceptions		= new LongAdder();
-	private final AtomicLongArray						status			= new AtomicLongArray( 6 );
-	private final AtomicLongArray						latency			= new AtomicLongArray( BUCKETS.length + 1 );
-	private final Map<String, Url>						urls			= new ConcurrentHashMap<>();
-	private final Bounded								bounded			= new Bounded();
+	private final long													startedAt		= System.currentTimeMillis();
+	private volatile long												firstInstall	= startedAt;
+	private final LongAdder												requests		= new LongAdder();
+	private final LongAdder												errors			= new LongAdder();
+	private final LongAdder												slow			= new LongAdder();
+	private final LongAdder												totalMs			= new LongAdder();
+	private final AtomicLong											maxMs			= new AtomicLong();
+	private final LongAdder												queries			= new LongAdder();
+	private final LongAdder												queryMs			= new LongAdder();
+	private final LongAdder												httpCalls		= new LongAdder();
+	private final LongAdder												exceptions		= new LongAdder();
+	private final AtomicLongArray										status			= new AtomicLongArray( 6 );
+	private final AtomicLongArray										latency			= new AtomicLongArray( BUCKETS.length + 1 );
+	private final Map<String, Url>										urls			= new ConcurrentHashMap<>();
+	private final Bounded												bounded			= new Bounded();
 	/** minute (epoch minutes) to { requests, errors, totalMs }. */
-	private final ConcurrentSkipListMap<Long, long[]>	minutes			= new ConcurrentSkipListMap<>();
-	private volatile long								baseRequests, baseErrors, baseSlow, baseQueries, baseExceptions, baseRuns;
-	private volatile boolean							dirty;
-	private volatile int								keepMinutes		= 60;
+	private final ConcurrentSkipListMap<Long, long[]>					minutes			= new ConcurrentSkipListMap<>();
+	private volatile long												baseRequests, baseErrors, baseSlow, baseQueries, baseExceptions, baseRuns;
+	private volatile boolean											dirty;
+	private volatile int												keepMinutes		= 60;
+	/** Which server these totals belong to. */
+	private volatile java.util.function.Supplier<Map<String, Object>>	serverSource	= Map::of;
+
+	/**
+	 * Where the identity of this server comes from, so the totals say which machine they describe.
+	 */
+	public void identify( java.util.function.Supplier<Map<String, Object>> source ) {
+		this.serverSource = source;
+	}
 
 	/**
 	 * How many minutes of the minute series to keep. 60 in memory only, more with the disk store.
@@ -176,6 +185,7 @@ public final class Reports {
 		m.put( "startedAt", startedAt );
 		m.put( "uptimeMs", System.currentTimeMillis() - startedAt );
 		m.put( "persisted", persisted );
+		m.put( "server", this.serverSource.get() );
 		long				reqs	= requests.sum();
 		Map<String, Object>	now		= new LinkedHashMap<>();
 		now.put( "requests", reqs );
@@ -275,6 +285,7 @@ public final class Reports {
 	public Map<String, Object> toPersist() {
 		dirty = false;
 		Map<String, Object> m = new LinkedHashMap<>();
+		m.put( "server", this.serverSource.get() );
 		m.put( "firstInstall", firstInstall );
 		m.put( "runs", baseRuns + 1 );
 		m.put( "requests", baseRequests + requests.sum() );

@@ -39,7 +39,7 @@
 		Alpine.data("lensApp", function () {
 			return {
 				state: null, tab: "overview", live: true, es: null, streamOk: false, timer: null, toastMsg: "", now: Date.now(),
-				overview: null, requests: [], capacity: 0, settings: null,
+				overview: null, requests: [], capacity: 0, servers: 1, settings: null,
 				rf: "all", rq: "", rsel: null, detail: null, detailErr: "",
 				executors: [], execCounts: {}, esel: null, hist: {},
 				tasks: null, ksel: null, kf: "all", kq: "", confirm: "", runResult: null, running: "",
@@ -110,6 +110,7 @@
 				disconnect: function () { if (this.es) { this.es.close(); this.es = null; } this.streamOk = false; },
 				onTick: function (d) {
 					if (d.overview) { this.overview = d.overview; this.badges(); }
+					if (d.servers !== undefined) { this.servers = d.servers; }
 					if (d.requests) { this.requests = d.requests; if (this.rsel === null && d.requests.length) { this.pick(d.requests[0].id); } }
 					if (d.executors) { this.setExecutors(d.executors); }
 					if (d.tasks) { this.tasks = d.tasks; if (!this.ksel && this.allTasks().length) { this.ksel = this.allTasks()[0].scheduler + "/" + this.allTasks()[0].name; } }
@@ -133,7 +134,7 @@
 					try {
 						var o = await (await this.api("overview")).json();
 						var r = await (await this.api("requests")).json();
-						this.overview = o; this.requests = r.requests; this.capacity = r.capacity;
+						this.overview = o; this.requests = r.requests; this.capacity = r.capacity; this.servers = r.servers || 1;
 						if (this.rsel === null && this.requests.length) { this.pick(this.requests[0].id); }
 						if (this.has("executors")) { this.setExecutors(await (await this.api("executors")).json()); }
 						if (this.has("tasks")) { this.tasks = await (await this.api("tasks")).json(); }
@@ -405,8 +406,9 @@
 				copyCurl: async function () {
 					var q = function (s) { return "'" + String(s).replace(/'/g, "'\\''") + "'"; };
 					var r = this.detail.request, h = this.detail.headers || {}, parts = ["curl -X " + q(r.method) + " " + q(r.url + (r.query ? "?" + r.query : ""))];
+					var note = r.serverId ? "# handled by server " + r.serverHost + " " + r.serverIp + " (" + r.serverId + ")\n" : "";
 					Object.keys(h).filter(function (k) { return ["host", "content-length", "connection"].indexOf(k.toLowerCase()) < 0 && h[k] !== "[redacted]"; }).forEach(function (k) { parts.push("-H " + q(k + ": " + h[k])); });
-					try { await navigator.clipboard.writeText(parts.join(" \\\n  ")); this.toast("cURL copied. Redacted headers are left out."); } catch (e) { this.toast("Could not copy"); }
+					try { await navigator.clipboard.writeText(note + parts.join(" \\\n  ")); this.toast("cURL copied. Redacted headers are left out."); } catch (e) { this.toast("Could not copy"); }
 				},
 				wfHeight: function () { return Math.min(40, this.bars().length) * 16 + 8; },
 				spark: function () { return this.overview ? this.line(this.overview.series, Math.max(1, Math.max.apply(null, this.overview.series)), 240, 46) : ""; },

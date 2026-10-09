@@ -108,4 +108,18 @@ public class QueryStatsTest {
 		assertThat( size ).isAtLeast( QueryStats.MAX_STATEMENTS );
 	}
 
+	@Test
+	@DisplayName( "a statement keeps the server that ran it and the snapshot names the server" )
+	@SuppressWarnings( "unchecked" )
+	void server() {
+		QueryStats stats = new QueryStats();
+		stats.identify( () -> Map.of( "id", "abc12345" ) );
+		LensRequest r = new LensRequest();
+		r.serverId = "abc12345";
+		r.queries.add( q( 1, "select 1", 2 ) );
+		stats.record( r, 25 );
+		Map<String, Object> snap = stats.snapshot();
+		assertThat( ( Map<String, Object> ) snap.get( "server" ) ).containsEntry( "id", "abc12345" );
+		assertThat( ( ( List<Map<String, Object>> ) snap.get( "statements" ) ).get( 0 ).get( "serverId" ) ).isEqualTo( "abc12345" );
+	}
 }

@@ -35,6 +35,8 @@ sed -i "s|@HARNESS_APP@|$HERE/app|g" "$RUN/home/config/boxlang.json"
 sed -i "s|\"reloadAssets\": true|\"reloadAssets\": ${LENS_RELOAD_ASSETS:-true}|" "$RUN/home/config/boxlang.json"
 # LENS_LICENSE=trial|plus|expired|none shows that license state in the console. Empty detects bx-plus.
 sed -i "s|@LENS_LICENSE@|${LENS_LICENSE:-}|g" "$RUN/home/config/boxlang.json"
+# LENS_SERVER_HEADER=true also sends X-BxLens-Server. LENS_SERVER_NAME and LENS_SERVER_ADDRESS (environment) set the server identity
+sed -i "s|@LENS_SERVER_HEADER@|${LENS_SERVER_HEADER:-false}|g" "$RUN/home/config/boxlang.json"
 cp -R "$ROOT/build/modules/bx-lens" "$RUN/home/modules/bxLens"
 # DEV=1 serves the UI files straight from src/main/bx/assets, so edits show on refresh (needs dev.reloadAssets)
 if [ -n "${DEV:-}" ]; then

@@ -64,7 +64,7 @@ test.describe( 'panels', () => {
 		expect( await page.evaluate( () => navigator.clipboard.readText() ) ).toContain( 'SELECT id, customer_id, total FROM orders' );
 		await lens.open( 'Request' );
 		await page.locator( '#bxlens .abtn', { hasText: 'Copy as cURL' } ).click();
-		expect( await page.evaluate( () => navigator.clipboard.readText() ) ).toMatch( /^curl -X 'GET' 'http:\/\/127\.0\.0\.1:\d+\/n-plus-one\.bxm'$/ );
+		expect( await page.evaluate( () => navigator.clipboard.readText() ) ).toMatch( /^# handled by server \S+ \S+ \([0-9a-f]{8}\)\ncurl -X 'GET' 'http:\/\/127\.0\.0\.1:\d+\/n-plus-one\.bxm'$/ );
 	} );
 
 

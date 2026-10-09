@@ -12,7 +12,7 @@
 <div class="shell" x-data="lensApp()" x-init="init()" x-cloak>
   <header class="top">
     <span class="mark" aria-hidden="true"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#bx-mark"/></svg></span><b>BxLens</b>
-    <span class="hostinfo" x-show="state" x-text="state ? state.host + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
+    <span class="hostinfo" id="serverinfo" x-show="state" :title="state && state.server ? 'Server id ' + state.server.id : ''" x-text="state ? state.host + (state.server ? ' (' + state.server.ip + ')' : '') + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
     <span class="spacer"></span>
     <span class="chipx hid" x-show="state" x-text="state ? state.role : ''" style="margin-right:6px"></span>
     <span class="lic" :class="licenseClass()" x-show="state" x-text="state ? state.license.label : ''"></span>
@@ -38,7 +38,7 @@
 
       <!-- Overview -->
       <section x-show="tab === 'overview'">
-        <h1 class="h1">Overview <small>this server only, last <span x-text="overview && overview.windowMinutes ? overview.windowMinutes + ' minutes' : 'requests in memory'"></span></small></h1>
+        <h1 class="h1">Overview <small>this server only (<span id="overview-server" x-text="state && state.server ? state.server.host + ', ' + state.server.ip : ''"></span>), last <span x-text="overview && overview.windowMinutes ? overview.windowMinutes + ' minutes' : 'requests in memory'"></span></small></h1>
         <template x-if="overview">
           <div>
             <div class="tiles">
@@ -72,19 +72,20 @@
           <input type="search" placeholder="Filter by URL" aria-label="Filter requests" x-model="rq">
         </div>
         <div class="split">
-          <div class="card scroll" style="padding:0"><table><thead><tr><th>Time</th><th>Method</th><th>URL</th><th class="num">Status</th><th class="num">Time</th><th class="num">SQL</th><th class="num">Issues</th></tr></thead><tbody>
+          <div class="card scroll" style="padding:0"><table><thead><tr><th>Time</th><th>Method</th><th>URL</th><th x-show="servers > 1" id="server-col">Server</th><th class="num">Status</th><th class="num">Time</th><th class="num">SQL</th><th class="num">Issues</th></tr></thead><tbody>
             <template x-for="r in filtered()" :key="r.id"><tr class="row" :class="rsel === r.id ? 'sel' : ''" tabindex="0" @click="pick(r.id)" @keydown.enter="pick(r.id)">
               <td class="mono" x-text="time(r.at)"></td><td x-text="r.method"></td><td class="mono" x-text="r.url"></td>
+              <td class="mono" x-show="servers > 1" x-text="r.serverHost + ' ' + r.serverId"></td>
               <td class="num"><span class="pill" :class="r.state === 'unfinished' ? 'crit' : statusClass(r.status)" x-text="r.state === 'unfinished' ? 'unfinished' : r.status"></span></td><td class="num" x-text="fmt(r.ms)"></td><td class="num" x-text="r.queries"></td>
               <td class="num" :style="r.issues ? 'color:var(--warn)' : ''" x-text="r.issues"></td></tr></template>
-            <tr x-show="!filtered().length"><td colspan="7" class="empty">No requests match.</td></tr></tbody></table></div>
+            <tr x-show="!filtered().length"><td colspan="8" class="empty">No requests match.</td></tr></tbody></table></div>
           <div class="card">
             <div class="empty" x-show="!detail && !detailErr">Pick a request.</div>
             <div class="empty" x-show="detailErr" x-text="detailErr"></div>
             <template x-if="detail">
               <div>
                 <h3><span class="mono" style="color:var(--ink)" x-text="detail.request.method + ' ' + detail.request.uri"></span><span x-text="time(Date.parse(detail.request.startedAt))"></span></h3>
-                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.state === 'unfinished' ? 'unfinished' : detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-show="detail.cost && detail.cost.cpuMs !== null" x-text="'cpu ' + fmt(detail.cost ? detail.cost.cpuMs : 0)"></span><span class="pill" x-show="detail.cost && detail.cost.allocBytes !== null" x-text="'alloc ' + bytes(detail.cost ? detail.cost.allocBytes : 0)"></span><span class="pill" x-text="detail.request.remoteAddr"></span><span class="pill mono" title="Request id" x-text="'id ' + detail.request.id"></span></div>
+                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.state === 'unfinished' ? 'unfinished' : detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-show="detail.cost && detail.cost.cpuMs !== null" x-text="'cpu ' + fmt(detail.cost ? detail.cost.cpuMs : 0)"></span><span class="pill" x-show="detail.cost && detail.cost.allocBytes !== null" x-text="'alloc ' + bytes(detail.cost ? detail.cost.allocBytes : 0)"></span><span class="pill" x-text="detail.request.remoteAddr"></span><span class="pill mono" id="detail-server" title="The server that handled this request" x-text="'server ' + detail.request.serverHost + ' ' + detail.request.serverIp + ' (' + detail.request.serverId + ')'"></span><span class="pill mono" title="Request id" x-text="'id ' + detail.request.id"></span></div>
                 <div class="tools"><button class="btn mini" @click="copyJson()"><svg class="ic"><use href="#ph-copy"/></svg>Copy JSON</button><button class="btn mini" @click="downloadJson()"><svg class="ic"><use href="#ph-download-simple"/></svg>Download JSON</button><button class="btn mini" @click="copyCurl()"><svg class="ic"><use href="#ph-terminal-window"/></svg>Copy as cURL</button></div>
                 <template x-for="i in detail.issues" :key="i.title + i.detail + i.line"><div class="issue" :class="i.severity === 'crit' ? 'crit' : (i.severity === 'info' ? 'note' : '')"><b x-text="i.severity === 'crit' ? 'Error' : (i.severity === 'info' ? 'Note' : 'Warn')"></b><span x-text="i.title + (i.detail ? ': ' + i.detail : '')"></span></div></template>
                 <template x-if="detail.slowSample"><div><h3 style="margin-top:8px">Where it was at <span x-text="detail.slowSample.atMs + ' ms'"></span></h3><ul class="frames" style="max-height:160px"><template x-for="(f, i) in detail.slowSample.frames" :key="i"><li :class="f.bx ? 'bx' : ''" x-text="f.text"></li></template></ul></div></template>
@@ -417,7 +418,7 @@
 
       <!-- Queries -->
       <section x-show="tab === 'queries'">
-        <h1 class="h1">Queries <small>every statement seen since <span x-text="qs ? new Date(qs.since).toLocaleTimeString() : ''"></span>, in memory</small></h1>
+        <h1 class="h1">Queries <small>every statement seen since <span x-text="qs ? new Date(qs.since).toLocaleTimeString() : ''"></span>, in memory<span x-show="qs && qs.server && qs.server.host" x-text="qs && qs.server ? ' on ' + qs.server.host : ''"></span></small></h1>
         <template x-if="qs">
           <div>
             <div class="tiles">
@@ -461,7 +462,7 @@
               <div class="tools" x-show="egroup && egroup.samples.length > 1"><template x-for="(sm, i) in (egroup ? egroup.samples : [])" :key="i"><button class="btn mini" :class="esample === i ? 'primary' : ''" @click="esample = i" x-text="'Sample ' + (i + 1)"></button></template></div>
               <template x-if="cur()">
                 <div>
-                  <dl class="kv"><dt>Request</dt><dd class="mono" x-text="cur().method + ' ' + cur().uri + (cur().query ? '?' + cur().query : '')"></dd><dt>Status</dt><dd x-text="cur().status + ' after ' + cur().ms + ' ms'"></dd><dt>From</dt><dd class="mono" x-text="cur().remoteAddr"></dd><dt>When</dt><dd x-text="new Date(cur().at).toLocaleString()"></dd><dt x-show="cur().template">Template</dt><dd class="mono" x-show="cur().template" x-text="cur().template"></dd><dt x-show="cur().sql">Statement</dt><dd class="mono" x-show="cur().sql" x-text="cur().sql"></dd></dl>
+                  <dl class="kv"><dt>Request</dt><dd class="mono" x-text="cur().method + ' ' + cur().uri + (cur().query ? '?' + cur().query : '')"></dd><dt>Status</dt><dd x-text="cur().status + ' after ' + cur().ms + ' ms'"></dd><dt>From</dt><dd class="mono" x-text="cur().remoteAddr"></dd><dt>Server</dt><dd class="mono" id="sample-server" x-text="cur().serverHost + ' ' + cur().serverIp + ' (' + cur().serverId + ')'"></dd><dt>When</dt><dd x-text="new Date(cur().at).toLocaleString()"></dd><dt x-show="cur().template">Template</dt><dd class="mono" x-show="cur().template" x-text="cur().template"></dd><dt x-show="cur().sql">Statement</dt><dd class="mono" x-show="cur().sql" x-text="cur().sql"></dd></dl>
                   <p x-show="cur().detail" class="sub" x-text="cur().detail"></p>
                   <h3 style="margin-top:10px">Stack</h3>
                   <pre class="code" style="max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all"><template x-for="(f, i) in (cur().frames || [])" :key="'b' + i"><div style="color:var(--cyan)" x-text="(f.file || '') + ':' + (f.line || '') + (f.name ? '  ' + f.name : '')"></div></template><template x-for="(j, i) in (cur().java || [])" :key="'j' + i"><div style="color:var(--dim)" x-text="j"></div></template></pre>
@@ -478,7 +479,7 @@
 
       <!-- Reports -->
       <section x-show="tab === 'reports'">
-        <h1 class="h1">Reports <small>totals for this server</small></h1>
+        <h1 class="h1">Reports <small>totals for this server<span id="reports-server" x-show="rep && rep.server" x-text="rep && rep.server ? ' (' + rep.server.host + ', ' + rep.server.ip + ', id ' + rep.server.id + ')' : ''"></span></small></h1>
         <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="rep && !rep.persisted">Totals are since the server started and are kept in memory. BoxLang+ keeps totals since first install across restarts.</div>
         <template x-if="rep">
           <div>

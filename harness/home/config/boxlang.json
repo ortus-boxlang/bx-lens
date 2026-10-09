@@ -32,7 +32,8 @@
 					"maxMinutes": 1
 				},
 				"history": {
-					"trackNonHtml": true
+					"trackNonHtml": true,
+					"serverHeader": "@LENS_SERVER_HEADER@"
 				},
 				"collectors": {
 					"queries": {

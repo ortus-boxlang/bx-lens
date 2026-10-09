@@ -6,6 +6,7 @@
 		queries : lensQueries( 3, "total" ),
 		inflight : lensInflight(),
 		license : lensLicense(),
-		diagnostics : lensDiagnostics()
+		diagnostics : lensDiagnostics(),
+		server : lensServer()
 	} ) );
 </bx:script>

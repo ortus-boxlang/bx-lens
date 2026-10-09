@@ -7,7 +7,6 @@ package ortus.boxlang.modules.bxlens;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,7 +47,6 @@ public final class ConsoleRouter {
 	    + "connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 	private final LensService			service;
-	private volatile String				hostName;
 
 	public ConsoleRouter( LensService service ) {
 		this.service = service;
@@ -254,7 +252,8 @@ public final class ConsoleRouter {
 		} else if ( route.equals( "overview" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, overview() );
 		} else if ( route.equals( "requests" ) && method.equals( "GET" ) ) {
-			json( context, ex, 200, Map.of( "requests", service.getStore().summaries( true ), "capacity", service.getStore().capacity() ) );
+			json( context, ex, 200, Map.of( "requests", service.getStore().summaries( true ), "capacity", service.getStore().capacity(), "servers",
+			    service.getStore().serverCount(), "server", service.getIdentity().get().toMap() ) );
 		} else if ( route.startsWith( "requests/" ) && method.equals( "GET" ) ) {
 			RequestStore.Entry e = service.getStore().get( route.substring( "requests/".length() ) );
 			if ( e == null ) {
@@ -466,7 +465,8 @@ public final class ConsoleRouter {
 		LensConfig			cfg	= service.getConfig();
 		Map<String, Object>	m	= new LinkedHashMap<>();
 		m.put( "version", service.getVersion() );
-		m.put( "host", hostName() );
+		m.put( "host", service.getIdentity().get().host() );
+		m.put( "server", service.getIdentity().get().toMap() );
 		m.put( "boxlang", boxlangVersion() );
 		m.put( "jvmUptimeSeconds", ManagementFactory.getRuntimeMXBean().getUptime() / 1000 );
 		m.put( "csrf", s.csrf );
@@ -887,6 +887,7 @@ public final class ConsoleRouter {
 		}
 		m.put( "series", series );
 		m.put( "lens", service.asyncStats() );
+		m.put( "server", service.getIdentity().get().toMap() );
 		// Attention list from what we know today: failing routes and slow routes
 		List<Map<String, Object>> attention = new ArrayList<>();
 		for ( Map<String, Object> r : slow ) {
@@ -1147,6 +1148,7 @@ public final class ConsoleRouter {
 				}
 				if ( want.contains( "requests" ) ) {
 					tick.put( "requests", service.getStore().summaries( true ) );
+					tick.put( "servers", service.getStore().serverCount() );
 					tick.put( "overview", overview() );
 				}
 				context.writeToBuffer( "event: tick\ndata: " + Json.write( tick ) + "\n\n" );
@@ -1232,19 +1234,6 @@ public final class ConsoleRouter {
 		} catch ( IOException e ) {
 			return "";
 		}
-	}
-
-	private String hostName() {
-		String h = hostName;
-		if ( h == null ) {
-			try {
-				h = InetAddress.getLocalHost().getHostName();
-			} catch ( Exception e ) {
-				h = "localhost";
-			}
-			hostName = h;
-		}
-		return h;
 	}
 
 	private String boxlangVersion() {

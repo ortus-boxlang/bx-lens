@@ -23,6 +23,7 @@ public class LensDiagnostics extends BaseLensBIF {
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
 		Map<String, Object> m = new LinkedHashMap<>();
 		m.put( "version", service().getVersion() );
+		m.put( "server", service().getIdentity().get().toMap() );
 		m.put( "enabled", service().isEnabled() );
 		m.put( "collectLevel", service().getConfig().collectLevel );
 		m.put( "history", Map.of( "size", service().getStore().size(), "capacity", service().getStore().capacity() ) );

@@ -70,6 +70,9 @@ public final class LensService {
 	 */
 	public static final String										MARKER				= "<!--bxlens:here-->";
 
+	/** Names the server that answered. Sent only with the request id header and only when <code>history.serverHeader</code> is true. */
+	public static final String										SERVER_HEADER		= "X-BxLens-Server";
+
 	private static volatile LensService								instance;
 
 	private volatile BoxRuntime										runtime;
@@ -115,6 +118,7 @@ public final class LensService {
 	private final ErrorStore										errors				= new ErrorStore();
 	private final Reports											reports				= new Reports();
 	private final AiService											ai					= new AiService( this );
+	private final ortus.boxlang.modules.bxlens.util.ServerIdentity	identity			= new ortus.boxlang.modules.bxlens.util.ServerIdentity();
 	private volatile java.nio.file.Path								storeDir;
 	private volatile long											lastFlush;
 
@@ -175,6 +179,11 @@ public final class LensService {
 		if ( this.settingsStore.skipped() > 0 ) {
 			getLogger().warn( "bx-lens: ignored {} invalid entries in the settings overrides file [{}]", this.settingsStore.skipped(), overridesFile );
 		}
+		this.identity.configure( this.config.getString( "server.name", "" ), this.config.getString( "server.address", "" ),
+		    this.config.getString( "server.id", "" ) );
+		this.queryStats.identify( () -> this.identity.get().toMap() );
+		this.reports.identify( () -> this.identity.get().toMap() );
+		this.errors.identify( () -> this.identity.get().toMap() );
 		this.barGuard		= new AccessGuard( this.config, "bar.access", this.config.getBool( "bar.allowAllIPs", false ) );
 		this.consoleGuard	= new AccessGuard( this.config, "console.access", true );
 		this.auth			= new ConsoleAuth( this.config );
@@ -494,6 +503,11 @@ public final class LensService {
 		req.userAgent	= ua == null ? "" : ua;
 		req.template	= uri;
 		req.thread		= Thread.currentThread();
+		// The cached identity: no lookup happens here
+		ortus.boxlang.modules.bxlens.util.ServerIdentity.Info me = identity.get();
+		req.serverHost	= me.host();
+		req.serverIp	= me.ip();
+		req.serverId	= me.id();
 		if ( licensing.has( "cost" ) ) {
 			req.data.put( "_costStart", ortus.boxlang.modules.bxlens.util.Cost.begin() );
 		}
@@ -502,6 +516,10 @@ public final class LensService {
 		try {
 			if ( showBar || config.getBool( "history.headerAlways", true ) ) {
 				ex.setResponseHeader( config.idHeader, req.id );
+				// Which server answered, only next to the id and only when asked for: it names a machine to whoever sees the response
+				if ( config.getBool( "history.serverHeader", false ) ) {
+					ex.setResponseHeader( SERVER_HEADER, req.serverId );
+				}
 			}
 		} catch ( Throwable t ) {
 			// Headers already sent
@@ -666,7 +684,7 @@ public final class LensService {
 		}, () -> {
 			analyze( req, cfg );
 			return Snapshot.summaryWithIssues( req, cfg );
-		} );
+		} ).server( req.serverId );
 	}
 
 	/**
@@ -756,6 +774,7 @@ public final class LensService {
 		m.put( "dropped", w.dropped() );
 		m.put( "processed", w.processed() );
 		m.put( "failed", w.failed() );
+		m.put( "server", identity.get().toMap() );
 		return m;
 	}
 
@@ -1037,6 +1056,13 @@ public final class LensService {
 	}
 
 	/**
+	 * The identity of this server, detected once and refreshed every few minutes. Reading it does no lookup.
+	 */
+	public ortus.boxlang.modules.bxlens.util.ServerIdentity getIdentity() {
+		return identity;
+	}
+
+	/**
 	 * Is the Plus disk store in use? It needs the license, <code>store.enabled</code> and a folder to write to.
 	 */
 	public boolean diskStoreOn() {
@@ -1063,7 +1089,7 @@ public final class LensService {
 			}
 			f = storeDir.resolve( "errors.json" );
 			if ( java.nio.file.Files.exists( f ) ) {
-				errors.load( ortus.boxlang.modules.bxlens.util.Plain.list( ortus.boxlang.modules.bxlens.util.Plain
+				errors.load( ErrorStore.groupsOf( ortus.boxlang.modules.bxlens.util.Plain
 				    .parse( java.nio.file.Files.readString( f, java.nio.charset.StandardCharsets.UTF_8 ) ) ), System.currentTimeMillis() - hours * 3_600_000L );
 			}
 		} catch ( Throwable t ) {
@@ -1088,12 +1114,12 @@ public final class LensService {
 			}
 			if ( force || errors.isDirty() ) {
 				List<Map<String, Object>>	all		= errors.toPersist();
-				String						json	= Json.write( all );
+				String						json	= Json.write( ErrorStore.fileOf( identity.get().toMap(), all ) );
 				while ( json.length() > maxBytes && all.size() > 1 ) {
 					all.sort( ( a, b ) -> Long.compare( ortus.boxlang.modules.bxlens.util.Plain.num( a.get( "lastSeen" ), 0 ),
 					    ortus.boxlang.modules.bxlens.util.Plain.num( b.get( "lastSeen" ), 0 ) ) );
 					all		= new ArrayList<>( all.subList( all.size() / 2, all.size() ) );
-					json	= Json.write( all );
+					json	= Json.write( ErrorStore.fileOf( identity.get().toMap(), all ) );
 				}
 				ortus.boxlang.modules.bxlens.util.Plain.writeAtomic( storeDir.resolve( "errors.json" ), json );
 			}
@@ -1120,6 +1146,9 @@ public final class LensService {
 			m.put( "queryString", ortus.boxlang.modules.bxlens.util.Secrets.redactQuery( r.queryString, config, 500 ) );
 			m.put( "app", r.appName );
 			m.put( "remoteAddr", r.remoteAddr );
+			m.put( "serverHost", r.serverHost );
+			m.put( "serverIp", r.serverIp );
+			m.put( "serverId", r.serverId );
 			m.put( "startedAt", r.startMillis );
 			m.put( "elapsedMs", ( now - r.startNanos ) / 1_000_000L );
 			Thread t = r.thread;

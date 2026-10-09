@@ -44,6 +44,10 @@ public final class LensRequest {
 	public volatile String											queryString		= "";
 	public volatile String											remoteAddr		= "";
 	public volatile String											host			= "";
+	/** The machine that handled the request, copied from the cached server identity when the request starts. */
+	public volatile String											serverHost		= "";
+	public volatile String											serverIp		= "";
+	public volatile String											serverId		= "";
 	public volatile String											userAgent		= "";
 	public volatile String											appName			= "";
 	public volatile String											template		= "";
