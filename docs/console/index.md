@@ -102,7 +102,7 @@ Most of the console is free. The items marked BoxLang+ need a license or trial, 
 
 ### Requests
 
-The list shows time, method, URL, status, duration, SQL count and issue count, newest first. Filter by All, Errors, Slow or JSON, or by URL text. Pick a row to see the detail: status, timings, issues, the slow request sample if there is one, and a timeline waterfall.
+The list shows time, method, URL, status, duration, SQL count and issue count, newest first. A Server column is added when the history holds requests of more than one server id (for example after the id was changed), and the detail always names the server that handled the request. Filter by All, Errors, Slow or JSON, or by URL text. Pick a row to see the detail: status, timings, issues, the slow request sample if there is one, and a timeline waterfall.
 
 ![The Requests page](../assets/screenshots/console-requests.png)
 

@@ -9,7 +9,7 @@ icon: lucide:braces
 
 ## Request
 
-The Request panel shows the method, URL, status, request headers, **response headers** and params of the current request. Copy it as JSON or as a cURL command. Lens masks header and param values whose key matches `redact.keys`. The `Cookie` and `Authorization` headers are masked by default. At `collect.level: "light"` request headers are not collected.
+The Request panel shows the method, URL, status, the server that handled the request (host, address and id), request headers, **response headers** and params of the current request. Copy it as JSON or as a cURL command. Lens masks header and param values whose key matches `redact.keys`. The `Cookie` and `Authorization` headers are masked by default. At `collect.level: "light"` request headers are not collected.
 
 The response headers are what your app sent, so you can check security headers and cookies in place. Missing ones are reported as [Notes](../console/issues.md#security-notes).
 

@@ -31,7 +31,7 @@ Each group keeps its five newest samples. A sample holds:
 
 - the time, the request id, the method, the path and the status
 - the query string, with the values of secret-looking parameters hidden
-- the client address, user agent, application, template and duration
+- the client address, the server that handled it (host, address and id), user agent, application, template and duration
 - the message and detail
 - the BoxLang frames and the Java frames (no Java frames at `collect.level` `light`)
 - the SQL statement, for a database error, without parameter values
@@ -76,10 +76,14 @@ The totals and the URL lists are in memory. A URL is `METHOD path` without the q
 
 **Reset the counters** clears the totals, the URL lists and the minute series of this run. It is for admins, is written to the audit log and is refused when `console.readOnly` is on.
 
+The page header names the server the totals belong to (host, address and id). The same `server` is in the result of `lensReport()`.
+
 Turn the page off with `collectors.reports.enabled` or `tabs.hide`.
 
 ## The disk store
 
 The disk store needs BoxLang+ or a trial. On Free, both pages show a note that the data is kept in memory only. With a license, Lens writes `errors.json` and `reports.json` to `store.dir` (default `lens-data` in the BoxLang home) every `store.flushSeconds`, and when the module stops. Each file is written to a temporary file and renamed, so a crash cannot leave half a file. Errors older than `store.retentionHours` are dropped. When `errors.json` would be bigger than `store.maxMB`, the older half of the groups is dropped. In a container, put `store.dir` on a mounted volume. See [Running Lens in production](../guides/production.md).
+
+Both files carry the identity of the server that wrote them in a top level `server` object, and every error group and sample has its own `serverId`, so files from many servers can be merged without losing where a record came from. `errors.json` is `{ "server": {...}, "groups": [...] }`. Older files, a plain list of groups, are still read.
 
 The files hold redacted data, but they are still data from your server. Give the folder the permissions you give to your logs.

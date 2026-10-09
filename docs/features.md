@@ -81,6 +81,24 @@ One page at `/~bxlens/index.bxm`, with its own password, an optional second view
 - **Audit log** (`bxlens-audit.log`) records every change, download and denied attempt. No secrets.
 - Access rules per surface: loopback, an IP list, allowed hosts (DNS rebinding guard), a required header, and proxy header trust only from trusted peers.
 
+## Server identity
+
+Every record says which machine produced it, so the data of many servers can end up in one database and still be told apart. This is built in and free. It is a name and an address, never a lookup while a request runs.
+
+| What | Where the identity appears |
+|---|---|
+| A request | The `serverHost`, `serverIp` and `serverId` of the summary and the detail, the Request tab of the bar, the console request detail, the Requests table (a Server column shows when the history holds more than one server id), the JSON and cURL exports |
+| Errors | The group and every sample, and a top level `server` on the list |
+| Reports and queries | A top level `server` on the totals and on the query statistics, and the server id of each statement |
+| In flight | Each running request |
+| Audit log | Every line has `server=<id>` |
+| Disk store | `errors.json` and `reports.json` have a top level `server`, every error group and sample has its own `serverId` |
+| BIFs | `lensServer()`, and the `server` key of `lensReport()` and `lensDiagnostics()`. The rows of `lensErrors()`, `lensQueries()` and `lensInflight()` carry `serverId` |
+| Response header | `X-BxLens-Server`, only next to `X-BxLens-Id` and only with `history.serverHeader` |
+| Console | The host name and address in the header and on the Overview |
+
+The identity is detected once at start and looked at again every five minutes. Set `server.name`, `server.address` and `server.id` (or the environment variables `LENS_SERVER_NAME`, `LENS_SERVER_ADDRESS` and `LENS_SERVER_ID`) behind containers or NAT. See [`server`](configuration.md#server).
+
 ## Integrations
 
 An integration reads another module's events. It is **off by default**, and it is only offered when that module is installed. Until both are true Lens registers no listener.
@@ -93,7 +111,7 @@ How to add one: [Integrations](reference/integrations.md).
 
 ## BIFs for your code
 
-`lensMessage()`, `lensDump()`, `lensMeasure()`, `lensStart()`, `lensStop()`, `lensException()`, `lensPanel()`, `lensEnable()`, `lensDisable()`, `lensIsEnabled()`, `lensRender()`, `lensRequestId()`, and for tools and dashboards `lensReport()`, `lensErrors()`, `lensQueries()`, `lensInflight()`, `lensLicense()`, `lensDiagnostics()`. The tracking BIFs do nothing when the request is not tracked.
+`lensMessage()`, `lensDump()`, `lensMeasure()`, `lensStart()`, `lensStop()`, `lensException()`, `lensPanel()`, `lensEnable()`, `lensDisable()`, `lensIsEnabled()`, `lensRender()`, `lensRequestId()`, and for tools and dashboards `lensReport()`, `lensErrors()`, `lensQueries()`, `lensInflight()`, `lensLicense()`, `lensDiagnostics()` and `lensServer()`. The tracking BIFs do nothing when the request is not tracked.
 
 ## Safe by default
 

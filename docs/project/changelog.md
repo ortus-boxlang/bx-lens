@@ -13,6 +13,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 
 ### Added
 
+- Server identity on every record: host, address and an instance id on requests, errors, reports, query statistics, in flight entries, the audit log and the disk store files, plus `lensServer()`. See [`server`](../configuration.md#server) and [Server identity](../features.md#server-identity).
 - Five BIFs that return the console data as plain structs and arrays, in any request: `lensReport`, `lensErrors`, `lensQueries`, `lensInflight` and `lensLicense`. See [Data functions](../guides/bifs.md#data-functions).
 - The [BIFs panel](../panels/bifs.md) and the `collectors.bifs` collector: time per built-in function, from `postBIFInvocation`. It is heavy and off by default. It needs a BoxLang build with core pull request 657.
 - The [Modules page](../console/modules.md) in the console: every loaded module, nested ones too, with version, state, path and what it provides.

@@ -147,8 +147,10 @@ The password and everything on screen travel over the connection, so use HTTPS.
 Lens writes a line for every login, failed login, lockout, logout, denied attempt and change to its own log, `bxlens-audit.log`, through the BoxLang logging service. It is in the BoxLang logs directory, so you can read it on the [Logs](console/logs.md) page. A line looks like this:
 
 ```text
-event=settings.change role=admin ip=10.0.0.12 keys={thresholds.slowQueryMs=50}
+event=settings.change role=admin ip=10.0.0.12 server=9d596ef0 keys={thresholds.slowQueryMs=50}
 ```
+
+`server` is the id of the Lens instance that wrote the line, so the audit logs of many servers can be read together. See [`server`](configuration.md#server).
 
 The events are:
 
