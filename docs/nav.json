@@ -4,6 +4,7 @@
 		"title": "Start Here",
 		"children": [
 			"getting-started.md",
+			"features.md",
 			"configuration.md",
 			"ui.md",
 			"security.md",
