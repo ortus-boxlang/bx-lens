@@ -60,6 +60,8 @@ Lens is off by default. There are two surfaces and you switch them on independen
 		"proxyHeader": "X-Forwarded-For",
 		"proxyPeers": "private"
 	},
+	"async": { "enabled": true, "queueSize": 2000 },
+	"request": { "maxMinutes": 10 },
 	"inject": true,
 	"contentTypes": [ "text/html" ],
 	"excludePaths": [ "/~bxlens/*", "/favicon.ico" ],
@@ -179,6 +181,13 @@ See [Security](security.md#behind-a-proxy).
 | `inject` | boolean | `true` | Inject the bar before `</body>` on HTML responses. Set false and call [`lensRender()`](guides/bifs.md#lensrender) to place it yourself. |
 | `contentTypes` | list | `["text/html"]` | Response content types that get the bar. |
 | `excludePaths` | list | `["/~bxlens/*", "/favicon.ico"]` | Paths that are never tracked. A trailing `*` is a prefix match. Console paths are always excluded. |
+
+## `async`
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | boolean | `true` | Run the work a request does not need to wait for (statistics, the history, the audit log) on one background thread. `false` runs it in the request. `boxlang.json` only. |
+| `queueSize` | number | `2000` | How many tasks may wait. When the queue is full new tasks are dropped and counted (never the request, which never waits). The console Overview and System pages and `lensDiagnostics()` show the depth and the dropped count. `boxlang.json` only. |
 
 ## `request`
 

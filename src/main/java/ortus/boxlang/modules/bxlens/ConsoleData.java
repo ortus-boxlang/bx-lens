@@ -546,6 +546,7 @@ public final class ConsoleData {
 			}
 		}
 		m.put( "disks", disks );
+		m.put( "lens", service.asyncStats() );
 		m.put( "at", System.currentTimeMillis() );
 		return m;
 	}

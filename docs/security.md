@@ -123,6 +123,10 @@ Failed logins are counted per client in two windows, one for each role. A wrong 
 
 Every field in an audit line is stripped of control characters and cut to a length, so a client cannot forge a line. Refusals are audited too: `denied` (viewer), `denied.csrf`, `denied.readonly`, `denied.plus`, `denied.actions` and `denied.access` (a caller the console answers with 404, at most one line a minute per address). Reading a log file (`logfile.read`) and the environment (`environment.read`) are audited. A search term is logged as its length only.
 
+### What the page loads
+
+The bar adds a small block to your page and loads five static files from `/~bxlens/index.bxm/assets/` on your own server. The files hold no request data and no secret, so they are served without the console check; the data of a request is only in the page, for callers `bar.access` allows. See [Bar files](reference/bar-files.md) for the caching and the Content-Security-Policy the bar needs (`script-src 'self' 'unsafe-eval'`, `style-src 'self'`, `connect-src 'self'`; no `unsafe-inline`).
+
 ### Host names and DNS rebinding
 
 A guard whose rule is exactly `local` accepts only the Host names `localhost`, `127.0.0.1` and `[::1]`, unless `access.allowedHosts` is set. Add your own name there to reach the bar or console under it.

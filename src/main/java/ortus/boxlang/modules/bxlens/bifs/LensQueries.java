@@ -33,6 +33,7 @@ public class LensQueries extends BaseLensBIF {
 	@Override
 	@SuppressWarnings( "unchecked" )
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
+		service().sync();
 		int												limit	= Math.max( 1, IntegerCaster.cast( arguments.get( LIMIT ) ) );
 		String											key		= switch ( arguments.getAsString( SORT ).toLowerCase() ) {
 																	case "total" -> "totalMs";

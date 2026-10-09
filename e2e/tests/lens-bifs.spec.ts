@@ -20,6 +20,10 @@ test.describe( 'Lens data BIFs', () => {
 		// This very request is running while the BIF is called
 		expect( j.inflight.some( ( x: any ) => x.uri === '/api/lens.json.bxm' ) ).toBe( true );
 		expect( [ 'plus', 'trial', 'expired', 'none' ] ).toContain( j.license.state );
+		expect( j.diagnostics.async.enabled ).toBe( true );
+		expect( j.diagnostics.async.capacity ).toBe( 2000 );
+		expect( j.diagnostics.async.dropped ).toBe( 0 );
+		expect( j.diagnostics.history.capacity ).toBeGreaterThan( 0 );
 	} );
 
 } );

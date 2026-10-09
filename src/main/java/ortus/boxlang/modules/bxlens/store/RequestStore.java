@@ -31,7 +31,8 @@ public final class RequestStore {
 	public static final class Entry {
 
 		private final String						id;
-		private final Map<String, Object>			summary;
+		private volatile Map<String, Object>		summary;
+		private final Supplier<Map<String, Object>>	summarySource;
 		private volatile Supplier<String>			source;
 		private volatile String						json;
 		private final Supplier<String>				consoleSource;
@@ -58,6 +59,19 @@ public final class RequestStore {
 		    Supplier<Map<String, Object>> analyzedSource ) {
 			this.id				= id;
 			this.summary		= summary;
+			this.summarySource	= null;
+			this.source			= source;
+			this.consoleSource	= consoleSource;
+			this.analyzedSource	= analyzedSource;
+		}
+
+		/**
+		 * @param summarySource builds the basic list row on first use, so a request nobody lists costs no row
+		 */
+		public Entry( String id, Supplier<Map<String, Object>> summarySource, Supplier<String> source, Supplier<String> consoleSource,
+		    Supplier<Map<String, Object>> analyzedSource ) {
+			this.id				= id;
+			this.summarySource	= summarySource;
 			this.source			= source;
 			this.consoleSource	= consoleSource;
 			this.analyzedSource	= analyzedSource;
@@ -71,7 +85,17 @@ public final class RequestStore {
 		 * The basic list row, without issues.
 		 */
 		public Map<String, Object> summary() {
-			return summary;
+			Map<String, Object> s = summary;
+			if ( s == null ) {
+				synchronized ( this ) {
+					s = summary;
+					if ( s == null ) {
+						s		= summarySource.get();
+						summary	= s;
+					}
+				}
+			}
+			return s;
 		}
 
 		/**
@@ -79,7 +103,7 @@ public final class RequestStore {
 		 */
 		public Map<String, Object> summary( boolean withIssues ) {
 			if ( !withIssues || analyzedSource == null ) {
-				return summary;
+				return summary();
 			}
 			Map<String, Object> a = analyzed;
 			if ( a == null ) {

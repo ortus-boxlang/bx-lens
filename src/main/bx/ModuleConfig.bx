@@ -117,6 +117,10 @@ class {
 			contentTypes : [ "text/html" ],
 			excludePaths : [ "/~bxlens/*", "/favicon.ico" ],
 
+			// Work a request does not need to wait for (statistics, the history, the audit log) runs on one background thread with a bounded queue.
+			// When the queue is full new work is dropped and counted: a request never waits. enabled false runs that work in the request
+			async : { enabled : true, queueSize : 2000 },
+
 			// A request still running after this many minutes is finished by the watchdog as unfinished (its open spans are closed with an estimate)
 			request : { maxMinutes : 10 },
 

@@ -48,6 +48,7 @@
               <div class="card"><h3>p95 time</h3><div class="big"><span x-text="Math.round(overview.p95Ms)"></span><small>ms</small></div><div class="sub" x-text="'median ' + Math.round(overview.medianMs) + ' ms'"></div></div>
               <div class="card"><h3>Queries</h3><div class="big" x-text="overview.queriesPerRequest"></div><div class="sub">per request</div></div>
             </div>
+            <div class="sub" style="margin-bottom:8px" x-show="overview.lens && overview.lens.enabled" x-text="'Lens work queue: ' + overview.lens.depth + ' waiting, ' + overview.lens.dropped + ' dropped'"></div>
             <div class="grid2">
               <div class="card"><h3>Needs attention</h3>
                 <div class="empty" x-show="!attn().length">Nothing needs attention.</div>
@@ -526,7 +527,7 @@
               </div>
               <div class="card"><h3>Runtime</h3>
                 <dl class="kv"><dt>JVM</dt><dd x-text="system.runtime.vm"></dd><dt>Vendor</dt><dd x-text="system.runtime.vendor"></dd><dt>Java</dt><dd x-text="system.runtime.java"></dd><dt>OS</dt><dd x-text="system.cpu.os + ' ' + system.cpu.arch"></dd><dt>PID</dt><dd x-text="system.runtime.pid"></dd><dt>Uptime</dt><dd x-text="dur(system.runtime.uptimeMs / 1000)"></dd>
-                  <dt>Classes</dt><dd x-text="system.classes.loaded + ' loaded, ' + system.classes.unloaded + ' unloaded'"></dd><dt>Flags</dt><dd><template x-for="f in system.runtime.flags" :key="f"><div x-text="f"></div></template><span x-show="!system.runtime.flags.length">none</span></dd></dl></div>
+                  <dt>Classes</dt><dd x-text="system.classes.loaded + ' loaded, ' + system.classes.unloaded + ' unloaded'"></dd><dt>Lens work queue</dt><dd x-text="system.lens ? (system.lens.enabled ? system.lens.depth + ' of ' + system.lens.capacity + ' waiting, ' + system.lens.processed + ' done, ' + system.lens.dropped + ' dropped' : 'off, work runs in the request') : ''"></dd><dt>Flags</dt><dd><template x-for="f in system.runtime.flags" :key="f"><div x-text="f"></div></template><span x-show="!system.runtime.flags.length">none</span></dd></dl></div>
               <div class="card"><h3>System properties <span>selected, secrets masked</span></h3><dl class="kv"><template x-for="r in propRows()" :key="r.k"><div style="display:contents"><dt x-text="r.k"></dt><dd x-text="r.v"></dd></div></template></dl></div>
             </div>
           </div>

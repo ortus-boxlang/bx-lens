@@ -67,6 +67,23 @@ When the console is on, Lens collects every request on the server, not only thos
 13. **Size the history.** `history.maxRequests` is the memory you spend. Each request holds its full snapshot in memory. On Free the history is capped at 25.
 14. **Watch the audit log.** `bxlens-audit.log` in the logs directory records logins, failed logins, denied attempts and every change. Read it on the Logs page or ship it with your other logs.
 
+## Work off the request thread
+
+A collector never blocks and never throws into a request, and heavy aggregation is async. When a request ends, Lens closes its spans, takes its status and, if the bar shows, builds the payload for the page. Everything else is queued for one daemon thread (`bxlens-worker`): the query statistics, the error groups, the reports, the history entry and the audit log lines. Issue analysis is not done at all until the console opens a request.
+
+- The queue is bounded (`async.queueSize`, default 2000). When it is full the new task is dropped and counted. A request never waits for it.
+- A task that fails is counted and forgotten. The worker keeps going.
+- Tasks run in order. Pages of the console and the data BIFs wait (up to a second) for the queue to catch up before they read, so they always include the request that just ended.
+- At shutdown the queue drains (up to three seconds) before the statistics are saved.
+- The depth, the number of finished tasks and the dropped count are on the console Overview and System pages and in `lensDiagnostics()`. A dropped count that keeps growing means the server is busier than the worker. Raise `async.queueSize` or turn collection down with `collect.level`.
+- `async.enabled: false` does the work in the request again.
+
+## The files of the bar
+
+A page that shows the bar gets a block of about a kilobyte, not the whole bar. The styles, the script, Alpine.js, the markup and the icons are five files under `/~bxlens/index.bxm/assets/`, with a content hash in the URL. A browser (or a CDN or proxy) keeps each for a year (`Cache-Control: public, max-age=31536000, immutable`) and fetches the new ones by itself after an upgrade. They hold no request data and no secret. See [Bar files](../reference/bar-files.md) for the headers, who can fetch them and the Content-Security-Policy the bar needs.
+
+If you proxy to BoxLang with a path filter, allow `/~bxlens/index.bxm/assets/*` for the people who see the bar, not only for the console.
+
 ## The console URL
 
 `/~bxlens/index.bxm` always works. Lens also rewrites `/~bxlens` and `/~bxlens/` (with the trailing slash) to it, in `onWebExecutorRequest`. Nothing else in the public folder becomes reachable that way.

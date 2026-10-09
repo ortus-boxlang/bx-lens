@@ -29,6 +29,7 @@ public class LensErrors extends BaseLensBIF {
 	@Override
 	@SuppressWarnings( "unchecked" )
 	public Object _invoke( IBoxContext context, ArgumentsScope arguments ) {
+		service().sync();
 		int						limit	= Math.max( 1, IntegerCaster.cast( arguments.get( LIMIT ) ) );
 		java.util.List<Object>	groups	= ( java.util.List<Object> ) service().getErrors().list().get( "groups" );
 		return BoxData.of( groups.size() > limit ? groups.subList( 0, limit ) : groups );

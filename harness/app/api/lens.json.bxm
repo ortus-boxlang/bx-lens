@@ -5,6 +5,7 @@
 		errors : lensErrors( 5 ),
 		queries : lensQueries( 3, "total" ),
 		inflight : lensInflight(),
-		license : lensLicense()
+		license : lensLicense(),
+		diagnostics : lensDiagnostics()
 	} ) );
 </bx:script>
