@@ -75,10 +75,10 @@ public final class WebExchange {
 	public String remoteAddr() {
 		String		peer	= peerAddr();
 		LensConfig	cfg		= LensService.getInstance().getConfig();
-		if ( !cfg.getBool( "access.trustProxyHeader", true ) ) {
+		if ( !cfg.trustProxyHeader ) {
 			return peer;
 		}
-		return ClientIp.resolve( cfg, peer, exchange.getRequestHeader( cfg.getString( "access.proxyHeader", "X-Forwarded-For" ) ) );
+		return ClientIp.resolve( cfg, peer, exchange.getRequestHeader( cfg.proxyHeader ) );
 	}
 
 	public String host() {

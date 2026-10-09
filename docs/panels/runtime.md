@@ -20,6 +20,8 @@ The Runtime panel (collector `jvm`) is a snapshot of the server the request ran 
 | Caches | the **names** of the configured caches (no statistics, no configuration) |
 | Settings | a short list of main settings taken from the real configuration: debug mode, compiler, time zone, locale, the request, session and application timeouts, session storage and management, the default datasource, the number of mappings, the modules directory, the size of the security allow and deny lists and the experimental flags that are on |
 
+![The Runtime panel](../assets/screenshots/runtime.png)
+
 Only keys that exist in the configuration are listed. A value whose name looks secret is hidden by the same matcher as everywhere else in Lens. The console [Configuration](../console/configuration.md) page shows every area with the effective value and where it came from.
 
 ## Request cost

@@ -60,6 +60,10 @@ public final class LensConfig {
 	public final int															maxItems;
 	/** A request still running after this many minutes is finished by the watchdog as unfinished. */
 	public final int															requestMaxMinutes;
+	/** The proxy settings, read once: they are needed for every request. */
+	public final boolean														trustProxyHeader;
+	public final String															proxyHeader;
+	public final List<String>													proxyPeers;
 	/** Hot reads resolved once when the config is built. */
 	public final boolean														queriesIncludeParams;
 	public final boolean														queriesCaptureCaller;
@@ -75,30 +79,38 @@ public final class LensConfig {
 		this.barEnabled		= getBool( "bar.enabled", false );
 		this.consoleEnabled	= getBool( "console.enabled", false );
 		String level = getString( "collect.level", "light" ).trim().toLowerCase( Locale.ROOT );
-		this.collectLevel			= List.of( "off", "light", "full" ).contains( level ) ? level : "light";
-		this.light					= "light".equals( this.collectLevel );
-		this.active					= ( this.barEnabled || this.consoleEnabled ) && !"off".equals( this.collectLevel );
-		this.sessionMinutes			= Math.max( 1, getInt( "console.sessionMinutes", 30 ) );
-		this.maxLoginAttempts		= Math.max( 1, getInt( "console.maxLoginAttempts", 5 ) );
-		this.lockoutMinutes			= Math.max( 1, getInt( "console.lockoutMinutes", 5 ) );
-		this.hiddenTabs				= lower( getList( "tabs.hide", List.of() ) );
-		this.inject					= getBool( "inject", true );
+		this.collectLevel		= List.of( "off", "light", "full" ).contains( level ) ? level : "light";
+		this.light				= "light".equals( this.collectLevel );
+		this.active				= ( this.barEnabled || this.consoleEnabled ) && !"off".equals( this.collectLevel );
+		this.sessionMinutes		= Math.max( 1, getInt( "console.sessionMinutes", 30 ) );
+		this.maxLoginAttempts	= Math.max( 1, getInt( "console.maxLoginAttempts", 5 ) );
+		this.lockoutMinutes		= Math.max( 1, getInt( "console.lockoutMinutes", 5 ) );
+		this.hiddenTabs			= lower( getList( "tabs.hide", List.of() ) );
+		this.inject				= getBool( "inject", true );
 		// Off in light, on in full, unless the setting says otherwise
-		this.trackNonHtml			= getBool( "history.trackNonHtml", !this.light );
-		this.maxRequests			= Math.max( 1, getInt( "history.maxRequests", 50 ) );
-		this.idHeader				= getString( "history.header", "X-BxLens-Id" );
-		this.contentTypes			= lower( getList( "contentTypes", List.of( "text/html" ) ) );
-		this.excludePaths			= getList( "excludePaths", List.of( "/~bxlens/*", "/favicon.ico" ) );
-		this.redactKeys				= lower( getList( "redact.keys",
+		this.trackNonHtml		= getBool( "history.trackNonHtml", !this.light );
+		this.maxRequests		= Math.max( 1, getInt( "history.maxRequests", 50 ) );
+		this.idHeader			= getString( "history.header", "X-BxLens-Id" );
+		this.contentTypes		= lower( getList( "contentTypes", List.of( "text/html" ) ) );
+		this.excludePaths		= getList( "excludePaths", List.of( "/~bxlens/*", "/favicon.ico" ) );
+		this.redactKeys			= lower( getList( "redact.keys",
 		    List.of( "password", "pwd", "passwd", "token", "secret", "apikey", "api_key", "authorization", "cookie", "credential" ) ) );
-		this.redactMask				= getString( "redact.mask", "[redacted]" );
-		this.slowRequestMs			= getInt( "thresholds.slowRequestMs", 500 );
-		this.slowQueryMs			= getInt( "thresholds.slowQueryMs", 25 );
-		this.slowTemplateMs			= getInt( "thresholds.slowTemplateMs", 100 );
-		this.nPlusOneMin			= Math.max( 2, getInt( "thresholds.nPlusOneMin", 3 ) );
-		this.maxString				= getInt( "limits.maxString", 2000 );
-		this.maxDepth				= getInt( "limits.maxDepth", 4 );
-		this.maxItems				= getInt( "limits.maxItems", 100 );
+		this.redactMask			= getString( "redact.mask", "[redacted]" );
+		this.slowRequestMs		= getInt( "thresholds.slowRequestMs", 500 );
+		this.slowQueryMs		= getInt( "thresholds.slowQueryMs", 25 );
+		this.slowTemplateMs		= getInt( "thresholds.slowTemplateMs", 100 );
+		this.nPlusOneMin		= Math.max( 2, getInt( "thresholds.nPlusOneMin", 3 ) );
+		this.maxString			= getInt( "limits.maxString", 2000 );
+		this.maxDepth			= getInt( "limits.maxDepth", 4 );
+		this.maxItems			= getInt( "limits.maxItems", 100 );
+		this.trustProxyHeader	= getBool( "access.trustProxyHeader", true );
+		this.proxyHeader		= getString( "access.proxyHeader", "X-Forwarded-For" );
+		List<String> peers = new ArrayList<>( getList( "access.proxyPeers", List.of() ) );
+		if ( peers.isEmpty() ) {
+			String single = getString( "access.proxyPeers", "private" );
+			peers.add( single.isBlank() ? "private" : single );
+		}
+		this.proxyPeers				= Collections.unmodifiableList( peers );
 		this.requestMaxMinutes		= Math.max( 1, getInt( "request.maxMinutes", 10 ) );
 		this.queriesIncludeParams	= collectorBool( "queries", "includeParams", false );
 		this.queriesCaptureCaller	= collectorBool( "queries", "captureCaller", true );

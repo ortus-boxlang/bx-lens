@@ -97,7 +97,8 @@ public final class LensService {
 	/** The one worker for statistics, history and audit. Inline until Lens is activated. */
 	private volatile AsyncWorker									worker				= new AsyncWorker( false, 1 );
 	private final LensRegistry										registry			= new LensRegistry();
-	private final List<ILensCollector>								collectors			= Collections.synchronizedList( new ArrayList<>() );
+	/** Copy on write: a request walks it without a lock. Changes (a setting, a reload) are rare. */
+	private final List<ILensCollector>								collectors			= new java.util.concurrent.CopyOnWriteArrayList<>();
 	private volatile BoxLangLogger									logger;
 	private volatile BoxLangLogger									auditLogger;
 	private final Audit												audit				= new Audit( this );
@@ -447,7 +448,6 @@ public final class LensService {
 		req.showBar			= showBar;
 		req.requestContext	= rc;
 		req.method			= ex.method();
-		req.url				= ex.url();
 		req.uri				= uri;
 		req.queryString		= ex.queryString();
 		req.remoteAddr		= ex.remoteAddr();
@@ -469,16 +469,14 @@ public final class LensService {
 			// Headers already sent
 		}
 		tie( rc, req );
-		synchronized ( collectors ) {
-			for ( ILensCollector c : collectors ) {
-				try {
-					c.onRequestStart( req );
-				} catch ( Throwable t ) {
-					getLogger().debug( "Collector [{}] failed on request start: {}", c.id(), t.toString() );
-				}
+		for ( ILensCollector c : collectors ) {
+			try {
+				c.onRequestStart( req );
+			} catch ( Throwable t ) {
+				getLogger().debug( "Collector [{}] failed on request start: {}", c.id(), t.toString() );
 			}
 		}
-		announce( Keys.onLensRequestStart, Struct.of( "context", rc, "requestId", req.id ) );
+		announce( Keys.onLensRequestStart, () -> Struct.of( "context", rc, "requestId", req.id ) );
 		return req;
 	}
 
@@ -488,7 +486,9 @@ public final class LensService {
 	 */
 	private void tie( RequestBoxContext rc, LensRequest req ) {
 		try {
-			rc.getScopeNearby( ortus.boxlang.runtime.scopes.RequestScope.name ).put( Key.of( "bxlens" ), Struct.of( "id", req.id ) );
+			IStruct mine = new Struct();
+			mine.put( Keys.idKey, req.id );
+			rc.getScopeNearby( ortus.boxlang.runtime.scopes.RequestScope.name ).put( Keys.bxlens, mine );
 		} catch ( Throwable t ) {
 			// The request scope is optional
 		}
@@ -546,19 +546,17 @@ public final class LensService {
 		}
 		// A request that will not be kept in the history and will not show the bar needs none of the work that only feeds the page
 		final boolean keep = req.html || cfg.trackNonHtml;
-		synchronized ( collectors ) {
-			for ( ILensCollector c : collectors ) {
-				if ( !keep && c.snapshotOnly() ) {
-					continue;
-				}
-				try {
-					c.onRequestFinish( req );
-				} catch ( Throwable t ) {
-					getLogger().debug( "Collector [{}] failed on request finish [{}]: {}", c.id(), req.id, t.toString() );
-				}
+		for ( ILensCollector c : collectors ) {
+			if ( !keep && c.snapshotOnly() ) {
+				continue;
+			}
+			try {
+				c.onRequestFinish( req );
+			} catch ( Throwable t ) {
+				getLogger().debug( "Collector [{}] failed on request finish [{}]: {}", c.id(), req.id, t.toString() );
 			}
 		}
-		announce( Keys.onLensCollect, Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
+		announce( Keys.onLensCollect, () -> Struct.of( "context", rc, "requestId", req.id, "lens", new CollectHandle( req ) ) );
 		stats.recordRequest( Math.round( req.durationNs() / 1_000_000.0 ) );
 		// The console totals read the finished request directly. They are not needed to answer this request, so a worker does them
 		worker.submit( () -> {
@@ -570,6 +568,7 @@ public final class LensService {
 		// What the page and the console need from the web request is copied now, while it is still there. Nothing is analyzed or serialized yet
 		if ( keep && ex != null ) {
 			try {
+				req.url = ex.url();
 				if ( !cfg.light ) {
 					req.requestHeaders = ex.requestHeaders();
 				}
@@ -610,7 +609,7 @@ public final class LensService {
 				getLogger().warn( "bx-lens could not inject the bar for request [{}]: {}", req.id, t.toString() );
 			}
 		}
-		announce( Keys.onLensRequestFinish, Struct.of( "context", rc, "requestId", req.id ) );
+		announce( Keys.onLensRequestFinish, () -> Struct.of( "context", rc, "requestId", req.id ) );
 		req.release();
 	}
 
@@ -878,7 +877,10 @@ public final class LensService {
 		return sb.toString();
 	}
 
-	private void announce( ortus.boxlang.runtime.scopes.Key point, IStruct data ) {
+	/**
+	 * Announce a Lens point. The data is built only when something listens.
+	 */
+	private void announce( ortus.boxlang.runtime.scopes.Key point, java.util.function.Supplier<IStruct> data ) {
 		try {
 			if ( runtime != null ) {
 				runtime.getInterceptorService().announce( point, data );

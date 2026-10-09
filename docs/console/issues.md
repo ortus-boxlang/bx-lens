@@ -11,7 +11,7 @@ The console request detail lists everything suspicious about a request, ranked b
 
 An unfinished request (see [Core events](../reference/events.md#spans-that-never-close)) gets the critical issue **Request never finished**.
 
-![The Issues tab with ranked findings](../assets/screenshots/issues.png)
+![A request in the console, with its ranked issues](../assets/screenshots/issues.png)
 
 ## Sources
 
@@ -48,3 +48,7 @@ On HTML responses with a status from 200 to 399, Lens checks (setting `checks.se
 | Cookie flags missing | A cookie the response sets has no `HttpOnly`, no `Secure` (HTTPS only), or no `SameSite`. |
 
 The note names the missing headers or the cookies. Add them in your web server or `Application.bx`. JSON and other non-HTML responses are not checked.
+
+## Unfinished requests
+
+A request that never ends (a hung or killed thread, a lost event) is finished by the watchdog after `request.maxMinutes`. It is kept as **unfinished** with the critical issue "Request never finished". Its open spans are marked interrupted.

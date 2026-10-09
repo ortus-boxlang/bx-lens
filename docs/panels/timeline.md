@@ -19,7 +19,9 @@ The Timeline is the main view. It draws templates, functions, queries, HTTP call
 - Search by text. Press `/` to focus the search box.
 - Open the source file from a row in your editor.
 
-Slow rows carry a flag. Spans from custom panels appear here with the `custom` type. See [Extending Lens](../guides/extending.md#spans).
+A span whose end event never came (core does not fire `postFunctionInvoke` when an exception goes through a function) is drawn striped and marked **interrupted**. It ends at the time of the exception or the last activity Lens saw, never at the end of the span around it, and its end is an estimate. See [spans that never close](../reference/events.md#spans-that-never-close).
+
+Spans from custom panels appear here with the `custom` type. See [Extending Lens](../guides/extending.md#spans).
 
 All times are offsets from the start of the request.
 

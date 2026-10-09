@@ -25,63 +25,65 @@ import ortus.boxlang.runtime.context.RequestBoxContext;
  */
 public final class LensRequest {
 
-	private static final AtomicLong					SEQ				= new AtomicLong();
+	private static final AtomicLong									SEQ				= new AtomicLong();
 
-	public final long								startMillis		= System.currentTimeMillis();
+	public final long												startMillis		= System.currentTimeMillis();
 	/** Unique and cheap: the start time and a counter, both in base 36. It is not a secret. Sessions and CSRF tokens use a secure random. */
-	public final String								id				= newId( this.startMillis );
-	public final long								startNanos		= System.nanoTime();
-	public final AtomicBoolean						finished		= new AtomicBoolean( false );
-	public final AtomicBoolean						injected		= new AtomicBoolean( false );
+	public final String												id				= newId( this.startMillis );
+	public final long												startNanos		= System.nanoTime();
+	public final AtomicBoolean										finished		= new AtomicBoolean( false );
+	public final AtomicBoolean										injected		= new AtomicBoolean( false );
 
-	public volatile boolean							enabled			= true;
+	public volatile boolean											enabled			= true;
 	/** Is the bar shown to this caller? False when the request is collected only for the console. */
-	public volatile boolean							showBar			= true;
-	public volatile long							endNanos		= -1;
-	public volatile String							method			= "";
-	public volatile String							url				= "";
-	public volatile String							uri				= "";
-	public volatile String							queryString		= "";
-	public volatile String							remoteAddr		= "";
-	public volatile String							host			= "";
-	public volatile String							userAgent		= "";
-	public volatile String							appName			= "";
-	public volatile String							template		= "";
-	public volatile String							contentType		= "";
-	public volatile int								status			= 200;
-	public volatile boolean							html			= false;
+	public volatile boolean											showBar			= true;
+	public volatile long											endNanos		= -1;
+	public volatile String											method			= "";
+	public volatile String											url				= "";
+	public volatile String											uri				= "";
+	public volatile String											queryString		= "";
+	public volatile String											remoteAddr		= "";
+	public volatile String											host			= "";
+	public volatile String											userAgent		= "";
+	public volatile String											appName			= "";
+	public volatile String											template		= "";
+	public volatile String											contentType		= "";
+	public volatile int												status			= 200;
+	public volatile boolean											html			= false;
 	/** The request never ended by itself: it was cut off or swept by the watchdog. Its open spans were closed with an estimate. */
-	public volatile boolean							unfinished		= false;
+	public volatile boolean											unfinished		= false;
 	/** Has the issue engine looked at this request? It does so for the console, once. */
-	public volatile boolean							analyzed		= false;
-	public volatile RequestBoxContext				requestContext;
+	public volatile boolean											analyzed		= false;
+	public volatile RequestBoxContext								requestContext;
 	/** The thread that handles the request, sampled by the slow request watchdog. */
-	public volatile Thread							thread;
+	public volatile Thread											thread;
 
 	/** Request headers as received, copied when the request ends and sanitized only when a snapshot is built. Null when not captured. */
-	public volatile Map<String, String>				requestHeaders;
+	public volatile Map<String, String>								requestHeaders;
 	/** Response headers as sent, copied when the request ends. Null when not captured. */
-	public volatile Map<String, String>				responseHeaders;
+	public volatile Map<String, String>								responseHeaders;
 
-	public final List<Span>							spans			= Collections.synchronizedList( new ArrayList<>() );
-	public final List<Map<String, Object>>			queries			= Collections.synchronizedList( new ArrayList<>() );
-	public final List<Map<String, Object>>			exceptions		= Collections.synchronizedList( new ArrayList<>() );
-	public final List<Map<String, Object>>			messages		= Collections.synchronizedList( new ArrayList<>() );
-	public final List<Map<String, Object>>			logs			= Collections.synchronizedList( new ArrayList<>() );
-	public final List<Map<String, Object>>			http			= Collections.synchronizedList( new ArrayList<>() );
-	public final List<Map<String, Object>>			timers			= Collections.synchronizedList( new ArrayList<>() );
-	public final List<Map<String, Object>>			issues			= Collections.synchronizedList( new ArrayList<>() );
-	public final Map<String, Object>				data			= new ConcurrentHashMap<>();
-	public final Map<String, LensPanelBuilder>		panels			= Collections.synchronizedMap( new LinkedHashMap<>() );
-	public final Map<String, Map<String, Object>>	pendingTimers	= new ConcurrentHashMap<>();
+	public final List<Span>											spans			= Collections.synchronizedList( new ArrayList<>() );
+	public final List<Map<String, Object>>							queries			= Collections.synchronizedList( new ArrayList<>() );
+	public final List<Map<String, Object>>							exceptions		= Collections.synchronizedList( new ArrayList<>() );
+	public final List<Map<String, Object>>							messages		= Collections.synchronizedList( new ArrayList<>() );
+	public final List<Map<String, Object>>							logs			= Collections.synchronizedList( new ArrayList<>() );
+	public final List<Map<String, Object>>							http			= Collections.synchronizedList( new ArrayList<>() );
+	public final List<Map<String, Object>>							timers			= Collections.synchronizedList( new ArrayList<>() );
+	public final List<Map<String, Object>>							issues			= Collections.synchronizedList( new ArrayList<>() );
+	public final Map<String, Object>								data			= new ConcurrentHashMap<>();
+	public final Map<String, LensPanelBuilder>						panels			= Collections.synchronizedMap( new LinkedHashMap<>() );
+	public final Map<String, Map<String, Object>>					pendingTimers	= new ConcurrentHashMap<>();
 
 	/** Nanoseconds since the request started at the last thing Lens saw happen: a span opened or closed, an exception. */
-	private volatile long							lastActivity	= 0;
+	private volatile long											lastActivity	= 0;
 	/** When an exception was last seen on each thread, to close the spans it left open. */
-	private final Map<Long, Long>					exceptionAt		= new ConcurrentHashMap<>();
-	private final AtomicInteger						spanSeq			= new AtomicInteger( 0 );
-	private final Map<String, AtomicInteger>		typeCounts		= new ConcurrentHashMap<>();
-	private final Map<Long, ArrayDeque<Span>>		stacks			= new ConcurrentHashMap<>();
+	private final Map<Long, Long>									exceptionAt		= new ConcurrentHashMap<>();
+	private final AtomicInteger										spanSeq			= new AtomicInteger( 0 );
+	private final Map<String, AtomicInteger>						typeCounts		= new ConcurrentHashMap<>();
+	/** How many spans of each type were seen, by type index. No string is built per span. */
+	private final java.util.concurrent.atomic.AtomicIntegerArray	spanCounts		= new java.util.concurrent.atomic.AtomicIntegerArray( 8 );
+	private final Map<Long, ArrayDeque<Span>>						stacks			= new ConcurrentHashMap<>();
 
 	private static String newId( long millis ) {
 		return Long.toString( millis, 36 ) + Long.toString( SEQ.incrementAndGet(), 36 );
@@ -119,6 +121,20 @@ public final class LensRequest {
 		return typeCounts.computeIfAbsent( kind, k -> new AtomicInteger() ).incrementAndGet() <= max;
 	}
 
+	private boolean reserveSpan( String type, int max ) {
+		int i = switch ( type ) {
+			case Span.TEMPLATE -> 0;
+			case Span.FUNCTION -> 1;
+			case Span.QUERY -> 2;
+			case Span.HTTP -> 3;
+			case Span.TX -> 4;
+			case Span.TIMER -> 5;
+			case Span.CUSTOM -> 6;
+			default -> 7;
+		};
+		return spanCounts.incrementAndGet( i ) <= max;
+	}
+
 	/**
 	 * How many items of a kind were seen, including ones dropped over the cap.
 	 */
@@ -133,7 +149,7 @@ public final class LensRequest {
 	 * @return the span, or null when the cap for this type is reached
 	 */
 	public Span begin( String type, String label, int max ) {
-		if ( !reserve( "span:" + type, max ) ) {
+		if ( !reserveSpan( type, max ) ) {
 			return null;
 		}
 		ArrayDeque<Span>	stack	= stacks.computeIfAbsent( Thread.currentThread().threadId(), k -> new ArrayDeque<>() );
@@ -212,7 +228,7 @@ public final class LensRequest {
 	 * Add an already finished span, for example from a manual measure.
 	 */
 	public Span addClosed( String type, String label, long startNs, long endNs, int max ) {
-		if ( !reserve( "span:" + type, max ) ) {
+		if ( !reserveSpan( type, max ) ) {
 			return null;
 		}
 		ArrayDeque<Span>	stack	= stacks.get( Thread.currentThread().threadId() );
