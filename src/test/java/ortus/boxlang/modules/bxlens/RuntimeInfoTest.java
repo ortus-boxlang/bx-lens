@@ -37,6 +37,10 @@ public class RuntimeInfoTest {
 		List<Map<String, Object>> settings = ( List<Map<String, Object>> ) s.get( "settings" );
 		assertThat( settings ).isNotEmpty();
 		assertThat( settings.stream().map( m -> m.get( "label" ) ).toList() ).contains( "Time zone" );
+		// Session settings are named "session" but are not secrets
+		for ( Map<String, Object> st : settings ) {
+			assertThat( st.get( "value" ) ).isNotEqualTo( "[hidden]" );
+		}
 		// Cached: the same object comes back until the few seconds are over
 		assertThat( info.snapshot() ).isSameInstanceAs( s );
 	}
@@ -75,6 +79,8 @@ public class RuntimeInfoTest {
 		assertThat( out.get( "dbPassword" ) ).isEqualTo( "[hidden]" );
 		assertThat( out.get( "user" ) ).isEqualTo( "bob" );
 		assertThat( out.get( "url" ).toString() ).doesNotContain( "u:p" );
+		assertThat( RuntimeInfo.walk( "memory", "sessionStorage", 0 ) ).isEqualTo( "memory" );
+		assertThat( RuntimeInfo.walk( "x", "apiKey", 1 ) ).isEqualTo( "[hidden]" );
 	}
 
 }
