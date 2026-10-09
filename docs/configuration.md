@@ -51,6 +51,7 @@ Lens is off by default. There are two surfaces and you switch them on independen
 	"tabs": { "hide": [] },
 	"store": { "enabled": true, "dir": "", "retentionHours": 72, "maxMB": 50, "flushSeconds": 30 },
 	"ai": { "enabled": false, "provider": "", "model": "", "apiKey": "", "links": true },
+	"server": { "name": "", "address": "", "id": "" },
 	"checks": { "securityHeaders": true, "slowSample": true },
 	"dev": { "reloadAssets": false, "license": "" },
 	"access": {
@@ -65,7 +66,7 @@ Lens is off by default. There are two surfaces and you switch them on independen
 	"inject": true,
 	"contentTypes": [ "text/html" ],
 	"excludePaths": [ "/~bxlens/*", "/favicon.ico" ],
-	"history": { "trackNonHtml": "", "header": "X-BxLens-Id", "headerAlways": true, "maxRequests": 50 },
+	"history": { "trackNonHtml": "", "header": "X-BxLens-Id", "headerAlways": true, "serverHeader": false, "maxRequests": 50 },
 	"ui": {
 		"theme": "auto",
 		"startOpen": false,
@@ -202,7 +203,22 @@ See [Security](security.md#behind-a-proxy).
 | `trackNonHtml` | boolean | empty | Record JSON, SSE, file and redirect requests too. They show no bar. Empty means off at `collect.level` `light` and on at `full`. A request that is not kept costs no snapshot, no issue analysis and no history entry; the console totals still count it. |
 | `header` | string | `"X-BxLens-Id"` | Response header that carries the request id. |
 | `headerAlways` | boolean | `true` | Send the id header on every tracked request, not only when the bar is shown. The id is short and unique, not a secret. It is also `request.bxlens.id` in the request scope, the result of `lensRequestId()`, and the logging context key `requestId` (SLF4J MDC) for the request thread, so a log pattern with `%X{requestId}` prints it. |
+| `serverHeader` | boolean | `false` | Also send `X-BxLens-Server` with the id of this server (see [`server`](#server)), next to the request id header and only when that header is sent. Off by default because it names a machine to whoever sees the response. |
 | `maxRequests` | number | `50` | Size of the in-memory ring buffer. The oldest request is recycled when full. On Free the buffer is capped at 25. See [Licensing](licensing.md#free-and-boxlang). |
+
+## `server`
+
+Which machine produced a record. Every tracked request, error group and sample, report, query statistic, in-flight entry, history entry, export, audit line and file of the disk store carries this identity, so the data of many servers can be sent to one place and told apart. See [Server identity](features.md#server-identity).
+
+Lens detects the identity once at start and looks again at most every five minutes. It never does a lookup while a request runs. Leave the keys empty to detect. Set them when the machine does not report what you want, for example in a container or behind NAT.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `name` | string | `""` | The host name. Empty reads the environment variable `LENS_SERVER_NAME`, then asks the operating system, then reads `HOSTNAME` or `COMPUTERNAME`. |
+| `address` | string | `""` | The primary address. Empty reads `LENS_SERVER_ADDRESS`, then takes the first IPv4 address of an interface that is up, not loopback and not virtual, then IPv6, else `127.0.0.1`. The other addresses are listed too. |
+| `id` | string | `""` | The id of this instance. Empty reads `LENS_SERVER_ID`, then makes a short id from the host name and the start time of the JVM, so it is stable for one start and differs after a restart. Set it when a fixed id per server is wanted. |
+
+All three are `boxlang.json` only. The BoxLang runtime instance name is read from the environment variable `BOXLANG_INSTANCE_NAME` or the system property `boxlang.instanceName` when one is set.
 
 ## `ui`
 

@@ -88,6 +88,16 @@ class {
 				links    : true
 			},
 
+			// Which server this is. Every request, error, report, statistic and audit line carries it, so the data of many servers can be told
+			// apart. Empty means detect: the host name and the primary address of the machine. Set them behind containers or NAT. When empty,
+			// the environment variables LENS_SERVER_NAME and LENS_SERVER_ADDRESS are read
+			server : {
+				name    : "",
+				address : "",
+				// An id of this instance. Empty means a short id made from the host name and the start time of the JVM
+				id      : ""
+			},
+
 			// Optional checks
 			checks : {
 				// Notes for missing security headers and cookie flags
@@ -131,6 +141,8 @@ class {
 				header       : "X-BxLens-Id",
 				// Send the id header on every tracked request, not only when the bar is shown
 				headerAlways : true,
+				// Also send X-BxLens-Server with the id of this server, next to the request id header. Off by default: it names a machine
+				serverHeader : false,
 				maxRequests  : 50
 			},
 
