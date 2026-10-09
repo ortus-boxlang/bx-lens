@@ -11,7 +11,7 @@
 <!--ICONS-->
 <div class="shell" x-data="lensApp()" x-init="init()" x-cloak>
   <header class="top">
-    <span class="mark" aria-hidden="true"></span><b>BX Lens</b>
+    <span class="mark" aria-hidden="true"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#bx-mark"/></svg></span><b>BxLens</b>
     <span class="hostinfo" x-show="state" x-text="state ? state.host + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
     <span class="spacer"></span>
     <span class="chipx hid" x-show="state" x-text="state ? state.role : ''" style="margin-right:6px"></span>
@@ -558,7 +558,7 @@
               </div>
               <div class="card">
                 <h3>Preview <span>how the bar will look</span></h3>
-                <div class="prev"><div class="pstrip"><span class="plogo"></span><b>Lens</b><span class="pchip ok">GET 200</span><span class="pchip">/orders.bxm</span><span class="pchip">time 41 ms</span><span class="pchip">sql 7</span></div>
+                <div class="prev"><div class="pstrip"><span class="plogo"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#bx-mark"/></svg></span><b>Lens</b><span class="pchip ok">GET 200</span><span class="pchip">/orders.bxm</span><span class="pchip">time 41 ms</span><span class="pchip">sql 7</span></div>
                   <div class="ptabs"><template x-for="(t, i) in previewTabs()" :key="t.id"><span class="ptab" :class="i === 0 ? 'on' : ''"><span x-text="t.label"></span><span class="pk" x-show="i < 9" x-text="i + 1"></span></span></template></div></div>
                 <p class="sub" style="margin-top:10px">The number keys switch tabs in this order. A tab with no data still shows. Developers see changes on the next page load.</p>
               </div>

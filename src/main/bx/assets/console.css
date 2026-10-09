@@ -1,9 +1,9 @@
 /* BX Lens console. No external requests: system fonts, Phosphor icons from the inline sprite. */
 :root {
-  --ground: #1f2230; --panel: #262a3b; --raise: #2e3347; --line: #3a4059; --ink: #e8eaf2; --mute: #9aa1bb; --dim: #6b7391;
-  --cyan: #00dbff; --green: #00ff75; --warn: #ffb347; --crit: #ff5d6c; --ok: #3ddc97; --bx: #8fb8ff;
-  --side: #1a1d2a; --input: #1b1e2b; --tint-ok: #173a2e; --tint-warn: #3b2f1f; --tint-crit: #45252e; --sel: #1f3a46;
-  --grad: linear-gradient(90deg, #00dbff, #00ff75);
+  --ground: #060f1b; --panel: #0c1a2c; --raise: #12243b; --line: #1f3452; --ink: #e8f0fb; --mute: #93a8c4; --dim: #5f7694;
+  --cyan: #00d4ff; --green: #1af5b0; --blue: #2f6bff; --warn: #ffb347; --crit: #ff5d6c; --ok: #1af5b0; --bx: #7fb0ff;
+  --side: #040b15; --input: #08131f; --tint-ok: #0d3a35; --tint-warn: #3b2f1f; --tint-crit: #45252e; --sel: #0e2f4a;
+  --grad: linear-gradient(90deg, #1af5b0, #00d4ff, #2f6bff);
   --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
   color-scheme: dark;
@@ -11,7 +11,7 @@
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --ground: #f3f4f9; --panel: #ffffff; --raise: #f6f7fb; --line: #d9dcea; --ink: #1c2033; --mute: #565d78; --dim: #8a90a8;
-    --cyan: #0089a8; --green: #00a34a; --warn: #b36b00; --crit: #c4283b; --ok: #1a8a5e; --bx: #2f5fb3;
+    --cyan: #0089a8; --green: #00a37a; --blue: #2457d6; --warn: #b36b00; --crit: #c4283b; --ok: #1a8a5e; --bx: #2f5fb3;
     --side: #ebedf5; --input: #ffffff; --tint-ok: #dcf3e8; --tint-warn: #fbefd9; --tint-crit: #fbe1e5; --sel: #d9eef5;
     color-scheme: light;
   }
@@ -29,7 +29,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, .row:focus-visible {
 .centerwrap { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px; background: radial-gradient(900px 500px at 50% 25%, color-mix(in srgb, var(--cyan) 12%, var(--ground)), var(--ground) 70%); }
 .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; min-width: 0; }
 .login { width: min(380px, 100%); border-radius: 12px; padding: 26px 24px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
-.logo { width: 44px; height: 44px; border-radius: 11px; background: var(--grad); margin-bottom: 14px; }
+.logo { width: 64px; height: 64px; margin-bottom: 12px; filter: drop-shadow(0 0 14px rgba(0, 212, 255, .35)); }
 .login h1 { margin: 0 0 4px; font-size: 20px; } .login p { margin: 0 0 16px; color: var(--mute); }
 .login label { display: block; font: 600 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--dim); margin-bottom: 5px; }
 .login input { width: 100%; background: var(--input); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; color: var(--ink); font: 14px var(--mono); }
@@ -41,7 +41,7 @@ pre.code { margin: 8px 0 0; background: var(--input); border: 1px solid var(--li
 /* shell */
 .shell { display: flex; flex-direction: column; min-height: 100vh; }
 .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 9px 16px; background: var(--side); border-bottom: 1px solid var(--line); }
-.top .mark { width: 22px; height: 22px; border-radius: 6px; background: var(--grad); }
+.top .mark { width: 26px; height: 26px; flex: none; }
 .top .hostinfo { font: 12px var(--mono); color: var(--mute); }
 .spacer { flex: 1; }
 .lic { font: 600 11px var(--mono); padding: 2px 9px; border-radius: 9px; border: 1px solid var(--line); }
@@ -137,7 +137,7 @@ select.btn { padding: 5px 8px; }
 .eye { appearance: none; border: 0; background: none; color: var(--mute); cursor: pointer; padding: 2px 4px; border-radius: 4px; } .eye:hover { color: var(--ink); } .eye[disabled] { opacity: .4; cursor: not-allowed; }
 .prev { border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--ground); }
 .pstrip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding: 7px 10px; border-top: 2px solid var(--cyan); background: var(--panel); font: 11.5px var(--mono); }
-.plogo { width: 14px; height: 14px; border-radius: 4px; background: var(--grad); } .pchip { color: var(--mute); } .pchip.ok { color: var(--ok); }
+.plogo { width: 14px; height: 14px; } .pchip { color: var(--mute); } .pchip.ok { color: var(--ok); }
 .ptabs { display: flex; flex-wrap: wrap; gap: 2px; padding: 0 6px; background: var(--panel); border-top: 1px solid var(--line); }
 .ptab { padding: 7px 9px; color: var(--mute); font-size: 12px; border-bottom: 2px solid transparent; display: inline-flex; gap: 5px; align-items: center; } .ptab.on { color: var(--ink); border-bottom-color: var(--cyan); }
 .pk { font: 10px var(--mono); color: var(--dim); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; }

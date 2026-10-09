@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/assets/bxlens-logo.svg" alt="BxLens: observe, analyze, optimize" width="460"></p>
+
 # ⚡︎ BoxLang Module: BX Lens
 
 ```

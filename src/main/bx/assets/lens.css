@@ -15,11 +15,11 @@
 	--bar-h: 38px;
 }
 #bxlens[data-theme="dark"] {
-	--bg: #1c1f2c; --surface: #262a3b; --surface2: #303446; --line: #414766;
-	--fg: #e6e9f5; --muted: #98a2c4; --on-sem: #1c1f2c;
-	--a1: #00dbff; --a2: #00ff75; --grad: linear-gradient(90deg, #00dbff, #00ff75);
-	--warn: #ffb454; --crit: #ff6b81; --ok: #00ff75;
-	--t-template: #00dbff; --t-query: #00ff75; --t-http: #ffb454; --t-func: #b79cff; --t-tx: #ff8fd8; --t-timer: #98a2c4; --t-custom: #e8d36a;
+	--bg: #060f1b; --surface: #0c1a2c; --surface2: #12243b; --line: #1f3452;
+	--fg: #e8f0fb; --muted: #93a8c4; --on-sem: #060f1b;
+	--a1: #00d4ff; --a2: #1af5b0; --grad: linear-gradient(90deg, #1af5b0, #00d4ff, #2f6bff);
+	--warn: #ffb454; --crit: #ff6b81; --ok: #1af5b0;
+	--t-template: #00d4ff; --t-query: #1af5b0; --t-http: #ffb454; --t-func: #b79cff; --t-tx: #ff8fd8; --t-timer: #98a2c4; --t-custom: #e8d36a;
 }
 #bxlens .lens { position: fixed; inset: auto 0 0 0; z-index: 2147483000; background: var(--surface); color: var(--fg); font: 12px/1.45 var(--sans);
 	border-top: 2px solid transparent; border-image: var(--grad) 1; text-align: left; letter-spacing: normal; text-transform: none; }

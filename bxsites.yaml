@@ -9,10 +9,10 @@ theme:
             navCollapsible: true,
             navExpandAll: false,
             tocPosition: sticky,
-            accentColor: "#00C853",
-            accentColorDark: "#00FF75",
+            accentColor: "#0097c0",
+            accentColorDark: "#00D4FF",
         }
-    logo: "assets/boxlang-icon-full.svg"
+    logo: "assets/bxlens-mark.svg"
 search: true
 social:
     - url: "https://ortussolutions.atlassian.net/browse/BLMODULES"
