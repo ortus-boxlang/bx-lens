@@ -42,7 +42,7 @@ export default defineConfig( {
 			timeout: 240_000,
 			reuseExistingServer: !process.env.CI,
 			stdout: 'pipe',
-			env: { PORT: FREE_PORT, RUN_DIR: join( __dirname, '..', 'harness', '.run-free' ), SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: 'none' },
+			env: { PORT: FREE_PORT, RUN_DIR: join( __dirname, '..', 'harness', '.run-free' ), SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: 'none', LENS_RELOAD_ASSETS: 'false' },
 		},
 		// A third server with bx-orm, to prove ORM SQL and statistics
 		{

@@ -9,24 +9,40 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Builds the HTML block injected into a page and inserts it before the closing body tag.
- * The block carries the request payload as an inert JSON script plus the bar's CSS and JavaScript, so a page needs no extra request.
+ * <p>
+ * The block is small (about a kilobyte): a stylesheet link, an empty element, the request payload as an inert JSON script and a deferred script.
+ * The styles, the script, Alpine.js, the markup and the icons are separate files, served by the console route <code>assets/</code> with a content
+ * hash
+ * in the URL, so the browser fetches each once and keeps it. The files hold no data of any request and no secret.
  */
 public final class BarRenderer {
 
-	private final Path		assetsDir;
-	private final boolean	reload;
-	private String			css;
-	private String			html;
-	private String			js;
-	private String			alpine;
-	private String			icons;
+	/** Where the files are served from, relative to the server root. */
+	public static final String			ASSET_BASE	= "/~bxlens/index.bxm/assets/";
+
+	/** The files of the bar. */
+	public static final List<String>	NAMES		= List.of( "lens.css", "lens.js", "lens.html", "bar-icons.svg", "alpine.min.js" );
 
 	/**
-	 * @param assetsDir folder holding lens.css, lens.html, lens.js and alpine.min.js
-	 * @param reload    re-read the files on every render, for working on the UI
+	 * One file of the bar: its text and the hash of its text.
+	 */
+	public record Asset( String name, String text, String hash, String type ) {
+	}
+
+	private final Path					assetsDir;
+	private final boolean				reload;
+	private volatile Map<String, Asset>	assets	= Map.of();
+
+	/**
+	 * @param assetsDir folder holding lens.css, lens.html, lens.js, bar-icons.svg and alpine.min.js
+	 * @param reload    read the files and compute their hashes again on every render, for working on the UI. Such files are never cached by the browser
 	 */
 	public BarRenderer( Path assetsDir, boolean reload ) {
 		this.assetsDir	= assetsDir;
@@ -34,12 +50,39 @@ public final class BarRenderer {
 		load();
 	}
 
-	private void load() {
-		this.css	= read( assetsDir, "lens.css" );
-		this.html	= read( assetsDir, "lens.html" );
-		this.js		= read( assetsDir, "lens.js" );
-		this.alpine	= read( assetsDir, "alpine.min.js" );
-		this.icons	= read( assetsDir, "bar-icons.svg" );
+	private synchronized void load() {
+		Map<String, Asset> next = new LinkedHashMap<>();
+		for ( String n : NAMES ) {
+			String text = read( assetsDir, n );
+			next.put( n, new Asset( n, text, hash( text ), typeOf( n ) ) );
+		}
+		this.assets = next;
+	}
+
+	/**
+	 * Is this the name of a file of the bar?
+	 */
+	public static boolean isBarAsset( String name ) {
+		return NAMES.contains( name );
+	}
+
+	/**
+	 * A file of the bar, or null when the name is not one of them or the file is empty. Re-read when the renderer reloads.
+	 */
+	public Asset asset( String name ) {
+		if ( reload ) {
+			load();
+		}
+		Asset a = assets.get( name );
+		return a == null || a.text().isEmpty() ? null : a;
+	}
+
+	/**
+	 * Does the browser keep this URL for a year? Only when the renderer does not reload and the URL carries the current hash.
+	 */
+	public boolean immutable( String name, String version ) {
+		Asset a = assets.get( name );
+		return !reload && a != null && a.hash().equals( version );
 	}
 
 	/**
@@ -52,16 +95,22 @@ public final class BarRenderer {
 			// Contributor mode: edit the assets and refresh the page
 			load();
 		}
-		StringBuilder sb = new StringBuilder( css.length() + html.length() + js.length() + alpine.length() + payloadJson.length() + 512 );
+		Map<String, Asset>	a	= assets;
+		StringBuilder		sb	= new StringBuilder( payloadJson.length() + 1024 );
 		sb.append( "\n<!-- BX Lens -->\n" );
-		sb.append( "<style id=\"bxlens-css\">" ).append( css ).append( "</style>\n" );
-		sb.append( "<div id=\"bxlens\" x-data=\"bxLens()\" x-cloak>" ).append( icons ).append( html ).append( "</div>\n" );
+		sb.append( "<link rel=\"stylesheet\" id=\"bxlens-css\" href=\"" ).append( url( a, "lens.css" ) ).append( "\">\n" );
+		sb.append( "<div id=\"bxlens\" x-cloak data-base=\"" ).append( ASSET_BASE ).append( "\" data-html=\"" ).append( a.get( "lens.html" ).hash() )
+		    .append( "\" data-icons=\"" ).append( a.get( "bar-icons.svg" ).hash() ).append( "\" data-alpine=\"" ).append( a.get( "alpine.min.js" ).hash() )
+		    .append( "\"></div>\n" );
 		sb.append( "<script type=\"application/json\" id=\"bxlens-data\">" ).append( payloadJson ).append( "</script>\n" );
-		sb.append( "<script id=\"bxlens-js\">" ).append( safeScript( js ) ).append( "</script>\n" );
-		// Load Alpine only when the host page does not ship its own. lens.js registers with either.
-		sb.append( "<script id=\"bxlens-alpine\">if(!window.Alpine){" ).append( safeScript( alpine ) ).append( "}</script>\n" );
+		// Alpine is loaded by lens.js, and only when the host page has none of its own
+		sb.append( "<script defer id=\"bxlens-js\" src=\"" ).append( url( a, "lens.js" ) ).append( "\"></script>\n" );
 		sb.append( "<!-- /BX Lens -->\n" );
 		return sb.toString();
+	}
+
+	private static String url( Map<String, Asset> a, String name ) {
+		return ASSET_BASE + name + "?v=" + a.get( name ).hash();
 	}
 
 	private static final String	BODY_CLOSE	= "</body>";
@@ -116,12 +165,36 @@ public final class BarRenderer {
 	 * Is the asset set complete? Used by the service to warn at startup.
 	 */
 	public boolean isComplete() {
-		return !css.isEmpty() && !html.isEmpty() && !js.isEmpty() && !alpine.isEmpty();
+		for ( Asset x : assets.values() ) {
+			if ( x.text().isEmpty() ) {
+				return false;
+			}
+		}
+		return !assets.isEmpty();
 	}
 
-	// A literal closing script tag inside a script would end the element early
-	private static String safeScript( String src ) {
-		return src.replace( "</script", "<\\/script" );
+	private static String typeOf( String name ) {
+		if ( name.endsWith( ".css" ) ) {
+			return "text/css; charset=UTF-8";
+		} else if ( name.endsWith( ".js" ) ) {
+			return "text/javascript; charset=UTF-8";
+		} else if ( name.endsWith( ".svg" ) ) {
+			return "image/svg+xml; charset=UTF-8";
+		}
+		return "text/html; charset=UTF-8";
+	}
+
+	private static String hash( String text ) {
+		try {
+			byte[]			d	= MessageDigest.getInstance( "SHA-256" ).digest( text.getBytes( StandardCharsets.UTF_8 ) );
+			StringBuilder	sb	= new StringBuilder( 12 );
+			for ( int i = 0; i < 6; i++ ) {
+				sb.append( Character.forDigit( d[ i ] >> 4 & 15, 16 ) ).append( Character.forDigit( d[ i ] & 15, 16 ) );
+			}
+			return sb.toString();
+		} catch ( Exception e ) {
+			return Integer.toHexString( text.hashCode() );
+		}
 	}
 
 	private static String read( Path dir, String name ) {

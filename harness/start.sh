@@ -30,6 +30,8 @@ rm -rf "$RUN/home"
 mkdir -p "$RUN/home/modules"
 cp -R "$HERE/home/." "$RUN/home/"
 sed -i "s|@HARNESS_APP@|$HERE/app|g" "$RUN/home/config/boxlang.json"
+# LENS_RELOAD_ASSETS=false serves the UI files like production: hashed URLs, kept by the browser for a year
+sed -i "s|\"reloadAssets\": true|\"reloadAssets\": ${LENS_RELOAD_ASSETS:-true}|" "$RUN/home/config/boxlang.json"
 # LENS_LICENSE=trial|plus|expired|none shows that license state in the console. Empty detects bx-plus.
 sed -i "s|@LENS_LICENSE@|${LENS_LICENSE:-}|g" "$RUN/home/config/boxlang.json"
 cp -R "$ROOT/build/modules/bx-lens" "$RUN/home/modules/bxLens"

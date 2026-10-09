@@ -21,12 +21,15 @@ test.describe( 'the bar and the console', () => {
 		await expect( button ).toHaveAttribute( 'href', `${ BASE }#requests/${ id }` );
 	} );
 
-	test( 'the bar makes no request outside the server and uses Phosphor icons', async ( { lens, page } ) => {
-		const outside: string[] = [];
-		page.on( 'request', r => { const u = r.url(); if ( !u.startsWith( 'http://127.0.0.1' ) && !u.startsWith( 'data:' ) ) { outside.push( u ); } } );
+	test( 'the bar loads only same-origin Lens files, none external, and uses Phosphor icons', async ( { lens, page } ) => {
+		const seen: string[] = [];
+		page.on( 'request', r => seen.push( r.url() ) );
 		await lens.visit( '/orders.bxm' );
 		await expect( page.locator( '#bxlens svg.ic use[href^="#bxlens-ph-"]' ).first() ).toBeAttached();
+		const outside = seen.filter( u => !u.startsWith( 'http://127.0.0.1' ) && !u.startsWith( 'data:' ) );
 		expect( outside ).toEqual( [] );
+		const lensFiles = seen.filter( u => u.includes( '/~bxlens/index.bxm/assets/' ) ).map( u => new URL( u ).pathname.split( '/' ).pop() );
+		expect( lensFiles.sort() ).toEqual( [ 'alpine.min.js', 'bar-icons.svg', 'lens.css', 'lens.html', 'lens.js' ] );
 	} );
 
 	test( 'copying the request as JSON works from the menu', async ( { lens, page, context } ) => {
