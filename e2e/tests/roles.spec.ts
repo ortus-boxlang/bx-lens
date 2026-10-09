@@ -49,4 +49,35 @@ test.describe( 'roles and proxy headers', () => {
 		expect( inside.status() ).toBe( 200 );
 	} );
 
+	test( 'a viewer does not get logs, thread stacks, the environment or system details', async ( { page } ) => {
+		await signIn( page, 'lens-view' );
+		for ( const r of [ 'logfiles', 'logfiles/read?file=bxlens-audit.log&q=login', 'logfiles/download?file=bxlens-audit.log', 'threads', 'threads/dump', 'environment', 'system' ] ) {
+			expect( ( await api( page, 'GET', r ) ).status, r ).toBe( 403 );
+		}
+		for ( const r of [ 'overview', 'requests', 'inflight', 'queries', 'errors', 'reports', 'executors', 'tasks', 'datasources', 'caches', 'modules', 'settings' ] ) {
+			expect( ( await api( page, 'GET', r ) ).status, r ).toBe( 200 );
+		}
+		// The pages are not offered either
+		await expect( page.locator( '.nav:has-text("Logs")' ) ).toHaveCount( 0 );
+		await expect( page.locator( '.nav:has-text("Threads")' ) ).toHaveCount( 0 );
+		await expect( page.locator( '.nav:has-text("Environment")' ) ).toHaveCount( 0 );
+		await expect( page.locator( '.nav:has-text("System")' ) ).toHaveCount( 0 );
+		await expect( page.locator( '.nav:has-text("Queries")' ) ).toBeVisible();
+	} );
+
+	test( 'a viewer does not see where the console is reachable from or where overrides are saved', async ( { page } ) => {
+		await signIn( page, 'lens-view' );
+		const view = await page.evaluate( async () => await ( await fetch( '/~bxlens/index.bxm/api/settings', { credentials: 'same-origin' } ) ).json() );
+		const byKey = Object.fromEntries( view.settings.map( ( s: any ) => [ s.key, s ] ) );
+		expect( byKey[ 'console.access' ].value ).toBe( 'admin only' );
+		expect( byKey[ 'access.proxyPeers' ].value ).toBe( 'admin only' );
+		expect( byKey[ 'console.overridesFile' ].value ).toBe( 'admin only' );
+		expect( view.overridesFile ).toBe( '' );
+		await page.click( 'button:has-text("Log out")' );
+		await signIn( page, 'lens-demo' );
+		const admin = await page.evaluate( async () => await ( await fetch( '/~bxlens/index.bxm/api/settings', { credentials: 'same-origin' } ) ).json() );
+		expect( admin.settings.find( ( s: any ) => s.key === 'console.access' ).value ).not.toBe( 'admin only' );
+		expect( admin.overridesFile ).not.toBe( '' );
+	} );
+
 } );

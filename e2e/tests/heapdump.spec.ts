@@ -7,7 +7,10 @@ async function signIn( page: Page, pw = 'lens-demo' ) {
 	await page.fill( '#pw', pw );
 	await page.click( '.go' );
 	await expect( page.locator( '.shell .app' ) ).toBeVisible();
-	await page.click( '.nav:has-text("System")' );
+	// A viewer has no System page
+	if ( pw !== 'lens-view' ) {
+		await page.click( '.nav:has-text("System")' );
+	}
 }
 
 test.describe( 'heap and GC', () => {

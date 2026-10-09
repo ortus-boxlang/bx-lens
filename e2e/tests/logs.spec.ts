@@ -47,4 +47,18 @@ test.describe( 'logs', () => {
 		expect( d ).toBe( 403 );
 	} );
 
+	test( 'searches are bounded: parallel searches are answered or told to wait, never piled up', async ( { page } ) => {
+		await signIn( page );
+		const statuses = await page.evaluate( async () => {
+			const one = () => fetch( '/~bxlens/index.bxm/api/logfiles/read?file=bxlens-audit.log&lines=50&q=event', { credentials: 'same-origin' } ).then( r => r.status );
+			return await Promise.all( Array.from( { length: 24 }, one ) );
+		} );
+		expect( statuses.every( s => s === 200 || s === 429 ) ).toBe( true );
+		expect( statuses.some( s => s === 200 ) ).toBe( true );
+		// A search still answers afterwards and says whether the file was cut
+		const r = await page.evaluate( async () => await ( await fetch( '/~bxlens/index.bxm/api/logfiles/read?file=bxlens-audit.log&lines=5&q=login', { credentials: 'same-origin' } ) ).json() );
+		expect( r.lines.length ).toBeLessThanOrEqual( 5 );
+		expect( typeof r.cut ).toBe( 'boolean' );
+	} );
+
 } );

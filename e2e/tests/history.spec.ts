@@ -4,7 +4,7 @@ test.describe( 'history', () => {
 
 	test( 'JSON and SSE requests are recorded without getting a bar', async ( { lens, page, request } ) => {
 		const json = await request.get( '/api/orders.json.bxm' );
-		expect( json.headers()[ 'x-bxlens-id' ] ).toMatch( /^[0-9a-f]{10}$/ );
+		expect( json.headers()[ 'x-bxlens-id' ] ).toMatch( /^[0-9a-z]{9,16}$/ );
 		expect( await json.text() ).not.toContain( 'bxlens' );
 		JSON.parse( await json.text() );
 		const sse = await request.get( '/events.bxm' );

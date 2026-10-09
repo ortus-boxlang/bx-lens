@@ -28,7 +28,16 @@
 					"slowQueryMs": 15,
 					"slowRequestMs": 3000
 				},
+				"history": {
+					"trackNonHtml": true
+				},
 				"collectors": {
+					"queries": {
+						"includeParams": true
+					},
+					"orm": {
+						"enabled": true
+					},
 					"functions": {
 						"enabled": true,
 						"max": 500

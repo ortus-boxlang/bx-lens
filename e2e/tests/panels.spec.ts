@@ -96,7 +96,14 @@ test.describe( 'panels', () => {
 		expect( await page.evaluate( () => navigator.clipboard.readText() ) ).toContain( 'SELECT id, customer_id, total FROM orders' );
 		await lens.open( 'Request' );
 		await page.locator( '#bxlens .abtn', { hasText: 'Copy as cURL' } ).click();
-		expect( await page.evaluate( () => navigator.clipboard.readText() ) ).toMatch( /^curl -X GET 'http:\/\/127\.0\.0\.1:\d+\/n-plus-one\.bxm'$/ );
+		expect( await page.evaluate( () => navigator.clipboard.readText() ) ).toMatch( /^curl -X 'GET' 'http:\/\/127\.0\.0\.1:\d+\/n-plus-one\.bxm'$/ );
+	} );
+
+
+	test( 'the cURL builder closes and escapes single quotes in the method, address and query', async ( { lens, page } ) => {
+		await lens.visit( '/n-plus-one.bxm' );
+		const cmd = await page.evaluate( () => ( window as any ).Alpine.$data( document.getElementById( 'bxlens' ) ).curl( "GE'T", "http://h/a'b", "q='1" ) );
+		expect( cmd ).toBe( "curl -X 'GE'\\''T' 'http://h/a'\\''b?q='\\''1'" );
 	} );
 
 } );

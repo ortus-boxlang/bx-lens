@@ -8,7 +8,10 @@ async function signIn( page: Page, pw = 'lens-demo' ) {
 	await page.fill( '#pw', pw );
 	await page.click( '.go' );
 	await expect( page.locator( '.shell .app' ) ).toBeVisible();
-	await page.click( '.nav:has-text("Environment")' );
+	// A viewer has no Environment page
+	if ( pw !== 'lens-view' ) {
+		await page.click( '.nav:has-text("Environment")' );
+	}
 }
 
 test.describe( 'environment', () => {
