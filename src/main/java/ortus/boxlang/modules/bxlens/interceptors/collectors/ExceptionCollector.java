@@ -82,6 +82,7 @@ public class ExceptionCollector extends BaseCollector {
 				return;
 			}
 		}
+		req.noteException();
 		Sanitizer			clean	= new Sanitizer( cfg );
 		Map<String, Object>	m		= new LinkedHashMap<>();
 		String				type	= typeOf( t );

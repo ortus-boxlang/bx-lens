@@ -32,6 +32,8 @@ public final class Span {
 	public volatile int					line		= 0;
 	public volatile String				flagSeverity;
 	public volatile String				flagLabel;
+	/** The span never closed by itself: a post event was skipped, the request failed or it was cut off. Its end is an estimate. */
+	public volatile boolean				interrupted;
 	public final Map<String, Object>	detail		= new LinkedHashMap<>();
 
 	public Span( int id, String type, String label, long startNs, int depth ) {
@@ -68,6 +70,15 @@ public final class Span {
 	 * Convert to the JSON-ready shape the UI reads. Milliseconds with microsecond precision.
 	 */
 	public Map<String, Object> toMap() {
+		return toMap( true );
+	}
+
+	/**
+	 * Convert to the JSON-ready shape.
+	 *
+	 * @param withFlags include the flag the issue engine put on the span (the console does, the bar does not)
+	 */
+	public Map<String, Object> toMap( boolean withFlags ) {
 		Map<String, Object> m = new LinkedHashMap<>();
 		m.put( "id", id );
 		m.put( "type", type );
@@ -77,7 +88,10 @@ public final class Span {
 		m.put( "depth", depth );
 		m.put( "file", file );
 		m.put( "line", line );
-		if ( flagSeverity != null ) {
+		if ( interrupted ) {
+			m.put( "interrupted", true );
+		}
+		if ( withFlags && flagSeverity != null ) {
 			m.put( "flag", java.util.List.of( flagSeverity, flagLabel ) );
 		}
 		if ( !detail.isEmpty() ) {

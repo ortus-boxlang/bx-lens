@@ -17,6 +17,14 @@ public final class Text {
 	}
 
 	/**
+	 * Only a web address (http or https) is shown as a link. Anything else, such as <code>javascript:</code>, becomes an empty text.
+	 */
+	public static String webUrl( Object url ) {
+		String s = url == null ? "" : url.toString().trim();
+		return s.regionMatches( true, 0, "https://", 0, 8 ) || s.regionMatches( true, 0, "http://", 0, 7 ) ? s : "";
+	}
+
+	/**
 	 * Trim and collapse every run of whitespace to one space.
 	 */
 	public static String collapseSpaces( String s ) {

@@ -43,7 +43,9 @@ public class IntegrationTest extends BaseIntegrationTest {
 		for ( Object c : all ) {
 			ids.add( ( String ) c.getClass().getMethod( "id" ).invoke( c ) );
 		}
-		assertThat( ids ).containsAtLeast( "request", "templates", "queries", "http", "exceptions", "jvm", "cache", "modules" );
+		assertThat( ids ).containsAtLeast( "request", "templates", "queries", "http", "exceptions", "jvm" );
+		assertThat( ids ).doesNotContain( "cache" );
+		assertThat( ids ).doesNotContain( "modules" );
 		assertThat( ids ).doesNotContain( "functions" );
 		assertThat( ids ).doesNotContain( "bifs" );
 		assertThat( ids ).doesNotContain( "orm" );

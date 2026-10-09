@@ -218,13 +218,13 @@ public final class ConsoleRouter {
 		} else if ( route.equals( "overview" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, overview() );
 		} else if ( route.equals( "requests" ) && method.equals( "GET" ) ) {
-			json( context, ex, 200, Map.of( "requests", service.getStore().summaries(), "capacity", service.getStore().capacity() ) );
+			json( context, ex, 200, Map.of( "requests", service.getStore().summaries( true ), "capacity", service.getStore().capacity() ) );
 		} else if ( route.startsWith( "requests/" ) && method.equals( "GET" ) ) {
 			RequestStore.Entry e = service.getStore().get( route.substring( "requests/".length() ) );
 			if ( e == null ) {
 				json( context, ex, 404, Map.of( "error", "That request has been recycled" ) );
 			} else {
-				send( context, ex, 200, "application/json; charset=UTF-8", e.json(), true );
+				send( context, ex, 200, "application/json; charset=UTF-8", e.consoleJson(), true );
 			}
 		} else if ( route.equals( "settings" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, settings( session( ex ) ) );
@@ -283,6 +283,8 @@ public final class ConsoleRouter {
 				return;
 			}
 			json( context, ex, 200, service.getOrm().stats() );
+		} else if ( route.equals( "configuration" ) && method.equals( "GET" ) && panelOn( "configuration" ) ) {
+			json( context, ex, 200, service.getRuntimeInfo().configuration( isAdmin( s ) ) );
 		} else if ( route.equals( "environment" ) && method.equals( "GET" ) && panelOn( "environment" ) ) {
 			service.getAudit().log( "environment.read", s.role, ex.remoteAddr(), "" );
 			json( context, ex, 200, service.getEnvironment().environment() );
@@ -464,6 +466,7 @@ public final class ConsoleRouter {
 		    { "logfiles", "Logs", "file-text", "Runtime" },
 		    { "modules", "Modules", "plug", "Runtime" },
 		    { "environment", "Environment", "sliders-horizontal", "Runtime" },
+		    { "configuration", "Configuration", "list-checks", "Runtime" },
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },
 		    { "designer", "Bar designer", "layout", "Config" },
@@ -859,9 +862,8 @@ public final class ConsoleRouter {
 	// ---------------------------------------------------------------------------------------------
 
 	private static final String[][] BAR_TABS = {
-	    { "issues", "Issues" }, { "timeline", "Timeline" }, { "queries", "Queries" }, { "templates", "Templates" }, { "http", "HTTP" },
-	    { "exceptions", "Exceptions" }, { "messages", "Messages" }, { "timers", "Timers" }, { "cache", "Cache" }, { "modules", "Modules" }, { "bifs", "BIFs" },
-	    { "request", "Request" }, { "scopes", "Scopes" }, { "jvm", "Runtime" }, { "history", "History" }
+	    { "timeline", "Timeline" }, { "queries", "Queries" }, { "exceptions", "Exceptions" }, { "http", "HTTP" }, { "messages", "Messages" },
+	    { "timers", "Timers" }, { "request", "Request" }, { "scopes", "Scopes" }, { "bifs", "BIFs" }, { "runtime", "Runtime" }
 	};
 
 	/**
@@ -1027,7 +1029,7 @@ public final class ConsoleRouter {
 					}
 				}
 				if ( want.contains( "requests" ) ) {
-					tick.put( "requests", service.getStore().summaries() );
+					tick.put( "requests", service.getStore().summaries( true ) );
 					tick.put( "overview", overview() );
 				}
 				context.writeToBuffer( "event: tick\ndata: " + Json.write( tick ) + "\n\n" );

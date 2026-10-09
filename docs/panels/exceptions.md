@@ -28,6 +28,6 @@ A caught exception is critical, adds an issue and, by default, opens the panel o
 
 ## Uncaught errors
 
-When a request ends in an uncaught exception or an abort, core skips `onRequestEnd` and renders its own error page. Lens cannot inject a bar into that page, because the web context does not announce `onRequestFlushBuffer`. Lens still records the request, with its exception and issue, in [History](history.md).
+When a request ends in an uncaught exception or an abort, core skips `onRequestEnd` and renders its own error page. Lens cannot inject a bar into that page, because the web context does not announce `onRequestFlushBuffer`. Lens still records the request, with its exception, in the console [Requests](../console/index.md) page.
 
 `collectors.exceptions.max` caps the list (default 50).

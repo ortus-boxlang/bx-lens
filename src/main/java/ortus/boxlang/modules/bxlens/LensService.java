@@ -19,14 +19,12 @@ import ortus.boxlang.modules.bxlens.interceptors.BaseCollector;
 import ortus.boxlang.modules.bxlens.interceptors.ILensCollector;
 import ortus.boxlang.modules.bxlens.interceptors.TaskOutcomes;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.BifCollector;
-import ortus.boxlang.modules.bxlens.interceptors.collectors.CacheCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.ExceptionCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.FunctionCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.HttpCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.JvmCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.LifecycleCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.LogCollector;
-import ortus.boxlang.modules.bxlens.interceptors.collectors.ModulesCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.OrmCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.QueryCollector;
 import ortus.boxlang.modules.bxlens.interceptors.collectors.ScopesCollector;
@@ -106,6 +104,7 @@ public final class LensService {
 	private final LogData											logs				= new LogData();
 	private final EnvironmentData									environment			= new EnvironmentData( this );
 	private final OrmData											orm					= new OrmData();
+	private final RuntimeInfo										runtimeInfo			= new RuntimeInfo();
 	private final QueryStats										queryStats			= new QueryStats();
 	private final ErrorStore										errors				= new ErrorStore();
 	private final Reports											reports				= new Reports();
@@ -151,8 +150,7 @@ public final class LensService {
 		allBuiltIns.addAll( builtIns() );
 		List<String> ids = new ArrayList<>(
 		    List.of( "executors", "tasks", "datasources", "caches", "logfiles", "environment", "queries", "inflight", "errors", "reports", "ask", "orm",
-		        "system",
-		        "threads" ) );
+		        "system", "threads", "modules", "configuration" ) );
 		allBuiltIns.forEach( c -> {
 			if ( !ids.contains( c.id() ) && ! ( c instanceof LifecycleCollector ) ) {
 				ids.add( c.id() );
@@ -560,27 +558,28 @@ public final class LensService {
 		reports.record( req, cfg.slowRequestMs );
 		stats.recordRequest( Math.round( req.durationNs() / 1_000_000.0 ) );
 
-		RequestStore.Entry entry = null;
-		if ( keep ) {
-			IssueEngine.analyze( req, cfg );
-			if ( ex != null ) {
-				try {
-					if ( !cfg.light ) {
-						req.requestHeaders = ex.requestHeaders();
-					}
-					req.responseHeaders = ex.responseHeaders();
-					if ( SecurityChecks.applies( req, cfg ) ) {
-						SecurityChecks.analyze( req, cfg, req.responseHeaders, ex.responseCookies(), ex.secure() );
-					}
-				} catch ( Throwable t ) {
-					getLogger().debug( "Security checks failed: {}", t.toString() );
+		// What the page and the console need from the web request is copied now, while it is still there. Nothing is analyzed or serialized yet
+		if ( keep && ex != null ) {
+			try {
+				if ( !cfg.light ) {
+					req.requestHeaders = ex.requestHeaders();
 				}
+				req.responseHeaders = ex.responseHeaders();
+				if ( cfg.consoleEnabled && SecurityChecks.applies( req, cfg ) ) {
+					req.data.put( "_cookies", ex.responseCookies() );
+					req.data.put( "_secure", ex.secure() );
+				}
+			} catch ( Throwable t ) {
+				getLogger().debug( "Could not copy the response of request [{}]: {}", req.id, t.toString() );
 			}
-			applySlowSample( req );
-			entry = new RequestStore.Entry( req.id, Snapshot.summary( req, cfg ), () -> snapshotJson( req, cfg ) );
+		}
+		// The history serves the console. A bar only installation keeps nothing: the page it renders is all anybody sees
+		RequestStore.Entry entry = null;
+		if ( keep && cfg.consoleEnabled ) {
+			entry = entryFor( req, cfg );
 			store.add( entry );
 		}
-		if ( entry != null && trigger == Trigger.END && req.showBar && req.html && renderer != null && renderer.isComplete() && ex != null
+		if ( keep && trigger == Trigger.END && req.showBar && req.html && renderer != null && renderer.isComplete() && ex != null
 		    && !ex.responseStarted() ) {
 			try {
 				StringBuffer	buffer		= rc.getBuffer();
@@ -588,8 +587,9 @@ public final class LensService {
 				if ( ( cfg.inject || markerAt >= 0 ) && req.injected.compareAndSet( false, true ) ) {
 					boolean	consoleOk	= cfg.consoleEnabled
 					    && consoleGuard.isAllowed( ex.remoteAddr(), ex.host(), ex.requestHeader( consoleGuard.requiredHeader() ) );
-					// The page is built here, and only here, for a caller who is allowed to see the bar
-					String	block		= renderer.render( pagePayload( entry.json(), consoleOk ? "/~bxlens/index.bxm" : "" ) );
+					// The payload is built here, and only here, for a caller who is allowed to see the bar
+					String	json		= entry != null ? entry.json() : snapshotJson( req, cfg );
+					String	block		= renderer.render( pagePayload( json, consoleOk ? "/~bxlens/index.bxm" : "" ) );
 					if ( markerAt >= 0 ) {
 						buffer.replace( markerAt, markerAt + MARKER.length(), block );
 					} else {
@@ -601,6 +601,82 @@ public final class LensService {
 			}
 		}
 		announce( Keys.onLensRequestFinish, Struct.of( "context", rc, "requestId", req.id ) );
+		req.release();
+	}
+
+	/**
+	 * The history entry of a finished request. Its payloads and the issue analysis are built when somebody asks.
+	 */
+	private RequestStore.Entry entryFor( LensRequest req, LensConfig cfg ) {
+		return new RequestStore.Entry( req.id, Snapshot.summary( req, cfg ), () -> snapshotJson( req, cfg ), () -> {
+			try {
+				analyze( req, cfg );
+				return Json.write( Snapshot.build( req, cfg, true ) );
+			} catch ( Throwable t ) {
+				getLogger().warn( "bx-lens could not build request [{}] for the console: {}", req.id, t.toString() );
+				return Json.write( Map.of( "error", "This request could not be built" ) );
+			}
+		}, () -> {
+			analyze( req, cfg );
+			return Snapshot.summaryWithIssues( req, cfg );
+		} );
+	}
+
+	/**
+	 * Find the issues of a request: exceptions, N+1 and slow queries, slow templates, error statuses and security notes. Only the console
+	 * wants them, so this runs when the console looks at the request, once. The bar never shows them.
+	 */
+	private void analyze( LensRequest req, LensConfig cfg ) {
+		synchronized ( req ) {
+			if ( req.analyzed ) {
+				return;
+			}
+			req.analyzed = true;
+			IssueEngine.analyze( req, cfg );
+			try {
+				if ( req.data.get( "_cookies" ) instanceof List<?> cookies && req.responseHeaders != null ) {
+					@SuppressWarnings( "unchecked" )
+					List<SecurityChecks.Cookie> typed = ( List<SecurityChecks.Cookie> ) cookies;
+					SecurityChecks.analyze( req, cfg, req.responseHeaders, typed, Boolean.TRUE.equals( req.data.get( "_secure" ) ) );
+				}
+			} catch ( Throwable t ) {
+				getLogger().debug( "Security checks failed: {}", t.toString() );
+			}
+			applySlowSample( req );
+		}
+	}
+
+	/**
+	 * A request that never ended by itself (a thread that was killed, a lost event, a hang) is finished here by the watchdog once it is older
+	 * than <code>request.maxMinutes</code>: its open spans are closed with an estimate and marked, it is kept in the history as unfinished and
+	 * it leaves the list of running requests. Nothing is written to its response.
+	 */
+	private void sweepStale( LensConfig cfg ) {
+		long cut = System.nanoTime() - cfg.requestMaxMinutes * 60_000_000_000L;
+		for ( LensRequest r : active.values() ) {
+			if ( r.startNanos < cut && r.finished.compareAndSet( false, true ) ) {
+				try {
+					active.remove( r.id );
+					finishUnfinished( r, cfg );
+				} catch ( Throwable t ) {
+					getLogger().debug( "Could not finish the stale request [{}]: {}", r.id, t.toString() );
+				}
+			}
+		}
+	}
+
+	void finishUnfinished( LensRequest req, LensConfig cfg ) {
+		req.endNanos	= System.nanoTime();
+		req.unfinished	= true;
+		req.status		= 0;
+		req.html		= false;
+		req.closeAll();
+		queryStats.record( req, cfg.slowQueryMs );
+		errors.record( req, cfg );
+		reports.record( req, cfg.slowRequestMs );
+		if ( cfg.consoleEnabled ) {
+			store.add( entryFor( req, cfg ) );
+		}
 		req.release();
 	}
 
@@ -617,11 +693,9 @@ public final class LensService {
 	 * Once a request runs longer than the slow request limit, take one stack sample of its thread, so the issue can say where it was stuck.
 	 */
 	/** Requests kept in memory without a Plus license. */
-	public static final int		FREE_HISTORY		= 25;
+	public static final int	FREE_HISTORY	= 25;
 
-	private int					tick;
-	/** How long a request may be listed as running before it is dropped from the list: ten minutes. */
-	private static final long	ACTIVE_TTL_NANOS	= 10 * 60_000_000_000L;
+	private int				tick;
 
 	private void startWatchdog() {
 		watchdog = java.util.concurrent.Executors.newSingleThreadScheduledExecutor( r -> {
@@ -631,10 +705,8 @@ public final class LensService {
 		} );
 		watchdog.scheduleWithFixedDelay( () -> {
 			try {
-				if ( tick % 300 == 299 ) {
-					// A request that never finished (a killed thread, a lost event) must not stay in the list for ever
-					long cut = System.nanoTime() - ACTIVE_TTL_NANOS;
-					active.values().removeIf( r -> r.startNanos < cut );
+				if ( tick % 25 == 24 ) {
+					sweepStale( config );
 				}
 				if ( ++tick % 25 == 0 ) {
 					if ( config.consoleEnabled ) {
@@ -757,7 +829,6 @@ public final class LensService {
 		Map<String, Object> page = new LinkedHashMap<>();
 		page.put( "ui", ui );
 		page.put( "declared", registry.list() );
-		page.put( "history", store.summaries() );
 		StringBuilder sb = new StringBuilder( requestJson.length() + 4096 );
 		sb.append( "{\"data\":" ).append( requestJson );
 		String pageJson = Json.write( page );
@@ -777,8 +848,8 @@ public final class LensService {
 
 	private List<ILensCollector> builtIns() {
 		return List.of( new LifecycleCollector(), new TemplateCollector(), new FunctionCollector(), new QueryCollector(), new HttpCollector(),
-		    new ExceptionCollector(), new LogCollector(), new TransactionCollector(), new ScopesCollector(), new JvmCollector(), new CacheCollector(),
-		    new ModulesCollector(), new BifCollector(), new OrmCollector() );
+		    new ExceptionCollector(), new LogCollector(), new TransactionCollector(), new ScopesCollector(), new JvmCollector(),
+		    new BifCollector(), new OrmCollector() );
 	}
 
 	private List<String> collectorIds() {
@@ -1004,6 +1075,10 @@ public final class LensService {
 		m.put( "state", r.thread.getState().name() );
 		m.put( "frames", frames );
 		return m;
+	}
+
+	public RuntimeInfo getRuntimeInfo() {
+		return runtimeInfo;
 	}
 
 	public OrmData getOrm() {

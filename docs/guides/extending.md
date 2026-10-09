@@ -106,7 +106,7 @@ lensPanel( "phases", "Phases" )
 
 ### Issues
 
-A panel can add issues. They show on the [Issues](../panels/issues.md) tab and drive the strip color.
+A panel can add issues. They show among the issues in the console [request detail](../console/issues.md). The bar does not show issues.
 
 ```javascript
 lensPanel( "orm", "ORM" )

@@ -25,7 +25,7 @@ With `captureCaller`, each query records the template and line that ran it.
 :::
 :::
 
-Flagged queries appear on the [Issues](issues.md) tab, and each issue links back to its row.
+The bar lists the queries and does not flag them. The console [request detail](../console/issues.md) lists slow and N+1 queries as issues.
 
 ## Parameters
 

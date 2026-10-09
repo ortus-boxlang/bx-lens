@@ -8,7 +8,6 @@ package ortus.boxlang.modules.bxlens.store;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -20,52 +19,90 @@ import java.util.function.Supplier;
 public final class RequestStore {
 
 	/**
-	 * One stored request: its list summary and its full payload. The payload is JSON that is built the first time somebody asks for it
-	 * ({@link #json()}) and then kept, so a request nobody opens costs no serialization. The entry holds the finished request until the
-	 * payload is built, then lets it go.
+	 * One stored request. Everything but the basic summary is built the first time somebody asks for it, then kept:
+	 * <ul>
+	 * <li>{@link #json()}: the payload of the bar (what happened in the request),</li>
+	 * <li>{@link #consoleJson()}: the payload of the console, which also carries the issues,</li>
+	 * <li>{@link #summary(boolean)}: the list row, with the issue count and severity when asked for.</li>
+	 * </ul>
+	 * Issue analysis belongs to the console, so it only runs when the console asks. The entry holds the finished request until every payload that
+	 * can still be asked for was built.
 	 */
 	public static final class Entry {
 
-		private final String				id;
-		private final Map<String, Object>	summary;
-		private volatile Supplier<String>	source;
-		private volatile String				json;
+		private final String						id;
+		private final Map<String, Object>			summary;
+		private volatile Supplier<String>			source;
+		private volatile String						json;
+		private final Supplier<String>				consoleSource;
+		private volatile String						consoleJson;
+		private final Supplier<Map<String, Object>>	analyzedSource;
+		private volatile Map<String, Object>		analyzed;
 
 		/**
 		 * @param json the payload already built
 		 */
 		public Entry( String id, Map<String, Object> summary, String json ) {
-			this.id			= id;
-			this.summary	= summary;
-			this.json		= json;
+			this( id, summary, null, null, null );
+			this.json = json;
 		}
 
 		/**
 		 * @param source builds the payload on first use
 		 */
 		public Entry( String id, Map<String, Object> summary, Supplier<String> source ) {
-			this.id			= id;
-			this.summary	= summary;
-			this.source		= source;
+			this( id, summary, source, null, null );
+		}
+
+		public Entry( String id, Map<String, Object> summary, Supplier<String> source, Supplier<String> consoleSource,
+		    Supplier<Map<String, Object>> analyzedSource ) {
+			this.id				= id;
+			this.summary		= summary;
+			this.source			= source;
+			this.consoleSource	= consoleSource;
+			this.analyzedSource	= analyzedSource;
 		}
 
 		public String id() {
 			return id;
 		}
 
+		/**
+		 * The basic list row, without issues.
+		 */
 		public Map<String, Object> summary() {
 			return summary;
 		}
 
 		/**
-		 * Has the payload been built?
+		 * The list row, with the issue count and severity when <code>withIssues</code> is true (this runs the issue analysis once).
+		 */
+		public Map<String, Object> summary( boolean withIssues ) {
+			if ( !withIssues || analyzedSource == null ) {
+				return summary;
+			}
+			Map<String, Object> a = analyzed;
+			if ( a == null ) {
+				synchronized ( this ) {
+					a = analyzed;
+					if ( a == null ) {
+						a			= analyzedSource.get();
+						analyzed	= a;
+					}
+				}
+			}
+			return a;
+		}
+
+		/**
+		 * Has the bar payload been built?
 		 */
 		public boolean built() {
 			return json != null;
 		}
 
 		/**
-		 * The payload as JSON, built once.
+		 * The payload of the bar as JSON, built once.
 		 */
 		public String json() {
 			String j = json;
@@ -75,7 +112,26 @@ public final class RequestStore {
 					if ( j == null ) {
 						j		= source.get();
 						json	= j;
-						source	= null;
+					}
+				}
+			}
+			return j;
+		}
+
+		/**
+		 * The payload of the console as JSON, built once. It carries the issues.
+		 */
+		public String consoleJson() {
+			if ( consoleSource == null ) {
+				return json();
+			}
+			String j = consoleJson;
+			if ( j == null ) {
+				synchronized ( this ) {
+					j = consoleJson;
+					if ( j == null ) {
+						j			= consoleSource.get();
+						consoleJson	= j;
 					}
 				}
 			}
@@ -106,11 +162,23 @@ public final class RequestStore {
 	/**
 	 * Summaries, newest first.
 	 */
-	public synchronized List<Map<String, Object>> summaries() {
-		List<Map<String, Object>>	out	= new ArrayList<>( ring.size() );
-		Iterator<Entry>				it	= ring.descendingIterator();
-		while ( it.hasNext() ) {
-			out.add( it.next().summary() );
+	public List<Map<String, Object>> summaries() {
+		return summaries( false );
+	}
+
+	/**
+	 * Summaries, newest first.
+	 *
+	 * @param withIssues include the issue count and severity (runs the issue analysis for entries that did not have it yet)
+	 */
+	public List<Map<String, Object>> summaries( boolean withIssues ) {
+		List<Entry> copy;
+		synchronized ( this ) {
+			copy = new ArrayList<>( ring );
+		}
+		List<Map<String, Object>> out = new ArrayList<>( copy.size() );
+		for ( int i = copy.size() - 1; i >= 0; i-- ) {
+			out.add( copy.get( i ).summary( withIssues ) );
 		}
 		return out;
 	}

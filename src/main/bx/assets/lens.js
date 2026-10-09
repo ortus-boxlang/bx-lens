@@ -16,7 +16,7 @@
 	function component() {
 		return {
 			// ---- data
-			d: null, r: null, ui: {}, history: [], declared: [],
+			d: null, r: null, ui: {}, declared: [],
 			// ---- ui state
 			tab: "timeline", collapsed: true, detached: false, menu: false, menuStyle: "", height: 360, theme: "auto",
 			v0: 0, v1: 0, total: 0, sel: null, q: "", filters: {}, toastText: "", base: "",
@@ -28,7 +28,6 @@
 				var page;
 				try { page = JSON.parse( node.textContent ); } catch ( e ) { return; }
 				this.ui = page.ui || {};
-				this.history = page.history || [];
 				this.declared = page.declared || [];
 				this.d = page.data;
 				this.r = this.d.request;
@@ -47,10 +46,10 @@
 				if ( typeof saved.collapsed === "boolean" ) { this.collapsed = saved.collapsed; }
 				if ( saved.theme ) { this.theme = saved.theme; }
 				if ( saved.detached && this.ui.allowDetach ) { this.detached = true; }
-				// A problem opens the panel on Issues, whatever was saved
+				// An exception opens the panel on Exceptions, whatever was saved
 				if ( this.ui.autoOpenOnException && this.d.exceptions.length ) {
 					this.collapsed = false;
-					this.tab = this.d.issues.length ? "issues" : "exceptions";
+					this.tab = "exceptions";
 				}
 				if ( !this.tabIds().includes( this.tab ) ) { this.tab = this.tabIds()[ 0 ] || "timeline"; }
 				this.applyTheme();
@@ -62,8 +61,10 @@
 			},
 
 			// ---- derived
-			get sev() { return this.r ? this.r.severity : "none"; },
-			get statusClass() { var s = this.r.status; return s >= 500 ? "crit" : ( s >= 400 ? "warn" : "ok" ); },
+			// The strip is red for a server error or an exception nothing caught. Nothing else colors it
+			get sev() { return this.r && this.r.state === "crit" ? "crit" : "none"; },
+			get statusClass() { return this.sev === "crit" ? "crit" : ""; },
+			get sqlTime() { return this.sum( this.d.queries, "ms" ); },
 			get hotkeyLabel() { return this.ui.hotkey || "Ctrl+`"; },
 			get spanTypes() {
 				var present = {};
@@ -93,13 +94,7 @@
 				var id = this.sel;
 				return id === null ? null : ( this.d.spans.filter( function ( s ) { return s.id === id; } )[ 0 ] || null );
 			},
-			get sortedIssues() {
-				var rank = { crit: 0, warn: 1, info: 2 };
-				return this.d.issues.slice().sort( function ( a, b ) { return ( rank[ a.severity ] === undefined ? 1 : rank[ a.severity ] ) - ( rank[ b.severity ] === undefined ? 1 : rank[ b.severity ] ); } );
-			},
-			get treeSpans() {
-				return this.d.spans.filter( function ( s ) { return s.type === "template" || s.type === "func"; } );
-			},
+
 			get customPanels() {
 				var known = {}, declared = {};
 				this.declared.forEach( function ( p ) { declared[ p.id ] = p; } );
@@ -115,26 +110,23 @@
 				return out.sort( function ( a, b ) { return a.order - b.order; } );
 			},
 			get tabs() {
-				var d = this.d, c = d.counts, sevOf = function ( t ) { return d.issues.some( function ( i ) { return i.tab === t && i.severity === "crit"; } ) ? "crit" : ( d.issues.some( function ( i ) { return i.tab === t; } ) ? "warn" : "" ); };
+				var d = this.d, c = d.counts;
 				var list = [
-					{ id: "issues", label: "Issues", badge: c.issues || null, sev: this.sev === "none" ? "" : this.sev },
 					{ id: "timeline", label: "Timeline", badge: null, sev: "" },
-					{ id: "queries", label: "Queries", badge: c.queries || null, sev: sevOf( "queries" ) },
-					{ id: "templates", label: "Templates", badge: c.templates || null, sev: "" },
-					{ id: "http", label: "HTTP", badge: c.http || null, sev: "" },
+					{ id: "queries", label: "Queries", badge: c.queries || null, sev: "" },
 					{ id: "exceptions", label: "Exceptions", badge: c.exceptions || null, sev: c.exceptions ? "crit" : "" },
+					{ id: "http", label: "HTTP", badge: c.http || null, sev: "" },
 					{ id: "messages", label: "Messages", badge: ( c.messages + ( c.logs || 0 ) ) || null, sev: "" },
 					{ id: "timers", label: "Timers", badge: c.timers || null, sev: "" },
-					{ id: "cache", label: "Cache", badge: d.cache ? d.cache.length : null, sev: "" },
-					{ id: "modules", label: "Modules", badge: d.modules ? d.modules.length : null, sev: "" },
-					{ id: "bifs", label: "BIFs", badge: d.bifs ? d.bifs.length : null, sev: "" },
 					{ id: "request", label: "Request", badge: null, sev: "" },
 					{ id: "scopes", label: "Scopes", badge: null, sev: "" },
-					{ id: "jvm", label: "Runtime", badge: null, sev: "" },
-					{ id: "history", label: "History", badge: this.history.length || null, sev: "" }
+					{ id: "bifs", label: "BIFs", badge: d.bifs ? d.bifs.length : null, sev: "" },
+					{ id: "runtime", label: "Runtime", badge: null, sev: "" }
 				];
-				// The BIFs tab only exists when the bifs collector measured something
+				// Scopes and BIFs are opt in: the tab exists only when the collector gathered something
 				if ( !d.bifs ) { list = list.filter( function ( t ) { return t.id !== "bifs"; } ); }
+				if ( !d.scopes ) { list = list.filter( function ( t ) { return t.id !== "scopes"; } ); }
+				if ( !d.runtime ) { list = list.filter( function ( t ) { return t.id !== "runtime"; } ); }
 				this.customPanels.forEach( function ( p ) {
 					var b = p.badge && p.badge.count >= 0 ? p.badge.count : null;
 					list.push( { id: p.id, label: p.label, badge: b, sev: p.badge && p.badge.severity !== "none" ? p.badge.severity : "" } );
@@ -176,12 +168,6 @@
 				var t = this.theme;
 				if ( t === "auto" ) { t = window.matchMedia && window.matchMedia( "(prefers-color-scheme: dark)" ).matches ? "dark" : "light"; }
 				this.$root.setAttribute( "data-theme", t );
-			},
-			goIssue: function ( i ) {
-				if ( i.span ) { this.sel = i.span; }
-				this.tab = i.tab === "timeline" || i.span ? "timeline" : i.tab;
-				if ( !this.tabIds().includes( this.tab ) ) { this.tab = this.tabIds()[ 0 ] || "timeline"; }
-				this.persist();
 			},
 			zoom: function ( how ) {
 				var span = this.v1 - this.v0, mid = ( this.v0 + this.v1 ) / 2;

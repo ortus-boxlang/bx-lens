@@ -84,9 +84,8 @@ test.describe( 'Free: what is open and what is locked', () => {
 	test( 'the bar works but request cost and the slow sample are locked', async ( { page } ) => {
 		await page.goto( '/orders.bxm' );
 		await page.locator( '#bxlens .lens' ).waitFor();
-		await expect( page.locator( '#bxlens .chip', { hasText: 'cpu' } ) ).not.toBeVisible();
 		await page.keyboard.press( 'Control+`' );
-		await page.locator( '#bxlens .tab', { hasText: /^\s*Runtime/ } ).first().click();
+		await page.locator( '#bxlens .tab', { hasText: /^\s*Request/ } ).first().click();
 		await expect( page.locator( '#bxlens .panel' ) ).toContainText( 'BoxLang+' );
 		await page.locator( '#bxlens .tab', { hasText: /^\s*Timeline/ } ).first().click();
 		await expect( page.locator( '#bxlens .wf .r' ).first() ).toBeVisible();

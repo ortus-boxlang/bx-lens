@@ -1,4 +1,4 @@
-import { expect, Page, Locator, test as base } from '@playwright/test';
+import { expect, Page, Locator, APIRequestContext, test as base } from '@playwright/test';
 
 /** Helpers for driving the Lens bar. */
 export class Lens {
@@ -37,3 +37,15 @@ export const test = base.extend<{ lens: Lens }>( {
 	lens: async ( { page }, use ) => { await use( new Lens( page ) ); },
 } );
 export { expect };
+
+/** Sign in to the console with the API and read its JSON routes, for checks that belong to the console (issues, history). */
+export async function consoleApi( request: APIRequestContext, password = 'lens-demo' ) {
+	const r = await request.post( '/~bxlens/index.bxm/login', { headers: { 'X-Lens-Login': '1' }, form: { password } } );
+	expect( r.status() ).toBe( 200 );
+	return {
+		get: async ( path: string ) => {
+			const res = await request.get( `/~bxlens/index.bxm/api/${ path }`, { failOnStatusCode: false } );
+			return { status: res.status(), json: res.status() === 200 ? await res.json() : null };
+		},
+	};
+}

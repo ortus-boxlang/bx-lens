@@ -30,6 +30,16 @@ public final class Snapshot {
 	 * The full payload of one request. Built on demand, when the bar is rendered or an API route asks for it, from the finished request.
 	 */
 	public static Map<String, Object> build( LensRequest req, LensConfig cfg ) {
+		return build( req, cfg, false );
+	}
+
+	/**
+	 * The payload of one request.
+	 *
+	 * @param console true for the console, which also gets the issues and the flags of the issue engine. The bar shows what happened in the
+	 *                request and nothing the issue engine decided, so for the bar there are no issues, no flags and no N+1 counts.
+	 */
+	public static Map<String, Object> build( LensRequest req, LensConfig cfg, boolean console ) {
 		Sanitizer			clean	= new Sanitizer( cfg );
 		Map<String, Object>	m		= new LinkedHashMap<>();
 
@@ -49,7 +59,8 @@ public final class Snapshot {
 		r.put( "template", req.template );
 		r.put( "startedAt", Instant.ofEpochMilli( req.startMillis ).toString() );
 		r.put( "durationMs", Span.ms( req.durationNs() ) );
-		r.put( "severity", IssueEngine.severity( req ) );
+		r.put( "severity", console ? IssueEngine.severity( req ) : barState( req ) );
+		r.put( "state", req.unfinished ? "unfinished" : barState( req ) );
 		m.put( "request", r );
 
 		Map<String, Object>	headers	= new LinkedHashMap<>();
@@ -73,7 +84,7 @@ public final class Snapshot {
 		}
 		copy.sort( Comparator.comparingLong( s -> s.startNs ) );
 		for ( Span s : copy ) {
-			spans.add( s.toMap() );
+			spans.add( s.toMap( console ) );
 		}
 		int extra = 100000;
 		synchronized ( req.panels ) {
@@ -100,15 +111,31 @@ public final class Snapshot {
 		}
 		m.put( "spans", spans );
 
-		m.put( "queries", new ArrayList<>( req.queries ) );
+		if ( console ) {
+			m.put( "queries", new ArrayList<>( req.queries ) );
+		} else {
+			// Without what the issue engine added: the bar says what ran, not what was wrong with it
+			List<Map<String, Object>> qs = new ArrayList<>();
+			synchronized ( req.queries ) {
+				for ( Map<String, Object> q : req.queries ) {
+					Map<String, Object> c = new LinkedHashMap<>( q );
+					c.remove( "flag" );
+					c.remove( "count" );
+					qs.add( c );
+				}
+			}
+			m.put( "queries", qs );
+		}
 		m.put( "exceptions", new ArrayList<>( req.exceptions ) );
 		m.put( "messages", new ArrayList<>( req.messages ) );
 		m.put( "timers", new ArrayList<>( req.timers ) );
 		m.put( "http", new ArrayList<>( req.http ) );
 		m.put( "logs", new ArrayList<>( req.logs ) );
-		m.put( "issues", new ArrayList<>( req.issues ) );
+		if ( console ) {
+			m.put( "issues", new ArrayList<>( req.issues ) );
+		}
 
-		for ( String key : List.of( "scopes", "jvm", "cache", "modules", "bifs", "cost", "slowSample" ) ) {
+		for ( String key : List.of( "scopes", "runtime", "bifs", "cost", "slowSample" ) ) {
 			Object v = req.data.get( key );
 			if ( v != null ) {
 				m.put( key, v );
@@ -133,13 +160,32 @@ public final class Snapshot {
 		counts.put( "messages", req.messages.size() );
 		counts.put( "timers", req.timers.size() );
 		counts.put( "logs", req.logs.size() );
-		counts.put( "issues", req.countIssues() );
+		if ( console ) {
+			counts.put( "issues", req.countIssues() );
+		}
 		m.put( "counts", counts );
 		return m;
 	}
 
 	/**
-	 * One-line summary for the History list.
+	 * What colors the strip of the bar: red for a server error or an exception nothing caught, else none. No issue engine is involved.
+	 */
+	public static String barState( LensRequest req ) {
+		if ( req.status >= 500 ) {
+			return "crit";
+		}
+		synchronized ( req.exceptions ) {
+			for ( Map<String, Object> e : req.exceptions ) {
+				if ( "uncaught".equals( e.get( "origin" ) ) ) {
+					return "crit";
+				}
+			}
+		}
+		return "none";
+	}
+
+	/**
+	 * One-line summary for the console request list.
 	 */
 	public static Map<String, Object> summary( LensRequest req, LensConfig cfg ) {
 		Map<String, Object> s = new LinkedHashMap<>();
@@ -149,10 +195,19 @@ public final class Snapshot {
 		s.put( "status", req.status );
 		s.put( "type", classify( req.contentType ) );
 		s.put( "ms", Span.ms( req.durationNs() ) );
-		s.put( "issues", req.countIssues() );
-		s.put( "severity", IssueEngine.severity( req ) );
 		s.put( "queries", req.queries.size() );
 		s.put( "at", req.startMillis );
+		s.put( "state", req.unfinished ? "unfinished" : barState( req ) );
+		return s;
+	}
+
+	/**
+	 * The list row with what the issue engine found. Call it after the analysis.
+	 */
+	public static Map<String, Object> summaryWithIssues( LensRequest req, LensConfig cfg ) {
+		Map<String, Object> s = summary( req, cfg );
+		s.put( "issues", req.countIssues() );
+		s.put( "severity", IssueEngine.severity( req ) );
 		return s;
 	}
 

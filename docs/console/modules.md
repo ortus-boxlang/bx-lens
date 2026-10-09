@@ -40,4 +40,4 @@ Pick a row to see:
 
 ## Settings
 
-The page uses the `modules` collector, the same one as the bar's [Modules panel](../panels/modules.md). Turn both off with `collectors.modules.enabled`, or hide the page with `tabs.hide`. The [Environment](environment.md) page has a shorter list of modules with name, version, state and path.
+The page uses the `modules` collector, used only by this page. Turn it off with `collectors.modules.enabled`, or hide the page with `tabs.hide`. The [Environment](environment.md) page has a shorter list of modules with name, version, state and path.

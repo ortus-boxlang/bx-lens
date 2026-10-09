@@ -64,9 +64,7 @@ test.describe( 'timeline', () => {
 		await lens.open( 'Timeline' );
 		await expect( page.locator( '#bxlens .fchip', { hasText: 'Function' } ) ).toBeVisible();
 		await expect( page.locator( '#bxlens .wf .r', { hasText: 'report()' } ).first() ).toBeVisible();
-		await lens.open( 'Templates' );
-		await expect( page.locator( '#bxlens .tree' ) ).toContainText( 'fib()' );
-		await expect( page.locator( '#bxlens .tree' ) ).toContainText( 'report()' );
+		await expect( page.locator( '#bxlens .wf .r', { hasText: 'fib()' } ).first() ).toBeVisible();
 	} );
 
 	test( 'transactions are spans, and a rollback is flagged', async ( { lens, page } ) => {
@@ -74,7 +72,7 @@ test.describe( 'timeline', () => {
 		await lens.open( 'Timeline' );
 		const tx = page.locator( '#bxlens .wf .r' ).filter( { has: page.locator( '.lbl > span:first-child', { hasText: /^transaction$/ } ) } );
 		await expect( tx ).toHaveCount( 2 );
-		await expect( tx.filter( { hasText: 'Rollback' } ) ).toHaveCount( 1 );
+		await expect( tx.locator( '.flag:visible', { hasText: 'Rollback' } ) ).toHaveCount( 1 );
 	} );
 
 } );

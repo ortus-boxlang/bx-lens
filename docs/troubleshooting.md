@@ -15,7 +15,7 @@ Check these in order.
 2. **Is the caller allowed?** By default only loopback passes (`bar.access` is `"local"`). Add `"private"`, IPs or CIDR ranges. Remote and Docker hosts often need an entry. If you set `"all"` without `bar.allowAllIPs: true`, Lens falls back to loopback and logs an error. `access.allowedHosts` and `access.requireHeader` apply too. See [Configuration](configuration.md#bar).
 3. **Is the response HTML?** The `Content-Type` must start with an entry in `contentTypes`. JSON, SSE, files and redirects get no bar.
 4. **Is the path excluded?** Check `excludePaths`.
-5. **Did the request end in an uncaught error or abort?** Core renders its own error page and Lens cannot inject into it. Open the next HTML page and check [History](panels/history.md).
+5. **Did the request end in an uncaught error or abort?** Core renders its own error page and Lens cannot inject into it. Open the next HTML page and check the console Requests page.
 6. **Is the response committed?** Lens cannot inject after the response is sent, for example after a `flush`.
 7. **Is `inject` false?** Then you must call `lensRender()`.
 
@@ -116,7 +116,7 @@ Task actions need BoxLang+ or a trial. On Free the Tasks page shows a BoxLang+ n
 
 ## A JSON or ajax request shows nothing
 
-That is expected. Open the [History](panels/history.md) tab on an HTML page and find the request. Lens returns its id in the `X-BxLens-Id` header.
+That is expected. Open the console Requests page and find the request. Lens returns its id in the `X-BxLens-Id` header.
 
 ## A panel is missing
 
@@ -124,7 +124,7 @@ That is expected. Open the [History](panels/history.md) tab on an HTML page and 
 
 ## Cache numbers for the request look off
 
-Core announces no cache read events, so Lens compares cache statistics from the start and end of the request. Parallel requests can add to the numbers. See [Cache](panels/cache.md).
+Core announces no cache read events, so Lens compares cache statistics from the start and end of the request. Parallel requests can add to the numbers. The Caches page of the console shows the statistics.
 
 ## Open in editor does not work
 

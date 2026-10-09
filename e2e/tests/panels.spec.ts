@@ -2,29 +2,6 @@ import { test, expect } from './lens';
 
 test.describe( 'panels', () => {
 
-	test( 'Cache shows every registered cache and what this request did to it', async ( { lens, page } ) => {
-		await lens.visit( '/cache.bxm' );
-		await lens.open( 'Cache' );
-		const names = page.locator( '#bxlens .card .t > span:first-child' );
-		await expect( names.filter( { hasText: 'default' } ) ).toHaveCount( 1 );
-		const card = page.locator( '#bxlens .card', { hasText: /^\s*default/ } ).first();
-		await expect( card ).toContainText( 'This request:' );
-		await expect( card ).toContainText( '5 hits' );
-		await expect( card ).toContainText( '3 misses' );
-		await expect( card ).toContainText( '63% hit rate' );
-		await expect( card.locator( '.bar-meter' ) ).toBeVisible();
-	} );
-
-	test( 'Modules lists the loaded modules with version and author', async ( { lens, page } ) => {
-		await lens.visit( '/orders.bxm' );
-		await lens.open( 'Modules' );
-		const rows = lens.rows;
-		await expect( rows.filter( { hasText: 'bxLens' } ) ).toContainText( 'this module' );
-		await expect( rows.filter( { hasText: 'demoLens' } ) ).toContainText( 'Sample module that adds a panel to BX Lens' );
-		await expect( rows.filter( { hasText: 'derby' } ) ).toContainText( 'Apache Derby' );
-		await expect( rows.filter( { hasText: 'bxLens' } ).locator( '.pill', { hasText: 'active' } ) ).toBeVisible();
-	} );
-
 	test( 'Messages and Timers show what the page reported', async ( { lens, page } ) => {
 		await lens.visit( '/timers.bxm' );
 		await lens.open( 'Messages' );
@@ -76,15 +53,6 @@ test.describe( 'panels', () => {
 		await expect( lens.panel ).toContainText( '"userId": 42' );
 		await expect( lens.panel ).toContainText( '"apiToken": "[redacted]"' );
 		await expect( lens.panel ).not.toContainText( 'super-secret-token' );
-	} );
-
-	test( 'Runtime shows versions, memory and threads', async ( { lens, page } ) => {
-		await lens.visit( '/orders.bxm' );
-		await lens.open( 'Runtime' );
-		await expect( lens.panel ).toContainText( 'BoxLang' );
-		await expect( lens.panel ).toContainText( /1\.\d+\.\d+/ );
-		await expect( lens.panel ).toContainText( 'Heap' );
-		await expect( lens.panel ).toContainText( 'Threads' );
 	} );
 
 	test( 'Copy buttons copy SQL, cURL and file locations', async ( { lens, page, context } ) => {

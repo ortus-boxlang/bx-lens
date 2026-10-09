@@ -6,13 +6,16 @@ test.describe( 'the bar', () => {
 		await lens.visit( '/orders.bxm' );
 		await expect( lens.panel ).toBeHidden();
 		await expect( lens.strip ).toContainText( 'GET 200' );
-		await expect( lens.strip ).toContainText( '/orders.bxm' );
 		await expect( lens.strip ).toContainText( /time\s+[\d.]+ ms/ );
-		await expect( lens.strip ).toContainText( /mem\s+[\d.]+ MB/ );
-		await expect( lens.strip ).toContainText( /sql\s+1/ );
-		await expect( lens.strip ).toContainText( /tpl\s+3/ );
-		// A healthy page has no issues chip
-		await expect( page.locator( '#bxlens .chip.issues' ) ).toBeHidden();
+		await expect( lens.strip ).toContainText( /sql\s+1\s+[\d.]+ ms/ );
+		const id = ( await lens.data() ).data.request.id;
+		await expect( lens.strip ).toContainText( `id ${ id }` );
+		await expect( lens.strip.locator( 'a.console' ) ).toHaveAttribute( 'href', new RegExp( `#requests/${ id }$` ) );
+		// What was removed: the URL chip, memory, template count and every issue chip
+		await expect( lens.strip ).not.toContainText( /mem\s/ );
+		await expect( lens.strip ).not.toContainText( /tpl\s/ );
+		await expect( page.locator( '#bxlens .chip.issues' ) ).toHaveCount( 0 );
+		await expect( page.locator( '#bxlens .lens' ) ).toHaveClass( /sev-none/ );
 	} );
 
 	test( 'a chip opens the matching tab', async ( { lens, page } ) => {
@@ -26,9 +29,9 @@ test.describe( 'the bar', () => {
 		await lens.visit( '/orders.bxm' );
 		await page.keyboard.press( 'Control+`' );
 		await expect( lens.panel ).toBeVisible();
-		await page.keyboard.press( '3' );
-		await expect( lens.tab( 'Queries' ) ).toHaveAttribute( 'aria-selected', 'true' );
 		await page.keyboard.press( '2' );
+		await expect( lens.tab( 'Queries' ) ).toHaveAttribute( 'aria-selected', 'true' );
+		await page.keyboard.press( '1' );
 		await expect( lens.tab( 'Timeline' ) ).toHaveAttribute( 'aria-selected', 'true' );
 		await page.keyboard.press( 'Control+`' );
 		await expect( lens.panel ).toBeHidden();
@@ -36,10 +39,10 @@ test.describe( 'the bar', () => {
 
 	test( 'the open tab and panel state survive a reload', async ( { lens, page } ) => {
 		await lens.visit( '/orders.bxm' );
-		await lens.open( 'Cache' );
+		await lens.open( 'Request' );
 		await page.reload();
 		await expect( lens.panel ).toBeVisible();
-		await expect( lens.tab( 'Cache' ) ).toHaveAttribute( 'aria-selected', 'true' );
+		await expect( lens.tab( 'Request' ) ).toHaveAttribute( 'aria-selected', 'true' );
 	} );
 
 	test( 'the panel can be resized by dragging its edge', async ( { lens, page } ) => {
@@ -104,10 +107,22 @@ test.describe( 'the bar', () => {
 		page.on( 'pageerror', ( e ) => errors.push( e.message ) );
 		page.on( 'console', ( m ) => { if ( m.type() === 'error' && !m.text().includes( 'favicon' ) && !m.text().includes( '404' ) ) { errors.push( m.text() ); } } );
 		await lens.visit( '/n-plus-one.bxm' );
-		for ( const t of [ 'Issues', 'Timeline', 'Queries', 'Templates', 'HTTP', 'Exceptions', 'Messages', 'Timers', 'Cache', 'Modules', 'Request', 'Scopes', 'Runtime', 'History' ] ) {
+		for ( const t of [ 'Timeline', 'Queries', 'Exceptions', 'HTTP', 'Messages', 'Timers', 'Request', 'Scopes', 'Runtime' ] ) {
 			await lens.open( t );
 		}
 		expect( errors ).toEqual( [] );
+	} );
+
+
+	test( 'the bar has only the tabs of what happened in the request', async ( { lens, page } ) => {
+		await lens.visit( '/n-plus-one.bxm' );
+		await page.keyboard.press( 'Control+`' );
+		const labels = await page.locator( '#bxlens .tab > span:first-child' ).allTextContents();
+		for ( const gone of [ 'Issues', 'Modules', 'Cache', 'History', 'Templates' ] ) {
+			expect( labels, gone ).not.toContain( gone );
+		}
+		expect( labels.slice( 0, 7 ) ).toEqual( [ 'Timeline', 'Queries', 'Exceptions', 'HTTP', 'Messages', 'Timers', 'Request' ] );
+		expect( labels ).toContain( 'Runtime' );
 	} );
 
 } );

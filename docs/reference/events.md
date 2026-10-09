@@ -77,6 +77,27 @@ These are not per request. Lens uses two of them, and only when the console is o
 
 Core keeps run counts for a task but not the error of its last run, so the Tasks page keeps it in memory since Lens started. Everything else on the console Executors, Tasks, System and Threads pages is read on demand from core's async and scheduler services and the JDK management beans, not from events.
 
+## Spans that never close
+
+A span opens on a `pre` event and closes on the matching `post` event. Core does not always fire the `post` event. This is what the harness pages in `harness/app/spans` showed on core 1.19, checked by the end to end tests in `e2e/tests/interrupted.spec.ts`:
+
+| Case | What core fires | What Lens does |
+|---|---|---|
+| Exception thrown in a function (caught by the page or not) | `onFunctionException`. **No** `postFunctionInvoke`. | The function span is closed at the time of the exception event, marked interrupted and drawn striped. Its parent keeps its own end. |
+| Exception thrown through an include and caught by a try/catch | `postTemplateInvoke` still fires. No exception event. | The include span closes normally. The exception is not recorded (use `lensException()`). |
+| Uncaught exception | `onFunctionException` for the functions it passed, then `onError` and no `onRequestEnd`. | The request is finished from `onError`: open spans are closed and marked. Core renders its own error page, so there is no bar. |
+| `abort` | `onAbort`, templates close normally. | The request is finished from `onAbort`. No bar. |
+| Request timeout (`requestTimeout`) | Nothing. The web runtime did not interrupt the request in the harness. | The request is long, not interrupted. |
+| Client disconnect | Nothing. The request runs to its end. | The request ends normally and keeps its full time. |
+| Work in a thread that outlives the request | Nothing is attached to the request after it ended. | The thread adds no span, query or error to the finished request. |
+| A request that never ends (a hung or killed thread, a lost event) | Nothing. | After `request.maxMinutes` (default 10) the watchdog finishes it as **unfinished**: spans closed and marked, kept in the history, removed from In flight, with the issue "Request never finished". |
+
+Rules Lens follows:
+
+- A span left open by a skipped `post` event ends at the time of the last exception event on its thread when that came after the span started, else at the last activity Lens saw in the request. It never gets the end time of the span around it.
+- When a request finishes, `closeAll` marks every span that is still open as interrupted, with the same estimate.
+- An interrupted span has `interrupted: true` in the payload. The bar and the console draw it striped with a marker, and its end is an estimate, not a measurement.
+
 ## Not in core
 
 `onException`, `onSOAPRequest` and `onSOAPResponse` do not exist in core 1.19.

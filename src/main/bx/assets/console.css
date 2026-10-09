@@ -157,3 +157,5 @@ tr.row.sel td { background: var(--sel); }
 [x-cloak] { display: none !important; }
 .chipx.plus { background: var(--tint-warn); color: var(--warn); }
 .plusnote { background: var(--input); display: flex; gap: 8px; align-items: center; }
+
+.wf .cut { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.35) 0 4px, transparent 4px 8px); outline: 1px dashed var(--crit); }

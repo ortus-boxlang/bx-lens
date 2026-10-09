@@ -68,7 +68,7 @@ The diagnostic bundle needs BoxLang+ or a trial. It is a zip with a thread dump,
 :::
 
 ::: expandable "Does it work with APIs and JSON responses?"
-Those responses get no bar, but Lens collects and stores them by default. Find them in [History](panels/history.md).
+Those responses get no bar, but Lens collects and stores them by default. Find them on the console Requests page.
 :::
 
 ::: expandable "Does it work with ColdBox, Quick or CBWIRE?"
@@ -84,19 +84,19 @@ Yes. Call `lensDisable()` early in the request.
 :::
 
 ::: expandable "Why do I see Notes about security headers?"
-Lens checks HTML responses for a missing Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, HSTS on HTTPS, and cookie flags. They are Notes: they do not count as issues and do not color the strip. Turn them off with `checks.securityHeaders`. See [Issues](panels/issues.md#security-notes).
+Lens checks HTML responses for a missing Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, HSTS on HTTPS, and cookie flags. They are Notes: they do not count as issues and do not color the strip. Turn them off with `checks.securityHeaders`. See [Issues](console/issues.md#security-notes).
 :::
 
 ::: expandable "How is Lens different from BX Insights?"
 Lens covers one server and one request at a time. BX Insights is the separate observability product for clusters, history over time and alerting. See the [Roadmap](project/roadmap.md#relation-to-bx-insights).
 :::
 
-::: expandable "How does the Cache panel count hits and misses for a request?"
-Core announces no cache read events. Lens subtracts the cache statistics at request start from those at request end. See [Cache](panels/cache.md).
+::: expandable "Why does the bar not show cache hits and misses for a request?"
+Core announces no cache read events, so Lens cannot count them per request. The Runtime tab lists the names of the caches and the console Caches page shows the statistics.
 :::
 
 ::: expandable "Why is there no bar on my error page?"
-Core renders its own page for uncaught exceptions and skips the event Lens uses. The request is still in [History](panels/history.md).
+Core renders its own page for uncaught exceptions and skips the event Lens uses. The request is still on the console Requests page.
 :::
 
 ::: expandable "Does it need Node or a build step in my app?"

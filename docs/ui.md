@@ -11,17 +11,15 @@ This page covers the bar. The console has its own pages, see [Console](console/i
 
 ## Health strip
 
-The bar starts as a collapsed strip with status, request time, memory, query count and template count.
+The bar starts as a collapsed strip with the status, the request time, the number of queries and the time they took, the number of exceptions, the request id and a **Console** button.
 
 ![The collapsed health strip](assets/screenshots/strip-collapsed.png)
 
-The strip border and an issues chip turn amber or red when the request is slow, has an N+1, catches an exception, or returns a 4xx or 5xx status. Click a chip to open the matching tab.
+The strip border turns red for a 5xx response or an exception nothing caught. It has no other color: the bar says what happened, it does not judge. The issues (slow, N+1, security notes) are in the console. Click a chip to open the matching tab. The request id chip copies the id, and the **Console** button opens this request in the console.
 
-The strip also shows two cost chips, `cpu` (CPU time of the request thread) and `alloc` (bytes it allocated). Click one to open the Runtime panel. They are hidden when the JVM cannot measure them.
+When an exception was thrown, Lens opens the panel on Exceptions for you. Turn this off with `ui.autoOpenOnException`.
 
-When an exception was caught, Lens opens the panel on Issues for you. Turn this off with `ui.autoOpenOnException`.
-
-![The panel opened on Issues after a caught exception](assets/screenshots/issues-exception.png)
+![The panel opened on Exceptions after a caught exception](assets/screenshots/issues-exception.png)
 
 ## Shortcuts
 
@@ -33,9 +31,8 @@ When an exception was caught, Lens opens the panel on Issues for you. Turn this 
 
 ## Console button and More menu
 
-When the console is on and you may use it, the strip has an **Open console** button. The **More** menu next to it has:
+When the console is on and you may use it, the strip has a **Console** button that opens this request in the console. The **More** menu next to it has:
 
-- Open this request in the console
 - Copy request as JSON
 - Copy request id
 - Detach as a floating window (or dock it again)

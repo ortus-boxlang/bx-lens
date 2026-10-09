@@ -7,7 +7,7 @@ icon: lucide:sliders-horizontal
 
 # Environment
 
-The Environment page shows what this server is made of: the effective BoxLang configuration, the loaded modules, the JVM arguments, the environment variables and the system properties.
+The Environment page shows what this server is made of: the loaded modules, the JVM arguments, the environment variables and the system properties.
 
 ![The Environment page](../assets/screenshots/console-environment.png)
 
@@ -15,7 +15,6 @@ The Environment page shows what this server is made of: the effective BoxLang co
 
 | Section | Content |
 |---|---|
-| Effective configuration | `boxlang.json` merged with the defaults and the environment, as BoxLang sees it. Long lists are cut at 200 entries and values at 500 characters. |
 | Modules | Name, version, state and path of every module. |
 | JVM arguments | The flags the JVM started with. |
 | Environment variables | Every variable, with a filter by name. |

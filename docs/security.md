@@ -222,7 +222,7 @@ The Logs page does not redact. The Environment page and the diagnostic bundle hi
 
 ## Security notes on your own pages
 
-Lens also looks at your responses. Missing security headers and cookie flags show up as Notes on the Issues tab. See [Issues](panels/issues.md#security-notes).
+Lens also looks at your responses. Missing security headers and cookie flags show up as Notes in the console request detail. See [Issues](console/issues.md#security-notes).
 
 ## Checklist
 

@@ -130,7 +130,10 @@ public final class IssueEngine {
 		}
 
 		// Request level
-		if ( req.status >= 500 ) {
+		if ( req.unfinished ) {
+			req.addIssue( "crit", "Request never finished", req.method + " " + req.uri + " had no end event after " + cfg.requestMaxMinutes
+			    + " minutes. Open spans were closed with an estimate.", "", 0, "timeline", 0 );
+		} else if ( req.status >= 500 ) {
 			req.addIssue( "crit", "HTTP " + req.status, req.method + " " + req.uri, "", 0, "request", 0 );
 		} else if ( req.status >= 400 ) {
 			req.addIssue( "warn", "HTTP " + req.status, req.method + " " + req.uri, "", 0, "request", 0 );

@@ -7,7 +7,7 @@ icon: lucide:package
 
 # Caches
 
-The Caches page lists every BoxCache cache with its statistics and a capped view of its keys. Use the [Cache panel](../panels/cache.md) of the bar to see what one request did to a cache. This page shows the cache as a whole.
+The Caches page lists every BoxCache cache with its statistics and a capped view of its keys. The bar does not show caches, because core announces no cache read events. The Runtime tab of the bar lists the cache names.
 
 ![The Caches page](../assets/screenshots/console-caches.png)
 

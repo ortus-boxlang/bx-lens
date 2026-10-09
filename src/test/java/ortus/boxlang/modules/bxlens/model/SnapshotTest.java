@@ -44,7 +44,7 @@ public class SnapshotTest {
 		LensPanelBuilder p = req.panel( "extra", "Extra", "spans" );
 		p.spans( List.of( Map.of( "label", "phase", "start", 1, "dur", 2 ) ) );
 		IssueEngine.analyze( req, LensConfig.defaults() );
-		Map<String, Object>	snap	= Snapshot.build( req, LensConfig.defaults() );
+		Map<String, Object>	snap	= Snapshot.build( req, LensConfig.defaults(), true );
 		Map<String, Object>	r		= ( Map<String, Object> ) snap.get( "request" );
 		assertThat( r.get( "method" ) ).isEqualTo( "GET" );
 		assertThat( r.get( "type" ) ).isEqualTo( "other" );
@@ -67,7 +67,9 @@ public class SnapshotTest {
 		Map<String, Object> s = Snapshot.summary( req, LensConfig.defaults() );
 		assertThat( s.get( "url" ) ).isEqualTo( "/api/orders?page=2" );
 		assertThat( s.get( "type" ) ).isEqualTo( "json" );
-		assertThat( s.keySet() ).containsAtLeast( "id", "method", "status", "ms", "issues", "severity", "queries", "at" );
+		assertThat( s.keySet() ).containsAtLeast( "id", "method", "status", "ms", "queries", "at" );
+		assertThat( s.keySet() ).doesNotContain( "issues" );
+		assertThat( Snapshot.summaryWithIssues( req, LensConfig.defaults() ).keySet() ).containsAtLeast( "issues", "severity" );
 	}
 
 	@SuppressWarnings( "unchecked" )
@@ -123,6 +125,59 @@ public class SnapshotTest {
 			assertThat( id ).matches( "[0-9a-z]{9,16}" );
 			assertThat( seen.add( id ) ).isTrue();
 		}
+	}
+
+	@SuppressWarnings( "unchecked" )
+	@Test
+	@DisplayName( "The bar payload carries no issues, no flags and no N+1 counts, the console payload does" )
+	public void barHasNoIssueEngine() {
+		LensRequest req = new LensRequest();
+		req.status = 200;
+		for ( int i = 0; i < 4; i++ ) {
+			Span s = req.begin( Span.QUERY, "SELECT 1", 10 );
+			s.detail.put( "sql", "SELECT x FROM t WHERE id = ?" );
+			req.end( s );
+			Map<String, Object> q = new java.util.LinkedHashMap<>();
+			q.put( "span", s.id );
+			q.put( "sql", "SELECT x FROM t WHERE id = ?" );
+			q.put( "ms", 1.0 );
+			req.queries.add( q );
+		}
+		IssueEngine.analyze( req, LensConfig.defaults() );
+		assertThat( req.issues ).isNotEmpty();
+		Map<String, Object> bar = Snapshot.build( req, LensConfig.defaults() );
+		assertThat( bar.containsKey( "issues" ) ).isFalse();
+		assertThat( ( ( Map<String, Object> ) bar.get( "counts" ) ).containsKey( "issues" ) ).isFalse();
+		for ( Map<String, Object> q : ( List<Map<String, Object>> ) bar.get( "queries" ) ) {
+			assertThat( q.containsKey( "flag" ) ).isFalse();
+			assertThat( q.containsKey( "count" ) ).isFalse();
+		}
+		for ( Map<String, Object> sp : ( List<Map<String, Object>> ) bar.get( "spans" ) ) {
+			assertThat( sp.containsKey( "flag" ) ).isFalse();
+		}
+		Map<String, Object> console = Snapshot.build( req, LensConfig.defaults(), true );
+		assertThat( console.containsKey( "issues" ) ).isTrue();
+		assertThat( ( ( List<Map<String, Object>> ) console.get( "queries" ) ).get( 0 ).containsKey( "flag" ) ).isTrue();
+	}
+
+	@SuppressWarnings( "unchecked" )
+	@Test
+	@DisplayName( "The strip is red for a 5xx or an uncaught exception, and for nothing else" )
+	public void stripState() {
+		LensRequest ok = new LensRequest();
+		ok.status = 404;
+		ok.addIssue( "warn", "x", "", "", 0, "", 0 );
+		assertThat( Snapshot.barState( ok ) ).isEqualTo( "none" );
+		LensRequest bad = new LensRequest();
+		bad.status = 503;
+		assertThat( Snapshot.barState( bad ) ).isEqualTo( "crit" );
+		LensRequest thrown = new LensRequest();
+		thrown.exceptions.add( Map.of( "origin", "uncaught" ) );
+		assertThat( Snapshot.barState( thrown ) ).isEqualTo( "crit" );
+		LensRequest caught = new LensRequest();
+		caught.exceptions.add( Map.of( "origin", "function:x" ) );
+		assertThat( Snapshot.barState( caught ) ).isEqualTo( "none" );
+		assertThat( ( ( Map<String, Object> ) Snapshot.build( bad, LensConfig.defaults() ).get( "request" ) ).get( "state" ) ).isEqualTo( "crit" );
 	}
 
 }

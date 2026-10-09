@@ -28,6 +28,9 @@
 					"slowQueryMs": 15,
 					"slowRequestMs": 3000
 				},
+				"request": {
+					"maxMinutes": 1
+				},
 				"history": {
 					"trackNonHtml": true
 				},

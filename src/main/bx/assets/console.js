@@ -206,7 +206,17 @@
 				loadModules: async function () { this.modl = await (await this.api("modules")).json(); if (!this.modsel && this.modl.modules.length) { this.modsel = this.modl.modules[0].name; } },
 				modRows: function () { var q = this.modq.toLowerCase(); return this.modl.modules.filter(function (m) { return !q || m.name.toLowerCase().indexOf(q) >= 0; }); },
 				modcur: function () { var s = this.modsel; return this.modl ? (this.modl.modules.find(function (m) { return m.name === s; }) || null) : null; },
-				envd: null, envView: "config", envq: "", base: base(),
+				envd: null, envView: "modules", envq: "", base: base(),
+				cfgd: null, cfgq: "",
+				loadConfig: async function () { var r = await this.api("configuration"); this.cfgd = r.ok ? await r.json() : null; },
+				cfgGroups: function () {
+					var q = this.cfgq.toLowerCase();
+					if (!this.cfgd) { return []; }
+					return this.cfgd.groups.map(function (g) {
+						return { name: g.name, admin: g.admin, entries: g.entries.filter(function (e) { return !q || e.key.toLowerCase().indexOf(q) >= 0 || JSON.stringify(e.value).toLowerCase().indexOf(q) >= 0 || g.name.toLowerCase().indexOf(q) >= 0; }) };
+					}).filter(function (g) { return g.entries.length; });
+				},
+				cfgText: function (v) { return v !== null && typeof v === "object" ? JSON.stringify(v) : String(v); },
 				loadEnv: async function () { this.envd = await (await this.api("environment")).json(); },
 				envRows: function () {
 					var rows = this.envView === "env" ? this.envd.env : this.envd.properties, q = this.envq.toLowerCase();
@@ -300,6 +310,7 @@
 					}
 					if (this.tab === "queries") { this.loadQueries(); }
 					if (this.tab === "environment" && !this.envd) { this.loadEnv(); }
+					if (this.tab === "configuration") { this.loadConfig(); }
 					if (this.tab === "modules") { this.loadModules(); }
 					if (this.tab === "orm") { this.loadOrm(); this.ormTimer = setInterval(function () { if (self.tab === "orm" && !document.hidden) { self.loadOrm(); } }, 5000); } else { clearInterval(this.ormTimer); }
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
@@ -367,7 +378,7 @@
 					if (!this.detail) { return []; }
 					var spans = this.detail.spans.slice(0, 40), total = spans.reduce(function (m, s) { return Math.max(m, s.start + s.dur); }, Math.max(this.detail.request.durationMs, 0.001));
 					return spans.map(function (s, i) {
-						return { key: s.id, type: s.type, label: s.label.indexOf("/") > -1 ? s.label.split("/").pop() : s.label, left: (s.start / total) * 100, width: Math.max(0.6, (s.dur / total) * 100), top: i * 16 };
+						return { key: s.id, type: s.type + (s.interrupted ? " cut" : ""), label: (s.interrupted ? "interrupted: " : "") + (s.label.indexOf("/") > -1 ? s.label.split("/").pop() : s.label), left: (s.start / total) * 100, width: Math.max(0.6, (s.dur / total) * 100), top: i * 16 };
 					});
 				},
 				copyJson: async function () { try { await navigator.clipboard.writeText(JSON.stringify(this.detail, null, 2)); this.toast("Request JSON copied"); } catch (e) { this.toast("Could not copy"); } },

@@ -50,6 +50,10 @@ public final class LensRequest {
 	public volatile String							contentType		= "";
 	public volatile int								status			= 200;
 	public volatile boolean							html			= false;
+	/** The request never ended by itself: it was cut off or swept by the watchdog. Its open spans were closed with an estimate. */
+	public volatile boolean							unfinished		= false;
+	/** Has the issue engine looked at this request? It does so for the console, once. */
+	public volatile boolean							analyzed		= false;
 	public volatile RequestBoxContext				requestContext;
 	/** The thread that handles the request, sampled by the slow request watchdog. */
 	public volatile Thread							thread;
@@ -71,6 +75,10 @@ public final class LensRequest {
 	public final Map<String, LensPanelBuilder>		panels			= Collections.synchronizedMap( new LinkedHashMap<>() );
 	public final Map<String, Map<String, Object>>	pendingTimers	= new ConcurrentHashMap<>();
 
+	/** Nanoseconds since the request started at the last thing Lens saw happen: a span opened or closed, an exception. */
+	private volatile long							lastActivity	= 0;
+	/** When an exception was last seen on each thread, to close the spans it left open. */
+	private final Map<Long, Long>					exceptionAt		= new ConcurrentHashMap<>();
 	private final AtomicInteger						spanSeq			= new AtomicInteger( 0 );
 	private final Map<String, AtomicInteger>		typeCounts		= new ConcurrentHashMap<>();
 	private final Map<Long, ArrayDeque<Span>>		stacks			= new ConcurrentHashMap<>();
@@ -129,9 +137,11 @@ public final class LensRequest {
 			return null;
 		}
 		ArrayDeque<Span>	stack	= stacks.computeIfAbsent( Thread.currentThread().threadId(), k -> new ArrayDeque<>() );
-		Span				span	= new Span( spanSeq.incrementAndGet(), type, label, now(), stack.size() );
+		long				t		= now();
+		Span				span	= new Span( spanSeq.incrementAndGet(), type, label, t, stack.size() );
 		spans.add( span );
 		stack.push( span );
+		lastActivity = t;
 		return span;
 	}
 
@@ -143,21 +153,27 @@ public final class LensRequest {
 			return;
 		}
 		long				t		= now();
-		ArrayDeque<Span>	stack	= stacks.get( Thread.currentThread().threadId() );
+		long				before	= lastActivity;
+		long				tid		= Thread.currentThread().threadId();
+		ArrayDeque<Span>	stack	= stacks.get( tid );
 		if ( stack != null ) {
 			while ( !stack.isEmpty() ) {
 				Span top = stack.pop();
-				if ( top.isOpen() ) {
-					top.endNs = t;
-				}
 				if ( top == span ) {
 					break;
+				}
+				if ( top.isOpen() ) {
+					// Its own end event never came (an exception went through it, or the event was skipped). It ended when the last thing we
+					// saw on this thread happened, not when the span around it ended
+					top.endNs		= estimate( top, exceptionAt.get( tid ), before, t );
+					top.interrupted	= true;
 				}
 			}
 		}
 		if ( span.isOpen() ) {
 			span.endNs = t;
 		}
+		lastActivity = t;
 	}
 
 	/**
@@ -203,6 +219,7 @@ public final class LensRequest {
 		Span				span	= new Span( spanSeq.incrementAndGet(), type, label, startNs, stack == null ? 0 : stack.size() );
 		span.endNs = endNs;
 		spans.add( span );
+		lastActivity = Math.max( lastActivity, endNs );
 		return span;
 	}
 
@@ -210,15 +227,53 @@ public final class LensRequest {
 	 * Close every span still open, called when the request ends.
 	 */
 	public void closeAll() {
-		long t = now();
+		long	t		= now();
+		long	lastEx	= -1;
+		for ( Long x : exceptionAt.values() ) {
+			lastEx = Math.max( lastEx, x );
+		}
 		synchronized ( spans ) {
 			for ( Span s : spans ) {
 				if ( s.isOpen() ) {
-					s.endNs = t;
+					// Still open when the request ended: its end event never came. It is marked, and it ends where the activity ended
+					s.endNs			= estimate( s, lastEx < 0 ? null : lastEx, lastActivity, t );
+					s.interrupted	= true;
 				}
 			}
 		}
 		stacks.clear();
+	}
+
+	/**
+	 * Remember that an exception passed on the current thread now. Spans on that thread that never see their end event are closed with this time.
+	 */
+	public void noteException() {
+		long t = now();
+		exceptionAt.put( Thread.currentThread().threadId(), t );
+		lastActivity = Math.max( lastActivity, t );
+	}
+
+	/**
+	 * Did any span end without its own end event?
+	 */
+	public boolean hasInterrupted() {
+		synchronized ( spans ) {
+			for ( Span s : spans ) {
+				if ( s.interrupted ) {
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * The end of a span whose end event never came: the exception on its thread when one came after it started, else the last activity,
+	 * never before its start and never after <code>limit</code>.
+	 */
+	private static long estimate( Span s, Long exception, long lastActivity, long limit ) {
+		long end = exception != null && exception >= s.startNs ? exception : lastActivity;
+		return Math.max( s.startNs, Math.min( limit, end ) );
 	}
 
 	/**

@@ -74,7 +74,7 @@
           <div class="card scroll" style="padding:0"><table><thead><tr><th>Time</th><th>Method</th><th>URL</th><th class="num">Status</th><th class="num">Time</th><th class="num">SQL</th><th class="num">Issues</th></tr></thead><tbody>
             <template x-for="r in filtered()" :key="r.id"><tr class="row" :class="rsel === r.id ? 'sel' : ''" tabindex="0" @click="pick(r.id)" @keydown.enter="pick(r.id)">
               <td class="mono" x-text="time(r.at)"></td><td x-text="r.method"></td><td class="mono" x-text="r.url"></td>
-              <td class="num"><span class="pill" :class="statusClass(r.status)" x-text="r.status"></span></td><td class="num" x-text="fmt(r.ms)"></td><td class="num" x-text="r.queries"></td>
+              <td class="num"><span class="pill" :class="r.state === 'unfinished' ? 'crit' : statusClass(r.status)" x-text="r.state === 'unfinished' ? 'unfinished' : r.status"></span></td><td class="num" x-text="fmt(r.ms)"></td><td class="num" x-text="r.queries"></td>
               <td class="num" :style="r.issues ? 'color:var(--warn)' : ''" x-text="r.issues"></td></tr></template>
             <tr x-show="!filtered().length"><td colspan="7" class="empty">No requests match.</td></tr></tbody></table></div>
           <div class="card">
@@ -83,7 +83,7 @@
             <template x-if="detail">
               <div>
                 <h3><span class="mono" style="color:var(--ink)" x-text="detail.request.method + ' ' + detail.request.uri"></span><span x-text="time(Date.parse(detail.request.startedAt))"></span></h3>
-                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-show="detail.cost && detail.cost.cpuMs !== null" x-text="'cpu ' + fmt(detail.cost ? detail.cost.cpuMs : 0)"></span><span class="pill" x-show="detail.cost && detail.cost.allocBytes !== null" x-text="'alloc ' + bytes(detail.cost ? detail.cost.allocBytes : 0)"></span><span class="pill" x-text="detail.request.remoteAddr"></span><span class="pill mono" title="Request id" x-text="'id ' + detail.request.id"></span></div>
+                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.state === 'unfinished' ? 'unfinished' : detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-show="detail.cost && detail.cost.cpuMs !== null" x-text="'cpu ' + fmt(detail.cost ? detail.cost.cpuMs : 0)"></span><span class="pill" x-show="detail.cost && detail.cost.allocBytes !== null" x-text="'alloc ' + bytes(detail.cost ? detail.cost.allocBytes : 0)"></span><span class="pill" x-text="detail.request.remoteAddr"></span><span class="pill mono" title="Request id" x-text="'id ' + detail.request.id"></span></div>
                 <div class="tools"><button class="btn mini" @click="copyJson()"><svg class="ic"><use href="#ph-copy"/></svg>Copy JSON</button><button class="btn mini" @click="downloadJson()"><svg class="ic"><use href="#ph-download-simple"/></svg>Download JSON</button><button class="btn mini" @click="copyCurl()"><svg class="ic"><use href="#ph-terminal-window"/></svg>Copy as cURL</button></div>
                 <template x-for="i in detail.issues" :key="i.title + i.message"><div class="issue" :class="i.severity === 'crit' ? 'crit' : (i.severity === 'info' ? 'note' : '')"><b x-text="i.severity === 'crit' ? 'Error' : (i.severity === 'info' ? 'Note' : 'Warn')"></b><span x-text="i.title + ': ' + i.message"></span></div></template>
                 <template x-if="detail.slowSample"><div><h3 style="margin-top:8px">Where it was at <span x-text="detail.slowSample.atMs + ' ms'"></span></h3><ul class="frames" style="max-height:160px"><template x-for="(f, i) in detail.slowSample.frames" :key="i"><li :class="f.bx ? 'bx' : ''" x-text="f.text"></li></template></ul></div></template>
@@ -328,16 +328,31 @@
         </template>
       </section>
 
+      <!-- Configuration -->
+      <section x-show="tab === 'configuration'">
+        <h1 class="h1">Configuration <small>the effective BoxLang settings by area, secrets hidden</small></h1>
+        <template x-if="cfgd">
+          <div>
+            <div class="tools" style="margin-bottom:10px"><input type="search" placeholder="Filter by key, value or area" x-model="cfgq" aria-label="Filter the configuration"><span class="sub" x-show="cfgd.adminOnlyHidden">Paths, security and logging settings are for the admin role.</span></div>
+            <template x-for="g in cfgGroups()" :key="g.name">
+              <div class="card" style="margin-bottom:12px"><h3 x-text="g.name"></h3>
+                <div class="scroll"><table><thead><tr><th>Key</th><th>Value</th><th>Source</th></tr></thead><tbody>
+                  <template x-for="e in g.entries" :key="e.key"><tr><td class="mono" x-text="e.key"></td><td class="mono" style="white-space:pre-wrap;word-break:break-all" x-text="cfgText(e.value)"></td><td><span class="chipx" :class="e.source === 'default' ? 'hid' : (e.source ? 'on' : '')" x-text="e.source || 'unknown'"></span></td></tr></template></tbody></table></div></div>
+            </template>
+            <div class="empty" x-show="!cfgGroups().length">Nothing matches.</div>
+          </div>
+        </template>
+      </section>
+
       <!-- Environment -->
       <section x-show="tab === 'environment'">
         <h1 class="h1">Environment <small>what this server is made of, secrets hidden</small></h1>
         <template x-if="envd">
           <div>
             <div class="tools" style="margin-bottom:10px">
-              <template x-for="v in ['config', 'modules', 'jvm', 'env', 'props']" :key="v"><button class="btn" :class="envView === v ? 'primary' : ''" @click="envView = v" x-text="{config: 'BoxLang config', modules: 'Modules', jvm: 'JVM arguments', env: 'Environment variables', props: 'System properties'}[v]"></button></template>
+              <template x-for="v in ['modules', 'jvm', 'env', 'props']" :key="v"><button class="btn" :class="envView === v ? 'primary' : ''" @click="envView = v" x-text="{modules: 'Modules', jvm: 'JVM arguments', env: 'Environment variables', props: 'System properties'}[v]"></button></template>
               <span style="flex:1"></span>
               <a class="btn" :class="state && (state.role === 'viewer' || !state.plus.bundle) ? 'disabled' : ''" :href="state && state.role !== 'viewer' && state.plus.bundle ? base + '/api/bundle' : null" :title="state && !state.plus.bundle ? 'BoxLang+ feature' : ''"><svg class="ic"><use href="#ph-download-simple"/></svg>Diagnostic bundle<span class="chipx plus" x-show="state && !state.plus.bundle" style="margin-left:6px">Plus</span></a></div>
-            <div class="card" x-show="envView === 'config'"><h3>Effective configuration <span>boxlang.json merged with defaults and environment</span></h3><pre class="code" style="max-height:560px;overflow:auto" x-text="JSON.stringify(envd.config, null, 2)"></pre></div>
             <div class="card" x-show="envView === 'modules'"><h3>Modules <span x-text="envd.modules.length"></span></h3><div class="scroll"><table><thead><tr><th>Name</th><th>Version</th><th>State</th><th>Path</th></tr></thead><tbody><template x-for="m in envd.modules" :key="m.name"><tr><td class="mono" x-text="m.name"></td><td x-text="m.version"></td><td><span class="chipx" :class="m.activated ? 'on' : 'hid'" x-text="m.activated ? 'active' : (m.enabled ? 'loaded' : 'disabled')"></span></td><td class="mono mute" x-text="m.path"></td></tr></template></tbody></table></div></div>
             <div class="card" x-show="envView === 'jvm'"><h3>JVM arguments</h3><pre class="code" x-text="envd.jvmArgs.join('\n')"></pre><dl class="kv" style="margin-top:10px"><template x-for="(v, k) in envd.info" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd x-text="v"></dd></div></template></dl></div>
             <div class="card" x-show="envView === 'env' || envView === 'props'"><h3 x-text="envView === 'env' ? 'Environment variables' : 'System properties'"><span class="sub" x-text="'values of names that look secret are hidden'"></span></h3>

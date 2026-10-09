@@ -20,8 +20,10 @@
 			"console/caches.md",
 			"console/logs.md",
 			"console/environment.md",
+			"console/configuration.md",
 			"console/modules.md",
 			"console/in-flight-and-queries.md",
+			"console/issues.md",
 			"console/errors-and-reports.md",
 			"console/ask-lens-and-ai.md",
 			"console/system-and-threads.md",
@@ -35,18 +37,13 @@
 			"panels/index.md",
 			"panels/timeline.md",
 			"panels/queries.md",
-			"panels/templates.md",
-			"panels/http.md",
 			"panels/exceptions.md",
+			"panels/http.md",
 			"panels/messages-and-timers.md",
 			"panels/request-and-scopes.md",
-			"panels/jvm.md",
-			"panels/cache.md",
-			"panels/modules.md",
 			"panels/bifs.md",
-			"panels/orm.md",
-			"panels/history.md",
-			"panels/issues.md"
+			"panels/runtime.md",
+			"panels/orm.md"
 		]
 	},
 	{

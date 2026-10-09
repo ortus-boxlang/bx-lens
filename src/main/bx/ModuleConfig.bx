@@ -117,6 +117,9 @@ class {
 			contentTypes : [ "text/html" ],
 			excludePaths : [ "/~bxlens/*", "/favicon.ico" ],
 
+			// A request still running after this many minutes is finished by the watchdog as unfinished (its open spans are closed with an estimate)
+			request : { maxMinutes : 10 },
+
 			// In-memory history ring buffer. The oldest request is recycled when full. Nothing is written to disk
 			history : {
 				// Keep JSON, SSE and other non HTML requests in the history. Empty means off in light and on in full
@@ -182,10 +185,10 @@ class {
 				timers       : { enabled : true, max : 200 },
 				transactions : { enabled : true, max : 50 },
 				logs         : { enabled : false, max : 200 },
-				scopes       : { enabled : true, url : true, form : true, cookie : false, session : false, request : false, application : false, variables : false },
+				// Opt in: the scope viewer shows a copy of scope contents, so it is off until you ask for it. Skipped at collect.level light
+				scopes       : { enabled : false, url : true, form : true, cookie : false, session : false, request : false, application : false, variables : false },
+				// The Runtime tab of the bar: versions, system, uptime, heap, cache names and main settings, cached for a few seconds
 				jvm          : { enabled : true },
-				cache        : { enabled : true },
-				modules      : { enabled : true },
 				// The SQL of bx-orm (Hibernate), shown like a normal query. Off by default: when off, Lens does not look at bx-orm at all
 				orm          : { enabled : false, statistics : true },
 				// Time per built-in function, from postBIFInvocation. Every BIF call allocates an event while this is on, so it is off by default
@@ -197,6 +200,8 @@ class {
 				caches       : { enabled : true },
 				logfiles     : { enabled : true },
 				environment  : { enabled : true },
+				modules      : { enabled : true },
+				configuration : { enabled : true },
 				inflight     : { enabled : true },
 				errors       : { enabled : true },
 				reports      : { enabled : true },

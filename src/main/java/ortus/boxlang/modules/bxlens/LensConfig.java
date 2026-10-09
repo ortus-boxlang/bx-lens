@@ -58,6 +58,8 @@ public final class LensConfig {
 	public final int															maxString;
 	public final int															maxDepth;
 	public final int															maxItems;
+	/** A request still running after this many minutes is finished by the watchdog as unfinished. */
+	public final int															requestMaxMinutes;
 	/** Hot reads resolved once when the config is built. */
 	public final boolean														queriesIncludeParams;
 	public final boolean														queriesCaptureCaller;
@@ -97,6 +99,7 @@ public final class LensConfig {
 		this.maxString				= getInt( "limits.maxString", 2000 );
 		this.maxDepth				= getInt( "limits.maxDepth", 4 );
 		this.maxItems				= getInt( "limits.maxItems", 100 );
+		this.requestMaxMinutes		= Math.max( 1, getInt( "request.maxMinutes", 10 ) );
 		this.queriesIncludeParams	= collectorBool( "queries", "includeParams", false );
 		this.queriesCaptureCaller	= collectorBool( "queries", "captureCaller", true );
 		this.ormEnabled				= isCollectorEnabled( "orm", false );

@@ -44,16 +44,16 @@ What is free, what needs BoxLang+, and the license states.
 
 ## What you get
 
-- A collapsed health strip: status, time, memory, query and template counts.
-- A unified waterfall of templates, functions, queries and HTTP calls on one time axis.
-- An Issues tab that ranks slow queries, N+1 patterns, slow templates, caught exceptions and 4xx/5xx responses.
+- A collapsed strip: status, time, query count and time, exception count, the request id and a Console button. It is red for a 5xx or an uncaught exception and has no other color.
+- A unified waterfall of templates, functions, queries and HTTP calls on one time axis. A span whose end event never came is drawn striped and marked interrupted.
+- In the console, issues per request: slow queries, N+1 patterns, slow templates, caught exceptions and 4xx/5xx responses. The bar only shows what happened.
 - BoxLang+: cost per request (CPU time and bytes allocated by the request thread) and a sample of where a slow request was stuck.
-- Security notes for missing headers and cookie flags.
-- A History tab with the last 50 requests (25 on Free), including JSON and SSE. Lens keeps them in memory only.
-- A password-protected console with an admin and a view-only role. Pages: Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, Caches, Logs, Modules, Environment, System (with Run GC), Threads, a Bar designer and editable Settings. Task actions, cache values and actions, log download, the diagnostic bundle, heap dumps and saving a bar layout need BoxLang+.
+- Security notes for missing headers and cookie flags, in the console request detail.
+- A history of the last 50 requests (25 on Free) in the console, including JSON and SSE when `history.trackNonHtml` is on. Lens keeps them in memory only.
+- A password-protected console with an admin and a view-only role. Pages: Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, Caches, Logs, Modules, Environment, System (with Run GC), Threads, a Configuration, Bar designer and editable Settings. Task actions, cache values and actions, log download, the diagnostic bundle, heap dumps and saving a bar layout need BoxLang+.
 - Optional AI help to explain an error, a query or a deadlock, with a prompt you copy or, with BoxLang+, a call through `bx-ai`, which ships inside Lens. Off by default.
 - Light and dark themes, resizing, a floating detached window and keyboard shortcuts.
-- Cache and Modules panels, an opt-in BIFs panel for time per built-in function, five BIFs that return the console data (`lensReport`, `lensErrors`, `lensQueries`, `lensInflight`, `lensLicense`), and a small API to add your own panels without writing JavaScript.
+- A Runtime snapshot tab, an opt-in BIFs panel for time per built-in function, five BIFs that return the console data (`lensReport`, `lensErrors`, `lensQueries`, `lensInflight`, `lensLicense`), and a small API to add your own panels without writing JavaScript.
 
 Free keeps the bar and most of the console. Items marked BoxLang+ need a license or a trial and show a "BoxLang+" note on Free. See [Licensing](licensing.md#free-and-boxlang).
 

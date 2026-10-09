@@ -71,6 +71,10 @@ public class TransactionCollector extends BaseCollector {
 			LensRequest	req		= request( event );
 			Span		span	= req == null ? null : req.open( Span.TX );
 			if ( span != null ) {
+				// Core announces a commit after a rollback when the transaction block ends, so a rollback is not overwritten
+				if ( "commit".equals( outcome ) && "rollback".equals( span.detail.get( "outcome" ) ) ) {
+					return;
+				}
 				span.detail.put( "outcome", outcome );
 				if ( "rollback".equals( outcome ) ) {
 					span.flag( "warn", "Rollback" );

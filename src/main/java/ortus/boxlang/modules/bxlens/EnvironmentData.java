@@ -101,7 +101,7 @@ public final class EnvironmentData {
 				m.put( "version", r.version );
 				m.put( "author", r.author );
 				m.put( "description", r.description );
-				m.put( "webURL", ortus.boxlang.modules.bxlens.interceptors.collectors.ModulesCollector.webUrl( r.webURL ) );
+				m.put( "webURL", ortus.boxlang.modules.bxlens.util.Text.webUrl( r.webURL ) );
 				m.put( "enabled", r.enabled );
 				m.put( "activated", r.activated );
 				m.put( "activationMs", r.activationTime );
@@ -150,44 +150,8 @@ public final class EnvironmentData {
 		return out;
 	}
 
-	/**
-	 * Copy a structure with secrets hidden, depth and size capped.
-	 */
 	private Object walk( Object v, String name, int depth ) {
-		if ( v == null ) {
-			return null;
-		}
-		if ( Secrets.isSecretName( name ) && ! ( v instanceof Map ) && ! ( v instanceof Collection ) ) {
-			return v.toString().isEmpty() ? "" : Secrets.HIDDEN;
-		}
-		if ( depth > 12 ) {
-			return "...";
-		}
-		if ( v instanceof Map<?, ?> map ) {
-			Map<String, Object> out = new LinkedHashMap<>();
-			for ( Map.Entry<?, ?> e : map.entrySet() ) {
-				String k = e.getKey() instanceof Key key ? key.getName() : String.valueOf( e.getKey() );
-				out.put( k, walk( e.getValue(), k, depth + 1 ) );
-			}
-			return out;
-		}
-		if ( v instanceof Collection<?> c ) {
-			List<Object>	out	= new ArrayList<>();
-			int				n	= 0;
-			for ( Object o : c ) {
-				if ( n++ >= 200 ) {
-					out.add( "..." );
-					break;
-				}
-				out.add( walk( o, name, depth + 1 ) );
-			}
-			return out;
-		}
-		if ( v instanceof Number || v instanceof Boolean ) {
-			return v;
-		}
-		String s = Secrets.text( v.toString() );
-		return s.length() > 500 ? s.substring( 0, 500 ) + "..." : s;
+		return RuntimeInfo.walk( v, name, depth );
 	}
 
 	/**

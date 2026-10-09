@@ -14,11 +14,11 @@ test.describe( 'the bar and the console', () => {
 
 	test( 'the bar offers a way into the console', async ( { lens, page } ) => {
 		await lens.visit( '/orders.bxm' );
-		await expect( page.locator( '#bxlens a.ibtn[title="Open the console"]' ) ).toHaveAttribute( 'href', BASE );
-		await page.locator( '#bxlens .more .ibtn' ).click();
-		const item = page.locator( '#bxlens .menu a', { hasText: 'Open this request in the console' } );
-		await expect( item ).toBeVisible();
-		expect( await item.getAttribute( 'href' ) ).toContain( '#requests/' );
+		const id = ( await lens.data() ).data.request.id;
+		const button = page.locator( '#bxlens a.console' );
+		await expect( button ).toBeVisible();
+		await expect( button ).toHaveText( /Console/ );
+		await expect( button ).toHaveAttribute( 'href', `${ BASE }#requests/${ id }` );
 	} );
 
 	test( 'the bar makes no request outside the server and uses Phosphor icons', async ( { lens, page } ) => {
@@ -54,7 +54,7 @@ test.describe( 'the bar and the console', () => {
 		await expect( rows.first() ).toBeVisible();
 		try {
 			await page.locator( '.drow', { hasText: 'Scopes' } ).locator( '.eye' ).click();
-			await page.locator( '.drow', { hasText: 'History' } ).locator( 'button[aria-label^="Move History up"]' ).click();
+			await page.locator( '.drow', { hasText: 'Runtime' } ).locator( 'button[aria-label^="Move Runtime up"]' ).click();
 			await expect( page.locator( '.ptabs .ptab', { hasText: 'Scopes' } ) ).toHaveCount( 0 );
 			await page.click( 'button:has-text("Save layout")' );
 			await expect( page.locator( '.toast' ) ).toContainText( 'Layout saved' );
@@ -65,7 +65,8 @@ test.describe( 'the bar and the console', () => {
 			const tabs = await bar.page.locator( '#bxlens .tab' ).allInnerTexts();
 			expect( tabs.join( '|' ) ).not.toContain( 'Scopes' );
 			const labels = tabs.map( t => t.trim().split( /\s+/ )[ 0 ] );
-			expect( labels.indexOf( 'History' ) ).toBeLessThan( labels.indexOf( 'Runtime' ) );
+			expect( labels.indexOf( 'Runtime' ) ).toBeGreaterThan( -1 );
+			expect( labels.indexOf( 'Runtime' ) ).toBeLessThan( labels.indexOf( 'Request' ) + 2 );
 		} finally {
 			await page.request.post( `${ BASE }/api/bar/reset`, { headers: { 'X-Lens-CSRF': await page.evaluate( () => document.body.dataset.csrf! ) } } );
 		}
@@ -74,12 +75,12 @@ test.describe( 'the bar and the console', () => {
 	test( 'resetting the designer brings every tab back', async ( { lens, page } ) => {
 		await signIn( page );
 		await page.click( '.nav:has-text("Bar designer")' );
-		await page.locator( '.drow', { hasText: 'Cache' } ).locator( '.eye' ).click();
+		await page.locator( '.drow', { hasText: 'Timers' } ).locator( '.eye' ).click();
 		await page.click( 'button:has-text("Save layout")' );
 		await page.click( 'button:has-text("Reset to default")' );
-		await expect( page.locator( '.drow', { hasText: 'Cache' } ).locator( '.eye' ) ).toHaveAttribute( 'aria-pressed', 'true' );
-		await lens.visit( '/cache.bxm' );
-		await expect( lens.tab( 'Cache' ) ).toBeAttached();
+		await expect( page.locator( '.drow', { hasText: 'Timers' } ).locator( '.eye' ) ).toHaveAttribute( 'aria-pressed', 'true' );
+		await lens.visit( '/timers.bxm' );
+		await expect( lens.tab( 'Timers' ) ).toBeAttached();
 	} );
 
 	test( 'saving a layout needs the CSRF token', async ( { page } ) => {

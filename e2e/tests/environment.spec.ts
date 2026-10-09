@@ -16,10 +16,8 @@ async function signIn( page: Page, pw = 'lens-demo' ) {
 
 test.describe( 'environment', () => {
 
-	test( 'shows config, modules, JVM arguments, variables and properties without secrets', async ( { page } ) => {
+	test( 'shows modules, JVM arguments, variables and properties without secrets', async ( { page } ) => {
 		await signIn( page );
-		const pre = page.locator( 'pre.code' ).first();
-		await expect( pre ).toContainText( 'modules' );
 		const text = await page.content();
 		expect( text ).not.toContain( 'lens-demo' );
 		await page.click( '.main section:visible button:has-text("Modules")' );

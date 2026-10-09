@@ -156,7 +156,7 @@ The console needs `enabled: true` and a password. See [Console](console/index.md
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `hide` | list | `[]` | Ids of bar tabs and console pages to hide. Bar ids: `issues`, `timeline`, `queries`, `templates`, `http`, `exceptions`, `messages`, `timers`, `cache`, `modules`, `request`, `scopes`, `jvm`, `history`, plus ids of custom panels. Console ids: `overview`, `requests`, `inflight`, `errors`, `reports`, `ask`, `queries`, `executors`, `tasks`, `datasources`, `caches`, `logfiles`, `environment`, `system`, `threads`, `designer`. The id `queries` hides both the bar tab and the console page. Settings is always shown. A disabled collector hides its tab too. |
+| `hide` | list | `[]` | Ids of bar tabs and console pages to hide. Bar ids: `timeline`, `queries`, `exceptions`, `http`, `messages`, `timers`, `request`, `scopes`, `bifs`, `runtime`, plus ids of custom panels. Console ids: `overview`, `requests`, `inflight`, `errors`, `reports`, `ask`, `queries`, `executors`, `tasks`, `datasources`, `caches`, `logfiles`, `environment`, `configuration`, `system`, `threads`, `designer`. The id `queries` hides both the bar tab and the console page. Settings is always shown. A disabled collector hides its tab too. |
 
 ## `access`
 
@@ -179,6 +179,12 @@ See [Security](security.md#behind-a-proxy).
 | `inject` | boolean | `true` | Inject the bar before `</body>` on HTML responses. Set false and call [`lensRender()`](guides/bifs.md#lensrender) to place it yourself. |
 | `contentTypes` | list | `["text/html"]` | Response content types that get the bar. |
 | `excludePaths` | list | `["/~bxlens/*", "/favicon.ico"]` | Paths that are never tracked. A trailing `*` is a prefix match. Console paths are always excluded. |
+
+## `request`
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `maxMinutes` | number | `10` | A request still running after this many minutes is finished by the watchdog as **unfinished**: its open spans are closed with an estimate and marked interrupted, it is kept in the console history with the issue "Request never finished", and it leaves the In flight list. Nothing is written to its response. The check runs every five seconds. |
 
 ## `history`
 
@@ -205,7 +211,7 @@ See [Security](security.md#behind-a-proxy).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `slowRequestMs` | number | `500` | Requests slower than this raise an issue. Also starts the [slow request sample](panels/issues.md#slow-request-sample). |
+| `slowRequestMs` | number | `500` | Requests slower than this raise an issue. Also starts the [slow request sample](console/issues.md#slow-request-sample). |
 | `slowQueryMs` | number | `25` | Queries slower than this warn. At 4 times this value they are critical. |
 | `slowTemplateMs` | number | `100` | Templates and functions with a self time above this raise an issue. |
 | `nPlusOneMin` | number | `3` | Runs of the same SQL needed to flag an N+1. |
@@ -214,7 +220,7 @@ See [Security](security.md#behind-a-proxy).
 
 | Key | Type | Default | Description |
 |---|---|---|---|
-| `securityHeaders` | boolean | `true` | Add Notes for missing security headers and cookie flags on HTML responses. See [Issues](panels/issues.md#security-notes). |
+| `securityHeaders` | boolean | `true` | Add Notes for missing security headers and cookie flags on HTML responses. See [Issues](console/issues.md#security-notes). |
 | `slowSample` | boolean | `true` | Sample the request thread once when it passes `thresholds.slowRequestMs`. |
 
 ## `store`
@@ -294,12 +300,12 @@ Each collector powers one or more panels and has an `enabled` flag. Most also ha
 | `timers` | `enabled`, `max` | `true`, `200` | Timers and measures. |
 | `transactions` | `enabled`, `max` | `true`, `50` | Transactions, shown as spans on the Timeline. |
 | `logs` | `enabled`, `max` | `false`, `200` | Log messages of one request, shown in Messages. Skipped at `light`. Not the console Logs page, which is `logfiles`. |
-| `scopes` | `enabled` | `true` | Scope viewer. Skipped at `light`. |
+| `scopes` | `enabled` | `false` | Scope viewer. Opt in: the tab exists only when this is on. Skipped at `light`. |
 | | `url`, `form` | `true` | Include these scopes. |
 | | `cookie`, `session`, `request`, `application`, `variables` | `false` | Include these scopes. Opt in. |
-| `jvm` | `enabled` | `true` | Runtime panel. |
-| `cache` | `enabled` | `true` | Cache panel. |
-| `modules` | `enabled` | `true` | Bar Modules panel and console [Modules](console/modules.md) page. |
+| `jvm` | `enabled` | `true` | Runtime tab of the bar: a snapshot of the runtime, cached for a few seconds. |
+| `modules` | `enabled` | `true` | Console [Modules](console/modules.md) page. |
+| `configuration` | `enabled` | `true` | Console [Configuration](console/configuration.md) page. |
 | `bifs` | `enabled` | `false` | Time per built-in function, from `postBIFInvocation`. Off by default and skipped at `light`, because every BIF call allocates an event while it is on. Needs a BoxLang build with core pull request 657. Lens's own `lens*` functions are left out, a request keeps up to 300 names, and the [panel](panels/bifs.md) shows the top 60 by total time. |
 | `executors` | `enabled` | `true` | Console [Executors](console/executors.md) page. |
 | `tasks` | `enabled` | `true` | Console [Tasks](console/tasks.md) page. |

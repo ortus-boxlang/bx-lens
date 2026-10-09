@@ -1,13 +1,15 @@
 ---
 title: Issues
-order: 13
+order: 8
 description: Everything suspicious in one ranked list.
 icon: lucide:circle-alert
 ---
 
 # Issues
 
-The Issues tab lists everything suspicious about the request, ranked by severity. Each issue links to its row in the panel that raised it.
+The console request detail lists everything suspicious about a request, ranked by severity. The bar does not: it only shows what happened. Issues are found when the console opens the request (once, then kept), so a bar only installation never runs the analysis.
+
+An unfinished request (see [Core events](../reference/events.md#spans-that-never-close)) gets the critical issue **Request never finished**.
 
 ![The Issues tab with ranked findings](../assets/screenshots/issues.png)
 

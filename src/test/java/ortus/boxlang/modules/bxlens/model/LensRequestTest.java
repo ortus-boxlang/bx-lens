@@ -78,4 +78,65 @@ public class LensRequestTest {
 		assertThat( s.flagLabel ).isEqualTo( "Slow" );
 	}
 
+	@Test
+	@DisplayName( "A child whose end event never came ends when the last thing happened, not when its parent ended" )
+	public void skippedPostEvent() throws Exception {
+		LensRequest	req		= new LensRequest();
+		Span		parent	= req.begin( Span.TEMPLATE, "/outer.bxm", 10 );
+		Span		child	= req.begin( Span.TEMPLATE, "/inner.bxm", 10 );
+		Thread.sleep( 5 );
+		req.noteException();
+		long exceptionAt = req.now();
+		Thread.sleep( 30 );
+		// The parent ends normally, the child's post event was skipped because an exception went through it
+		req.end( parent );
+		assertThat( child.interrupted ).isTrue();
+		assertThat( parent.interrupted ).isFalse();
+		assertThat( child.endNs ).isAtMost( exceptionAt );
+		assertThat( child.endNs ).isLessThan( parent.endNs );
+		assertThat( child.toMap().get( "interrupted" ) ).isEqualTo( true );
+		assertThat( parent.toMap().containsKey( "interrupted" ) ).isFalse();
+	}
+
+	@Test
+	@DisplayName( "Without an exception the child ends at the last activity before its parent closed" )
+	public void lastActivity() throws Exception {
+		LensRequest	req		= new LensRequest();
+		Span		parent	= req.begin( Span.TEMPLATE, "/outer.bxm", 10 );
+		Span		child	= req.begin( Span.QUERY, "SELECT 1", 10 );
+		Thread.sleep( 25 );
+		req.end( parent );
+		assertThat( child.interrupted ).isTrue();
+		assertThat( child.endNs ).isAtMost( child.startNs + 1_000_000L );
+		assertThat( child.endNs ).isAtLeast( child.startNs );
+	}
+
+	@Test
+	@DisplayName( "closeAll marks spans still open at the end of the request, and leaves closed ones alone" )
+	public void closeAllMarks() throws Exception {
+		LensRequest	req		= new LensRequest();
+		Span		done	= req.begin( Span.TEMPLATE, "/done.bxm", 10 );
+		req.end( done );
+		Span open = req.begin( Span.HTTP, "GET /slow", 10 );
+		Thread.sleep( 20 );
+		req.closeAll();
+		assertThat( open.isOpen() ).isFalse();
+		assertThat( open.interrupted ).isTrue();
+		assertThat( done.interrupted ).isFalse();
+		assertThat( req.hasInterrupted() ).isTrue();
+		assertThat( open.endNs ).isAtLeast( open.startNs );
+	}
+
+	@Test
+	@DisplayName( "A request whose spans all closed has none interrupted" )
+	public void cleanRequest() {
+		LensRequest	req	= new LensRequest();
+		Span		a	= req.begin( Span.TEMPLATE, "/a.bxm", 10 );
+		Span		b	= req.begin( Span.QUERY, "SELECT 1", 10 );
+		req.end( b );
+		req.end( a );
+		req.closeAll();
+		assertThat( req.hasInterrupted() ).isFalse();
+	}
+
 }
