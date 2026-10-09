@@ -142,7 +142,7 @@ test.describe( 'ops assistant', () => {
 		const chip = page.locator( '.tchip .chipbtn', { hasText: 'blockedThreads' } );
 		await expect( chip ).toBeVisible();
 		await expect( chip ).toContainText( /findings|deadlock|items/ );
-		await expect( page.locator( '.abub' ).last() ).toContainText( 'deadlock' );
+		await expect( page.locator( '.abub' ).last() ).toContainText( 'deadlock: false' );
 		await chip.click();
 		await expect( page.locator( '.targs' ).first() ).toBeVisible();
 		await page.click( '#agent-reset' );
@@ -292,7 +292,7 @@ test.describe( 'ops assistant', () => {
 		await page.click( '#agent-launch' );
 		await ask( page, 'show me the environment' );
 		await expect( page.locator( '.tchip .chipbtn', { hasText: 'environment' } ) ).toBeVisible();
-		await expect( page.locator( '.abub' ).last() ).toContainText( 'Based on the tool result' );
+		await expect( page.locator( '.abub' ).last() ).toContainText( 'tool returned' );
 		const log = await mockLog( request );
 		const toolMessage = JSON.stringify( log.map( e => e.last ) );
 		expect( toolMessage ).toContain( 'environment' );
@@ -306,7 +306,7 @@ test.describe( 'ops assistant', () => {
 		await page.click( '#agent-launch' );
 		await ask( page, 'how do i set the server name' );
 		await expect( page.locator( '.tchip .chipbtn', { hasText: 'searchDocs' } ) ).toBeVisible();
-		await expect( page.locator( '.abub' ).last() ).toContainText( '"mode":"embeddings"' );
+		await expect( page.locator( '.abub' ).last() ).toContainText( 'mode: embeddings' );
 		let st = await ( await request.get( `${ API }/agent/status` ) ).json();
 		expect( st.rag.mode ).toBe( 'embeddings' );
 		expect( st.rag.chunks ).toBeGreaterThan( 50 );
@@ -316,8 +316,9 @@ test.describe( 'ops assistant', () => {
 		await setAi( request, csrf, { 'ai.embeddingModel': 'gone-embed' } );
 		await page.click( '#agent-reset' );
 		await ask( page, 'how do i set the server name' );
-		await expect( page.locator( '.abub' ).last() ).toContainText( '"mode":"keywords"' );
-		await expect( page.locator( '.abub' ).last() ).toContainText( 'configuration.md' );
+		await expect( page.locator( '.abub' ).last() ).toContainText( 'mode: keywords' );
+		const toolMsg = JSON.stringify( ( await mockLog( request ) ).map( e => e.last ) );
+		expect( toolMsg ).toContain( 'configuration.md' );
 		st = await ( await request.get( `${ API }/agent/status` ) ).json();
 		expect( st.rag.mode ).toBe( 'keywords' );
 		await page.reload();

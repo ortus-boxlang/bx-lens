@@ -56,6 +56,18 @@ test.describe( 'Free: what is open and what is locked', () => {
 		await expect( sec.locator( '.plusnote' ) ).toContainText( 'BoxLang+' );
 	} );
 
+	test( 'the ops assistant is locked: no tools, a chat is refused and the AI settings cannot change', async ( { request } ) => {
+		const { csrf } = await session( request );
+		const st = await ( await request.get( `${ API }/agent/status` ) ).json();
+		expect( st ).toMatchObject( { licensed: false, available: false, tools: 0 } );
+		const chat = await request.post( `${ API }/agent/chat`, { headers: { 'X-Lens-CSRF': csrf }, form: { message: 'hello' } } );
+		expect( chat.status() ).toBe( 409 );
+		expect( ( await chat.json() ).plus ).toBe( true );
+		const cfg = await request.post( `${ API }/ai/config`, { headers: { 'X-Lens-CSRF': csrf }, form: { changes: '{"ai.enabled":true}' } } );
+		expect( cfg.status() ).toBe( 403 );
+		expect( ( await request.get( `${ API }/ai/config` ) ).status() ).toBe( 200 );
+	} );
+
 	test( 'the free pages and reads still work', async ( { request } ) => {
 		await request.get( '/orders.bxm' );
 		await session( request );

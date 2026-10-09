@@ -6,7 +6,7 @@ It answers the three calls Lens makes:
 
   POST /api/chat    chat, streamed (NDJSON) when "stream" is true, else one JSON object. Deterministic, driven by keywords in the last user
                     message (see decide()). When a keyword names a tool that the request offers, the answer is a tool call. When the last message
-                    is a tool result, the answer repeats the start of that result, so a test can tell the model saw it. Everything else is echoed.
+                    is a tool result, the answer lists the fields of that result, so a test can tell the model saw it. Everything else is echoed.
   POST /api/embed   embeddings. A bag of words hashed into 64 dimensions, so texts that share words are close.
   GET  /api/tags    the models it pretends to have (llama3.2 and nomic-embed-text).
 
@@ -63,6 +63,28 @@ ARGS = {
 }
 
 
+def summarize(content):
+	"""A readable answer built from a tool result: a title and one bullet per field of the result."""
+	try:
+		d = json.loads(content)
+	except ValueError:
+		return "Based on the tool result: " + str(content)[:400]
+	res = d.get("result", d) if isinstance(d, dict) else d
+	lines = ["Here is what the **%s** tool returned:" % (d.get("tool", "?") if isinstance(d, dict) else "?"), ""]
+	if isinstance(res, dict):
+		for k, v in list(res.items())[:12]:
+			if isinstance(v, dict):
+				vs = json.dumps(v)[:100]
+			elif isinstance(v, list):
+				vs = "%d items" % len(v)
+			else:
+				vs = str(v)[:140]
+			lines.append("- %s: %s" % (k, vs))
+	else:
+		lines.append(str(res)[:300])
+	return "\n".join(lines)
+
+
 def vector(text):
 	v = [0.0] * 64
 	for w in re.findall(r"[a-z0-9]+", text.lower()):
@@ -78,7 +100,7 @@ def decide(body):
 	tools = [t.get("function", {}).get("name") for t in body.get("tools", []) or []]
 	last = msgs[-1] if msgs else {"role": "user", "content": ""}
 	if last.get("role") == "tool":
-		return ("text", "Based on the tool result: " + str(last.get("content", ""))[:400])
+		return ("text", summarize(str(last.get("content", ""))))
 	text = str(last.get("content", ""))
 	low = text.lower()
 	if low.startswith("force:"):
