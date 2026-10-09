@@ -120,7 +120,8 @@ public final class RuntimeInfo {
 			for ( String[] k : BAR_KEYS ) {
 				Object v = cfg.get( Key.of( k[ 0 ] ) );
 				if ( v != null && !String.valueOf( v ).isEmpty() ) {
-					settings.add( entry( k[ 1 ], show( k[ 0 ], v ) ) );
+					// The key is one of BoxLang's own setting names (session timeout is not a secret), so only the value is checked
+					settings.add( entry( k[ 1 ], show( "", v ) ) );
 				}
 			}
 			if ( cfg.get( Key.of( "mappings" ) ) instanceof Map<?, ?> mp ) {
@@ -306,7 +307,8 @@ public final class RuntimeInfo {
 		if ( v == null ) {
 			return null;
 		}
-		if ( Secrets.isSecretName( name ) && ! ( v instanceof Map ) && ! ( v instanceof Collection ) ) {
+		// The name of a top level BoxLang setting is never a secret by itself (sessionTimeout). Names inside a value are checked
+		if ( depth > 0 && Secrets.isSecretName( name ) && ! ( v instanceof Map ) && ! ( v instanceof Collection ) ) {
 			return v.toString().isEmpty() ? "" : Secrets.HIDDEN;
 		}
 		if ( depth > 12 ) {
@@ -335,7 +337,7 @@ public final class RuntimeInfo {
 		if ( v instanceof Number || v instanceof Boolean ) {
 			return v;
 		}
-		return show( name, v );
+		return show( depth == 0 ? "" : name, v );
 	}
 
 	private static String show( String name, Object v ) {

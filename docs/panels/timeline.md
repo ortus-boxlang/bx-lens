@@ -21,6 +21,8 @@ The Timeline is the main view. It draws templates, functions, queries, HTTP call
 
 A span whose end event never came (core does not fire `postFunctionInvoke` when an exception goes through a function) is drawn striped and marked **interrupted**. It ends at the time of the exception or the last activity Lens saw, never at the end of the span around it, and its end is an estimate. See [spans that never close](../reference/events.md#spans-that-never-close).
 
+![An interrupted span in the timeline](../assets/screenshots/interrupted.png)
+
 Spans from custom panels appear here with the `custom` type. See [Extending Lens](../guides/extending.md#spans).
 
 All times are offsets from the start of the request.
