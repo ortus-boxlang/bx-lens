@@ -17,6 +17,7 @@ ICONS = [
     "sun", "moon", "circle-half", "dots-six-vertical", "arrow-square-out", "shield-check", "key", "play", "pause", "info", "layout",
     "list-checks", "tree-structure", "gauge", "hard-drives", "queue", "lock-simple", "arrows-clockwise", "dots-three", "browsers", "arrow-line-down",
     "package", "file-text", "hourglass", "chart-bar", "sparkle", "sliders-horizontal", "table", "trash", "clipboard-text",
+    "robot", "paper-plane-right", "chat-circle-dots", "stop", "arrow-counter-clockwise",
 ]
 
 src = Path(sys.argv[1]) / "regular"

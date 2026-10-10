@@ -49,7 +49,7 @@ One page at `/~bxlens/index.bxm`, with its own password, an optional second view
 | Errors | Errors grouped by cause with counts, where, and a stack and request context per sample. Redacted prompt copy for an AI chat | Free in memory, saved to disk with Plus |
 | Reports | Totals, error rate, p95 and p99, status codes, busiest and slowest URLs, a minute series | Free for 60 minutes, longer and saved with Plus |
 | Queries | Statements ranked by slowest, total time, count and failures, across every request | Free |
-| Ask Lens | Ask about this server in plain words. Copy prompt, Ask ChatGPT and Ask Claude buttons are free. Server side AI calls through the bundled bx-ai are Plus | Free copy, Plus calls |
+| Ask Lens | Ask about this server in plain words. Copy prompt, Ask ChatGPT and Ask Claude buttons are free. With BoxLang+ it is the full page of the [ops assistant](console/ai.md) | Free copy, Plus assistant |
 
 ### Runtime
 
@@ -72,7 +72,12 @@ One page at `/~bxlens/index.bxm`, with its own password, an optional second view
 | Page | What it does | Tier |
 |---|---|---|
 | Bar designer | Choose and order the bar tabs | Save Plus |
-| Settings | Change thresholds, collectors, interface and limits live, with a reset, saved to a small overrides file. Passwords, access rules, `console.*`, `store.*` and `ai.*` stay in `boxlang.json` | Free |
+| AI | Status, requirements, live settings and a connection test for the ops assistant. The key is never typed in: an environment variable name or a `bxsecret:` value | View Free, change Plus |
+| Settings | Change thresholds, collectors, interface and limits live, with a reset, saved to a small overrides file. Passwords, access rules, `console.*`, `store.*` and the AI key stay in `boxlang.json` | Free |
+
+### The ops assistant
+
+A chat in a drawer on every console page (and the full page of Ask Lens) that answers by calling tools: overview, requests, errors, queries, executors with concrete pool recommendations, threads, blocked threads and deadlocks, garbage collection pressure, datasources, logs, database metadata and a `diagnose` health sweep, plus a search of these docs. Actions (tasks, caches, run GC, integrations, a live setting) wait for an Approve click. Default model: Ollama on this machine. BoxLang+. See [the AI page](console/ai.md), [the tool list](reference/ai-tools.md) and the [threat model](security.md#ops-assistant-threat-model).
 
 ### Roles and control
 
@@ -80,6 +85,24 @@ One page at `/~bxlens/index.bxm`, with its own password, an optional second view
 - **Read only mode** refuses every change from the console.
 - **Audit log** (`bxlens-audit.log`) records every change, download and denied attempt. No secrets.
 - Access rules per surface: loopback, an IP list, allowed hosts (DNS rebinding guard), a required header, and proxy header trust only from trusted peers.
+
+## Server identity
+
+Every record says which machine produced it, so the data of many servers can end up in one database and still be told apart. This is built in and free. It is a name and an address, never a lookup while a request runs.
+
+| What | Where the identity appears |
+|---|---|
+| A request | The `serverHost`, `serverIp` and `serverId` of the summary and the detail, the Request tab of the bar, the console request detail, the Requests table (a Server column shows when the history holds more than one server id), the JSON and cURL exports |
+| Errors | The group and every sample, and a top level `server` on the list |
+| Reports and queries | A top level `server` on the totals and on the query statistics, and the server id of each statement |
+| In flight | Each running request |
+| Audit log | Every line has `server=<id>` |
+| Disk store | `errors.json` and `reports.json` have a top level `server`, every error group and sample has its own `serverId` |
+| BIFs | `lensServer()`, and the `server` key of `lensReport()` and `lensDiagnostics()`. The rows of `lensErrors()`, `lensQueries()` and `lensInflight()` carry `serverId` |
+| Response header | `X-BxLens-Server`, only next to `X-BxLens-Id` and only with `history.serverHeader` |
+| Console | The host name and address in the header and on the Overview |
+
+The identity is detected once at start and looked at again every five minutes. Set `server.name`, `server.address` and `server.id` (or the environment variables `LENS_SERVER_NAME`, `LENS_SERVER_ADDRESS` and `LENS_SERVER_ID`) behind containers or NAT. See [`server`](configuration.md#server).
 
 ## Integrations
 
@@ -93,7 +116,7 @@ How to add one: [Integrations](reference/integrations.md).
 
 ## BIFs for your code
 
-`lensMessage()`, `lensDump()`, `lensMeasure()`, `lensStart()`, `lensStop()`, `lensException()`, `lensPanel()`, `lensEnable()`, `lensDisable()`, `lensIsEnabled()`, `lensRender()`, `lensRequestId()`, and for tools and dashboards `lensReport()`, `lensErrors()`, `lensQueries()`, `lensInflight()`, `lensLicense()`, `lensDiagnostics()`. The tracking BIFs do nothing when the request is not tracked.
+`lensMessage()`, `lensDump()`, `lensMeasure()`, `lensStart()`, `lensStop()`, `lensException()`, `lensPanel()`, `lensEnable()`, `lensDisable()`, `lensIsEnabled()`, `lensRender()`, `lensRequestId()`, and for tools and dashboards `lensReport()`, `lensErrors()`, `lensQueries()`, `lensInflight()`, `lensLicense()`, `lensDiagnostics()` and `lensServer()`. The tracking BIFs do nothing when the request is not tracked.
 
 ## Safe by default
 
@@ -105,7 +128,7 @@ How to add one: [Integrations](reference/integrations.md).
 | `collectors.queries.includeParams` | off | Values can be personal data |
 | `collectors.functions`, `bifs`, `logs`, `scopes`, `orm` | off | They cost time or copy data |
 | `console.allowHeapDump` | off | A dump holds every secret in memory |
-| `ai.enabled` | off | When on, a redacted prompt leaves the server |
+| `ai.enabled` | off | When on, prompts and what the assistant reads leave the server (a local model keeps them in your network) |
 
 - Redaction happens before storing. Statement text is stored with literals masked, never parameter values.
 - Every in-memory store has a hard cap and drops the oldest entry.

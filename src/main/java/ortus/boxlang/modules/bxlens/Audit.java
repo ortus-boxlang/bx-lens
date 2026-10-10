@@ -32,10 +32,12 @@ public final class Audit {
 			final String	r	= clean( role == null ? "none" : role, 16 );
 			final String	i	= clean( ip, 64 );
 			final String	d	= clean( detail, 500 );
+			// Every line names the server that wrote it, because audit logs of many servers are read together
+			final String	sv	= clean( service.getIdentity().get().id(), 64 );
 			service.async( () -> {
 				BoxLangLogger l = service.auditLogger();
 				if ( l != null ) {
-					l.info( "event={} role={} ip={} {}", e, r, i, d );
+					l.info( "event={} role={} ip={} server={} {}", e, r, i, sv, d );
 				}
 			} );
 		} catch ( Throwable t ) {

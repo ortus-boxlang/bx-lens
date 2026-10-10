@@ -47,14 +47,25 @@ public final class QueryStats {
 		String	lastError		= "";
 		String	slowestRequest	= "";
 		String	lastRequest		= "";
+		/** The server that ran it last. */
+		String	serverId		= "";
 		/** At least one run came from bx-orm. */
 		boolean	orm;
 		String	kind			= "";
 	}
 
-	private final Map<String, Stat>	stats	= new ConcurrentHashMap<>();
-	private final Bounded			bounded	= new Bounded();
-	private volatile long			since	= System.currentTimeMillis();
+	private final Map<String, Stat>										stats			= new ConcurrentHashMap<>();
+	private final Bounded												bounded			= new Bounded();
+	private volatile long												since			= System.currentTimeMillis();
+	/** Which server these statistics belong to. */
+	private volatile java.util.function.Supplier<Map<String, Object>>	serverSource	= Map::of;
+
+	/**
+	 * Where the identity of this server comes from, so the snapshot says which machine it describes.
+	 */
+	public void identify( java.util.function.Supplier<Map<String, Object>> source ) {
+		this.serverSource = source;
+	}
 
 	/**
 	 * Fold the queries of a finished request into the statistics.
@@ -139,6 +150,7 @@ public final class QueryStats {
 				s.lastError		= safe.length() > 500 ? safe.substring( 0, 500 ) : safe;
 				s.lastSeen		= System.currentTimeMillis();
 				s.lastRequest	= req.id;
+				s.serverId		= req.serverId;
 				return;
 			}
 			s.totalMs	+= ms;
@@ -153,6 +165,7 @@ public final class QueryStats {
 			}
 			s.lastSeen		= System.currentTimeMillis();
 			s.lastRequest	= req.id;
+			s.serverId		= req.serverId;
 			String file = String.valueOf( q.getOrDefault( "file", "" ) );
 			if ( !file.isEmpty() && !"null".equals( file ) ) {
 				s.file	= file;
@@ -170,6 +183,7 @@ public final class QueryStats {
 			s.lastError		= safe.length() > 500 ? safe.substring( 0, 500 ) : safe;
 			s.lastSeen		= System.currentTimeMillis();
 			s.lastRequest	= req.id;
+			s.serverId		= req.serverId;
 		}
 	}
 
@@ -209,6 +223,7 @@ public final class QueryStats {
 				m.put( "lastError", s.lastError );
 				m.put( "slowestRequest", s.slowestRequest );
 				m.put( "lastRequest", s.lastRequest );
+				m.put( "serverId", s.serverId );
 				m.put( "orm", s.orm );
 				m.put( "kind", s.kind );
 				rows.add( m );
@@ -226,6 +241,7 @@ public final class QueryStats {
 		out.put( "totalMs", round( total ) );
 		out.put( "avgMs", count - failed == 0 ? 0 : round( total / ( count - failed ) ) );
 		out.put( "since", since );
+		out.put( "server", this.serverSource.get() );
 		out.put( "max", MAX_STATEMENTS );
 		return out;
 	}

@@ -39,6 +39,7 @@ public final class RequestStore {
 		private volatile String						consoleJson;
 		private final Supplier<Map<String, Object>>	analyzedSource;
 		private volatile Map<String, Object>		analyzed;
+		private volatile String						serverId	= "";
 
 		/**
 		 * @param json the payload already built
@@ -79,6 +80,14 @@ public final class RequestStore {
 
 		public String id() {
 			return id;
+		}
+
+		/**
+		 * The server that handled the request, so the store can tell whether one server or several produced its content.
+		 */
+		public Entry server( String serverId ) {
+			this.serverId = serverId == null ? "" : serverId;
+			return this;
 		}
 
 		/**
@@ -164,8 +173,13 @@ public final class RequestStore {
 	}
 
 	private volatile int				capacity;
-	private final ArrayDeque<Entry>		ring	= new ArrayDeque<>();
-	private final Map<String, Entry>	byId	= new HashMap<>();
+	private final ArrayDeque<Entry>		ring		= new ArrayDeque<>();
+	private final Map<String, Entry>	byId		= new HashMap<>();
+	/** Every server id ever added, so the console can show a Server column only when records of more than one server are here. Capped. */
+	private final java.util.Set<String>	servers		= new java.util.LinkedHashSet<>();
+
+	/** The most server ids remembered. A store that sees more has records of many servers either way. */
+	public static final int				MAX_SERVERS	= 64;
 
 	public RequestStore( int capacity ) {
 		this.capacity = Math.max( 1, capacity );
@@ -175,6 +189,9 @@ public final class RequestStore {
 	 * Store a request, recycling the oldest when at capacity.
 	 */
 	public synchronized void add( Entry entry ) {
+		if ( !entry.serverId.isEmpty() && servers.size() < MAX_SERVERS ) {
+			servers.add( entry.serverId );
+		}
 		ring.addLast( entry );
 		byId.put( entry.id(), entry );
 		while ( ring.size() > capacity ) {
@@ -216,6 +233,13 @@ public final class RequestStore {
 		return byId.get( id );
 	}
 
+	/**
+	 * How many distinct server ids were added since the store was created or cleared.
+	 */
+	public synchronized int serverCount() {
+		return servers.size();
+	}
+
 	public synchronized int size() {
 		return ring.size();
 	}
@@ -238,6 +262,7 @@ public final class RequestStore {
 	public synchronized void clear() {
 		ring.clear();
 		byId.clear();
+		servers.clear();
 	}
 
 }

@@ -128,6 +128,96 @@ public final class Secrets {
 	}
 
 	/**
+	 * Hide secrets in free text, which is what a log line, an error message or a stack can hold: a secret-looking <code>name=value</code>,
+	 * <code>name: value</code> or <code>"name":"value"</code> pair (the value runs to a space, quote, comma, semicolon, ampersand or brace), a
+	 * <code>Bearer</code> or <code>Basic</code> credential, and anything shaped like a JSON web token. It is stricter than {@link #text}, and
+	 * meant for text that goes to a language model. Scanned by hand, no regular expression.
+	 */
+	public static String loose( String value ) {
+		String s = text( value );
+		if ( s.isEmpty() ) {
+			return s;
+		}
+		StringBuilder	out	= new StringBuilder( s.length() );
+		int				i	= 0;
+		while ( i < s.length() ) {
+			char c = s.charAt( i );
+			if ( ( c == '=' || c == ':' ) && i > 0 ) {
+				int start = i;
+				while ( start > 0 && ( Character.isLetterOrDigit( s.charAt( start - 1 ) ) || "_.-".indexOf( s.charAt( start - 1 ) ) >= 0 ) ) {
+					start--;
+				}
+				String name = s.substring( start, i );
+				// A closing quote before the separator: "name":"value"
+				if ( name.isEmpty() && start > 0 && s.charAt( start - 1 ) == '"' ) {
+					int	end	= start - 1;
+					int	q	= end - 1;
+					while ( q >= 0 && ( Character.isLetterOrDigit( s.charAt( q ) ) || "_.-".indexOf( s.charAt( q ) ) >= 0 ) ) {
+						q--;
+					}
+					name = s.substring( q + 1, end );
+				}
+				if ( !name.isEmpty() && isSecretName( name ) ) {
+					int v = i + 1;
+					while ( v < s.length() && ( s.charAt( v ) == ' ' || s.charAt( v ) == '"' || s.charAt( v ) == '\'' ) ) {
+						v++;
+					}
+					int e = v;
+					while ( e < s.length() && " \t\r\n\",;&}'".indexOf( s.charAt( e ) ) < 0 ) {
+						e++;
+					}
+					if ( e > v && !s.startsWith( HIDDEN, v ) ) {
+						out.append( s, i, v ).append( HIDDEN );
+						i = e;
+						continue;
+					}
+				}
+			}
+			out.append( c );
+			i++;
+		}
+		return tokens( out.toString() );
+	}
+
+	/** Bearer and Basic credentials, and JSON web tokens, anywhere in the text. */
+	private static String tokens( String s ) {
+		StringBuilder	out	= new StringBuilder( s.length() );
+		int				i	= 0;
+		while ( i < s.length() ) {
+			boolean	bearer	= s.regionMatches( true, i, "bearer ", 0, 7 );
+			boolean	basic	= s.regionMatches( true, i, "basic ", 0, 6 );
+			boolean	jwt		= s.startsWith( "eyJ", i ) && ( i == 0 || !Character.isLetterOrDigit( s.charAt( i - 1 ) ) );
+			if ( bearer || basic ) {
+				int	v	= i + ( bearer ? 7 : 6 );
+				int	e	= v;
+				while ( e < s.length() && " \t\r\n\",;&}'".indexOf( s.charAt( e ) ) < 0 ) {
+					e++;
+				}
+				if ( e - v >= 8 ) {
+					out.append( s, i, v ).append( HIDDEN );
+					i = e;
+					continue;
+				}
+			} else if ( jwt ) {
+				int	e		= i;
+				int	dots	= 0;
+				while ( e < s.length() && ( Character.isLetterOrDigit( s.charAt( e ) ) || "-_.=".indexOf( s.charAt( e ) ) >= 0 ) ) {
+					dots += s.charAt( e ) == '.' ? 1 : 0;
+					e++;
+				}
+				if ( dots >= 2 && e - i > 20 ) {
+					out.append( HIDDEN );
+					i = e;
+					continue;
+				}
+			}
+			out.append( s.charAt( i ) );
+			i++;
+		}
+		return out.toString();
+	}
+
+	/**
 	 * A connection URL with the user info removed and secret parameters hidden.
 	 */
 	public static String url( String url ) {

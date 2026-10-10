@@ -247,7 +247,7 @@ test.describe( '@screens documentation screenshots', () => {
 	test( 'console ask, settings edit and heap', async ( { page } ) => {
 		await consoleLogin( page );
 		await page.click( '.nav:has-text("Ask Lens")' );
-		await page.fill( 'textarea', 'Why was the server slow in the last few minutes?' );
+		await page.fill( '#askq', 'Why was the server slow in the last few minutes?' );
 		await consoleShot( page, 'console-ask' );
 		await page.click( '.nav:has-text("Settings")' );
 		await page.locator( '.srow', { hasText: 'thresholds.slowQueryMs' } ).locator( 'input[type=number]' ).fill( '40' );
@@ -325,6 +325,50 @@ test.describe( '@screens documentation screenshots', () => {
 		await page.click( '.nav:has-text("Caches")' );
 		await page.waitForTimeout( 1200 );
 		await consoleShot( page, 'console-free-locked' );
+	} );
+
+	test( 'console ops assistant, approval card and AI page', async ( { page, request } ) => {
+		await consoleLogin( page );
+		const csrf = await page.evaluate( () => document.body.dataset.csrf! );
+		const set = ( changes: Record<string, any> ) => page.request.post( `${ CONSOLE }/api/ai/config`, { headers: { 'X-Lens-CSRF': csrf }, form: { changes: JSON.stringify( changes ) } } );
+		try {
+			expect( ( await set( { 'ai.enabled': true } ) ).status() ).toBe( 200 );
+			await page.reload();
+			await page.waitForSelector( '#agent-launch' );
+			await page.click( '#agent-launch' );
+			await page.fill( '#agent-input', 'How healthy are the executors and how do I improve them?' );
+			await page.click( '#agent-send' );
+			await expect( page.locator( '.abub' ).last() ).toContainText( 'tool returned' );
+			await page.locator( '.tchip .chipbtn' ).first().click();
+			await consoleShot( page, 'console-agent' );
+			await page.click( '#agent-reset' );
+			await page.fill( '#agent-input', 'please run gc now' );
+			await page.click( '#agent-send' );
+			await expect( page.locator( '.acard' ).last() ).toContainText( 'Approval needed' );
+			await consoleShot( page, 'console-agent-approval' );
+			await page.locator( '.acard [data-act=deny]' ).click();
+			await page.click( '#agent-reset' );
+			await page.keyboard.press( 'Escape' );
+			await page.click( '.nav:has-text("AI")' );
+			await page.click( '#ai-test' );
+			await expect( page.locator( '#ai-test-out' ) ).toContainText( 'Works' );
+			await consoleShot( page, 'console-ai' );
+		} finally {
+			for ( const k of [ 'ai.enabled' ] ) {
+				await page.request.post( `${ CONSOLE }/api/settings/reset`, { headers: { 'X-Lens-CSRF': csrf }, form: { key: k } } );
+			}
+		}
+	} );
+
+	test( 'console AI page on the free tier', async ( { page } ) => {
+		const free = `http://127.0.0.1:${ process.env.FREE_PORT || '8090' }`;
+		await page.goto( `${ free }/~bxlens/index.bxm` );
+		await page.fill( '#pw', 'lens-demo' );
+		await page.click( '.go' );
+		await page.waitForSelector( '.shell .app' );
+		await page.click( '.nav:has-text("AI")' );
+		await expect( page.locator( '.main section:visible .plusnote' ) ).toBeVisible();
+		await consoleShot( page, 'console-ai-locked' );
 	} );
 
 	test( 'bar bifs', async ( { lens } ) => {

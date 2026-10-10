@@ -82,7 +82,7 @@ When someone reaches the console over plain HTTP from a non-loopback address, ev
 | [In flight](in-flight-and-queries.md#in-flight) | Requests running right now, with a live stack. |
 | [Errors](errors-and-reports.md#errors) | Errors grouped by cause, with samples. In memory on Free. |
 | [Reports](errors-and-reports.md#reports) | Totals, percentiles, status codes, URLs and a minute by minute series. |
-| [Ask Lens](ask-lens-and-ai.md) | Questions about the server, and prompts for a model. |
+| [Ask Lens](ask-lens-and-ai.md) | Questions about the server, and prompts for a model. With BoxLang+ it is the full page of the [ops assistant](ai.md). |
 | [Queries](in-flight-and-queries.md#queries) | Statistics for every SQL statement. |
 | [Executors](executors.md) | Live health of every executor. |
 | [Tasks](tasks.md) | Schedulers and scheduled tasks. Run now, pause, resume and reload need BoxLang+. |
@@ -94,6 +94,7 @@ When someone reaches the console over plain HTTP from a non-loopback address, ev
 | [System](system-and-threads.md) | CPU, memory, garbage collection, Run GC, classes, disks and runtime details. A heap dump needs BoxLang+. |
 | [Threads](system-and-threads.md#threads) | Thread viewer, thread dump and deadlock detail. |
 | [Bar designer](bar-designer.md) | Choose and order the tabs of the bar. Saving a layout needs BoxLang+. |
+| [AI](ai.md) | Status, settings and a connection test for the ops assistant. Admin only. BoxLang+ to change anything. |
 | [Settings](settings.md) | The effective settings, editable by an admin. |
 
 Hide a page with `tabs.hide`, or turn its collector off. Settings is always there.
@@ -102,7 +103,7 @@ Most of the console is free. The items marked BoxLang+ need a license or trial, 
 
 ### Requests
 
-The list shows time, method, URL, status, duration, SQL count and issue count, newest first. Filter by All, Errors, Slow or JSON, or by URL text. Pick a row to see the detail: status, timings, issues, the slow request sample if there is one, and a timeline waterfall.
+The list shows time, method, URL, status, duration, SQL count and issue count, newest first. A Server column is added when the history holds requests of more than one server id (for example after the id was changed), and the detail always names the server that handled the request. Filter by All, Errors, Slow or JSON, or by URL text. Pick a row to see the detail: status, timings, issues, the slow request sample if there is one, and a timeline waterfall.
 
 ![The Requests page](../assets/screenshots/console-requests.png)
 

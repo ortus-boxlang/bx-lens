@@ -11,11 +11,13 @@
 		<button class="chip" :class="d.counts.exceptions ? 'crit' : ''" x-show="d.counts.exceptions" @click="open('exceptions')" title="Exceptions"><svg class="ic"><use href="#bxlens-ph-warning"/></svg> <b x-text="d.counts.exceptions + (d.counts.exceptions === 1 ? ' exception' : ' exceptions')"></b></button>
 		<button class="chip" @click="copy(r.id, 'Request id')" title="Request id (click to copy)">id <b x-text="r.id"></b></button>
 		<span class="grow"></span>
+		<a class="abtn ask" x-show="ui.consoleUrl && ui.agent" :href="ui.consoleUrl + '#agent'" target="_blank" rel="noopener noreferrer" title="Ask the ops assistant in the console">Ask</a>
 		<a class="abtn console" x-show="ui.consoleUrl" :href="ui.consoleUrl + '#requests/' + r.id" target="_blank" rel="noopener noreferrer" title="Open this request in the console"><svg class="ic"><use href="#bxlens-ph-arrow-square-out"/></svg> Console</a>
 		<span class="more"><button class="ibtn" @click="toggleMenu($event)" title="More" aria-haspopup="menu" :aria-expanded="menu"><svg class="ic"><use href="#bxlens-ph-dots-three"/></svg></button>
 			<span class="menu" x-show="menu" :style="menuStyle" @click.outside="menu = false" role="menu">
 				<button role="menuitem" @click="copy(JSON.stringify(d, null, 2), 'Request JSON'); menu = false">Copy request as JSON</button>
 				<button role="menuitem" @click="copy(r.id, 'Request id'); menu = false">Copy request id</button>
+				<a role="menuitem" class="menuask" x-show="ui.consoleUrl && ui.agent" :href="ui.consoleUrl + '#agent'" target="_blank" rel="noopener noreferrer" @click="menu = false">Ask the ops assistant</a>
 				<button role="menuitem" x-show="ui.allowDetach && !collapsed" @click="toggleDetach(); menu = false" x-text="detached ? 'Dock to the bottom' : 'Detach as a floating window'"></button>
 			</span></span>
 		<button class="ibtn" @click="toggleTheme()" title="Toggle theme"><svg class="ic"><use href="#bxlens-ph-circle-half"/></svg></button>
@@ -165,7 +167,7 @@
 			<dl class="kv">
 				<dt>Method</dt><dd x-text="r.method"></dd><dt>URL</dt><dd x-text="r.url + (r.query ? '?' + r.query : '')"></dd>
 				<dt>Status</dt><dd x-text="r.status + ' ' + r.contentType"></dd><dt>Application</dt><dd x-text="r.app || '(none)'"></dd>
-				<dt>Remote address</dt><dd x-text="r.remoteAddr"></dd><dt>Started</dt><dd x-text="r.startedAt"></dd><dt>Request id</dt><dd x-text="r.id"></dd>
+				<dt>Remote address</dt><dd x-text="r.remoteAddr"></dd><dt>Server</dt><dd class="bx-server" x-text="r.serverHost + ' ' + r.serverIp + ' (' + r.serverId + ')'"></dd><dt>Started</dt><dd x-text="r.startedAt"></dd><dt>Request id</dt><dd x-text="r.id"></dd>
 				<dt>Template</dt><dd x-text="r.template"></dd>
 			</dl>
 			<dl class="kv"><template x-for="(v, k) in d.headers" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd :class="v === '[redacted]' ? 'redact' : ''" x-text="v"></dd></div></template></dl>
@@ -177,7 +179,7 @@
 		<dl class="kv" x-show="d.responseHeaders"><template x-for="(v, k) in d.responseHeaders" :key="k"><div style="display:contents"><dt x-text="k"></dt><dd :class="v === '[redacted]' ? 'redact' : ''" x-text="v"></dd></div></template></dl>
 		<div class="actions" style="margin-top:10px">
 			<button class="abtn" @click="copy(JSON.stringify(d, null, 2), 'Request JSON')">Copy request JSON</button>
-			<button class="abtn" @click="copy(curl(r.method, r.url, r.query), 'cURL')">Copy as cURL</button>
+			<button class="abtn" @click="copy(curl(r.method, r.url, r.query, r), 'cURL')">Copy as cURL</button>
 		</div>
 	</div></template>
 

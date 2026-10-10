@@ -1,0 +1,153 @@
+/**
+ * [BoxLang]
+ *
+ * Copyright [2026] [Ortus Solutions, Corp]
+ */
+/**
+ * A little retrieval over the Lens documentation for the ops agent, built on bx-ai. The pages bundled under assets/docs are cut into
+ * chunks with the bx-ai MarkdownLoader (one chunk per section, long sections split at paragraphs). The chunks go to Java, which keeps them
+ * for a keyword search that needs no model. When an embedding model answers, they are also embedded into an in-memory BoxVectorMemory
+ * and searched by meaning. The index lives in memory only and is built again when the pages or the embedding settings change.
+ */
+class {
+
+	// The longest chunk, in characters, before a section is split at its paragraphs
+	static {
+		MAX_CHUNK = 1000
+	}
+
+	function init( required string docsDir, required struct settings ) {
+		variables.docsDir  = arguments.docsDir
+		variables.settings = arguments.settings
+		variables.chunks   = []
+		variables.memory   = javaCast( "null", "" )
+		return this
+	}
+
+	/**
+	 * Cut every page into chunks.
+	 *
+	 * @return array of { page, heading, text }
+	 */
+	array function load() {
+		var dir    = variables.docsDir.replace( "\", "/", "all" )
+		var out    = []
+		var files  = directoryList( path = dir, recurse = true, listInfo = "path", filter = "*.md", sort = "name" )
+		for ( var file in files ) {
+			var normal = file.replace( "\", "/", "all" )
+			var page   = normal.replace( dir & "/", "" )
+			var docs   = aiDocuments( file, { type : "markdown", splitByHeaders : true, headerLevel : 2 } ).load()
+			for ( var doc in docs ) {
+				var meta    = doc.getMetadata()
+				var heading = meta.sectionHeader ?: ""
+				for ( var piece in split( doc.getContent() ) ) {
+					out.append( { page : page, heading : heading, text : piece } )
+				}
+			}
+		}
+		variables.chunks = out
+		return out
+	}
+
+	/**
+	 * Embed the chunks into an in-memory vector store. Throws when the embedding model does not answer.
+	 */
+	function buildIndex() {
+		if ( !variables.chunks.len() ) {
+			load()
+		}
+		var opts = {}
+		if ( len( variables.settings.baseUrl ?: "" ) ) {
+			opts.baseUrl = variables.settings.baseUrl
+		}
+		if ( len( variables.settings.apiKey ?: "" ) ) {
+			opts.apiKey = variables.settings.apiKey
+		}
+		var memory = aiMemory(
+			"BoxVectorMemory",
+			createUUID(),
+			"",
+			"",
+			{
+				embeddingProvider : variables.settings.provider,
+				embeddingModel    : variables.settings.embeddingModel,
+				embeddingOptions  : opts,
+				cache             : false
+			}
+		)
+		var documents = []
+		var i = 0
+		for ( var c in variables.chunks ) {
+			i++
+			documents.append( {
+				id       : "doc-" & i,
+				text     : ( len( c.heading ) && !c.text.startsWith( c.heading ) ? c.heading & char( 10 ) : "" ) & c.text,
+				metadata : { page : c.page, heading : c.heading, text : c.text }
+			} )
+		}
+		var result = memory.seed( documents )
+		if ( !result.added ) {
+			throw( type = "EmbeddingUnavailable", message = result.errors.len() ? result.errors[ 1 ].error : "No chunk could be embedded" )
+		}
+		variables.memory = memory
+		return result.added
+	}
+
+	/**
+	 * Search by meaning.
+	 *
+	 * @question what the person asked
+	 * @limit    how many chunks to return
+	 *
+	 * @return array of { page, heading, text, score }
+	 */
+	array function search( required string question, numeric limit = 4 ) {
+		if ( isNull( variables.memory ) ) {
+			throw( type = "EmbeddingUnavailable", message = "The index is not built" )
+		}
+		var found = variables.memory.getRelevant( arguments.question, arguments.limit )
+		var out   = []
+		for ( var f in found ) {
+			var meta = f.metadata ?: {}
+			out.append( {
+				page    : meta.page ?: "",
+				heading : meta.heading ?: "",
+				text    : meta.text ?: ( f.text ?: "" ),
+				score   : f.score ?: 0
+			} )
+		}
+		return out
+	}
+
+	/**
+	 * Split a long section at its paragraphs into pieces of up to MAX_CHUNK characters.
+	 */
+	private array function split( required string content ) {
+		var text = trim( arguments.content )
+		if ( !len( text ) ) {
+			return []
+		}
+		if ( len( text ) <= static.MAX_CHUNK ) {
+			return [ text ]
+		}
+		var pieces  = []
+		var current = ""
+		for ( var para in text.listToArray( char( 10 ) & char( 10 ), false, true ) ) {
+			if ( len( current ) && len( current ) + len( para ) > static.MAX_CHUNK ) {
+				pieces.append( current )
+				current = ""
+			}
+			current &= ( len( current ) ? char( 10 ) & char( 10 ) : "" ) & para
+			// A single paragraph (a long table) is cut by lines
+			while ( len( current ) > static.MAX_CHUNK * 2 ) {
+				pieces.append( left( current, static.MAX_CHUNK ) )
+				current = mid( current, static.MAX_CHUNK + 1, len( current ) )
+			}
+		}
+		if ( len( trim( current ) ) ) {
+			pieces.append( current )
+		}
+		return pieces
+	}
+
+}

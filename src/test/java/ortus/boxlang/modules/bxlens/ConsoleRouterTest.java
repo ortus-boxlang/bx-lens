@@ -31,7 +31,7 @@ public class ConsoleRouterTest {
 	@Test
 	@DisplayName( "the pages and settings a viewer does not get" )
 	void viewer() {
-		assertThat( ConsoleRouter.ADMIN_PAGES ).containsExactly( "logfiles", "environment", "system", "threads" );
+		assertThat( ConsoleRouter.ADMIN_PAGES ).containsExactly( "logfiles", "environment", "system", "threads", "ai" );
 		assertThat( ConsoleRouter.ADMIN_SETTINGS ).containsExactly( "console.access", "access.proxypeers" );
 	}
 

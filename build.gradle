@@ -200,6 +200,12 @@ task createModuleStructure(type: Copy) {
         include '**/*.js', '**/*.css', '**/*.svg', '**/*.html', '**/*.txt'
         into 'assets'
     }
+    // The pages the ops agent searches (assets/docs). Only what helps an operator
+    from( 'docs' ) {
+        include 'features.md', 'configuration.md', 'licensing.md', 'security.md', 'troubleshooting.md', 'faq.md'
+        include 'console/*.md', 'reference/*.md', 'guides/production.md', 'guides/ollama.md'
+        into 'assets/docs'
+    }
     from( 'src/main/bx' ) {
 		include '**/*.bx', '**/*.bxm'
 		// Token Replacements Go Here

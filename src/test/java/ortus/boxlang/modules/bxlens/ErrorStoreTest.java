@@ -101,4 +101,44 @@ public class ErrorStoreTest {
 		assertThat( new ArrayList<>( store.toPersist() ) ).hasSize( 1 );
 	}
 
+	@Test
+	@DisplayName( "groups and samples carry the server of the request, and the list names the server" )
+	@SuppressWarnings( "unchecked" )
+	void serverIdentity() {
+		ErrorStore store = new ErrorStore();
+		store.identify( () -> Map.of( "id", "abc12345", "host", "web-1" ) );
+		LensRequest r = request( "/a", 500, "boom" );
+		r.serverId		= "abc12345";
+		r.serverHost	= "web-1";
+		r.serverIp		= "10.0.0.7";
+		store.record( r, LensConfig.defaults() );
+		Map<String, Object> list = store.list();
+		assertThat( ( Map<String, Object> ) list.get( "server" ) ).containsEntry( "id", "abc12345" );
+		Map<String, Object> group = ( ( List<Map<String, Object>> ) list.get( "groups" ) ).get( 0 );
+		assertThat( group.get( "serverId" ) ).isEqualTo( "abc12345" );
+		Map<String, Object> sample = ( Map<String, Object> ) ( ( List<?> ) store.get( ( String ) group.get( "id" ) ).get( "samples" ) ).get( 0 );
+		assertThat( sample.get( "serverId" ) ).isEqualTo( "abc12345" );
+		assertThat( sample.get( "serverHost" ) ).isEqualTo( "web-1" );
+		assertThat( sample.get( "serverIp" ) ).isEqualTo( "10.0.0.7" );
+	}
+
+	@Test
+	@DisplayName( "errors.json holds a top level server and the groups, and an older plain list still loads" )
+	void fileFormat() {
+		ErrorStore	store	= new ErrorStore();
+		LensRequest	r		= request( "/a", 500, "boom" );
+		r.serverId = "abc12345";
+		store.record( r, LensConfig.defaults() );
+		Map<String, Object>	file	= ErrorStore.fileOf( Map.of( "id", "abc12345" ), store.toPersist() );
+		Object				parsed	= Plain.parse( Json.write( file ) );
+		assertThat( Plain.map( Plain.map( parsed ).get( "server" ) ) ).containsEntry( "id", "abc12345" );
+		assertThat( ErrorStore.groupsOf( parsed ) ).hasSize( 1 );
+		// The older format was the list itself
+		Object legacy = Plain.parse( Json.write( Plain.map( parsed ).get( "groups" ) ) );
+		assertThat( ErrorStore.groupsOf( legacy ) ).hasSize( 1 );
+		ErrorStore loaded = new ErrorStore();
+		loaded.load( ErrorStore.groupsOf( parsed ), 0 );
+		assertThat( loaded.size() ).isEqualTo( 1 );
+	}
+
 }

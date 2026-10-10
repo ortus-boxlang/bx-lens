@@ -7,7 +7,7 @@ icon: lucide:sparkles
 
 # Ask Lens and AI help
 
-Lens can help you read an error, a failing query or a deadlock, and can answer questions about the server. All of it is optional. Nothing is sent anywhere unless you copy a prompt yourself or an admin turns on `ai.enabled`.
+Lens can help you read an error, a failing query or a deadlock, and can answer questions about the server. All of it is optional. Nothing is sent anywhere unless you copy a prompt yourself or an admin turns on `ai.enabled`. With BoxLang+ the Ask Lens page is the full page of the [ops assistant](ai.md), a chat that looks at the server with tools. The Copy prompt, Ask ChatGPT and Ask Claude buttons stay on the page.
 
 ![The Ask Lens page](../assets/screenshots/console-ask.png)
 
@@ -58,15 +58,14 @@ Passwords, parameter values and the configuration are not in a prompt. Credentia
 | Setting | Meaning |
 |---|---|
 | `ai.enabled` | The master switch. Off by default. |
-| `ai.provider` | A bx-ai provider. Empty uses the bx-ai default. |
-| `ai.model` | The model name. Empty uses the provider default. |
-| `ai.apiKey` | The API key. Use a `bxsecret:` value. Empty uses the key from the bx-ai settings. |
+| `ai.provider`, `ai.model`, `ai.baseUrl` | The provider (Ollama by default), the model (`llama3.2`) and the model server (`http://localhost:11434`). |
+| `ai.apiKey`, `ai.apiKeyEnv` | The API key as a `bxsecret:` value, or the name of an environment variable that holds it. |
 | `ai.links` | Show Copy prompt and the Ask ChatGPT and Ask Claude buttons. |
 
-A local provider such as Ollama keeps the prompt inside your network. A hosted provider receives it. These settings can only be changed in `boxlang.json`, not from the Settings page.
+A local provider such as Ollama keeps the prompt inside your network. A hosted provider receives it. The provider settings (not the key) can be changed from the [AI page](ai.md). They are shared by Explain with AI, Ask Lens and the assistant.
 
 BoxLang AI (`bx-ai` 3.4.0) ships inside Lens, in the module's `modules` folder, and is Apache 2.0 licensed. If a server removes it, Lens still loads, **Explain with AI** is hidden and the Ask page says the server is not set to call a model. Lens was checked against `bx-ai` 3.4.0 with a mock Ollama server (`harness/mock-ai.py`).
 
 ### Limits on the calls
 
-The server runs one AI call at a time, at most 10 per minute, and waits at most 90 seconds for an answer. A call uses a temperature of 0.2. Each call is written to the [audit log](../security.md#audit-log) with its size and provider, not its content. Calls are not blocked by `console.readOnly`, because they change nothing.
+Explain with AI and the single question button run one AI call at a time, at most 10 per minute, and waits at most 90 seconds for an answer. A call uses a temperature of 0.2. Each call is written to the [audit log](../security.md#audit-log) with its size and provider, not its content. Calls are not blocked by `console.readOnly`, because they change nothing.

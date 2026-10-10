@@ -1,0 +1,325 @@
+/**
+ * [BoxLang]
+ *
+ * Copyright [2026] [Ortus Solutions, Corp]
+ */
+/**
+ * The tools of the ops agent. Each method is a tool: the @AITool annotation makes it one, the comment above it is what the model reads to
+ * decide when to use it, and the @name lines describe the arguments. Every method only calls the Java Toolbox of the console session, which
+ * checks the role, the license, the read only mode and the arguments, asks for approval for the tools that change something, redacts the
+ * result and writes the audit line. Add a tool here, in ops/Tools.java and in docs/reference/ai-tools.md together: a test checks that the
+ * three agree.
+ */
+class {
+
+	function init( required any toolbox ) {
+		variables.toolbox = arguments.toolbox
+		return this
+	}
+
+	/**
+	 * Traffic and error numbers of this server: requests in memory and per second, how many returned a 5xx, the median, p95 and p99 time, status code classes, the slowest routes, the busiest, slowest and most failing URLs. Use it for 'how many requests did we serve' and 'what is the error rate'.
+	 */
+	@AITool
+	any function overview() {
+		return variables.toolbox.call( "overview", arguments )
+	}
+
+	/**
+	 * List recent requests, newest first, each with id, method, URL, status, time in ms, number of SQL queries and the number of issues Lens found. Use problemsOnly to see only the failed, slow or flagged ones.
+	 *
+	 * @limit how many requests to list, 1 to 50
+	 * @problemsOnly true to list only requests with a 5xx status, issues or that never finished
+	 * @urlContains only requests whose URL contains this text
+	 */
+	@AITool
+	any function requests( numeric limit = 15, boolean problemsOnly = false, string urlContains = "" ) {
+		return variables.toolbox.call( "requests", arguments )
+	}
+
+	/**
+	 * One request in detail: its issues (N+1 queries, slow queries, slow templates, failed HTTP calls), the slowest SQL statements, exceptions and outgoing HTTP calls. Get the id from requests.
+	 *
+	 * @id the request id from the requests tool
+	 */
+	@AITool
+	any function requestDetail( required string id ) {
+		return variables.toolbox.call( "requestDetail", arguments )
+	}
+
+	/**
+	 * The requests running right now, longest first, with the thread each one runs on. Use it to find a request that is stuck or slow right now.
+	 */
+	@AITool
+	any function inFlight() {
+		return variables.toolbox.call( "inFlight", arguments )
+	}
+
+	/**
+	 * Errors grouped by cause, newest first, with counts and where they happen. Pass an id from the list to get the latest samples with the stack of one group.
+	 *
+	 * @limit how many groups to list, 1 to 30
+	 * @id an error group id from the list, to get its samples and stack
+	 */
+	@AITool
+	any function errors( numeric limit = 10, string id = "" ) {
+		return variables.toolbox.call( "errors", arguments )
+	}
+
+	/**
+	 * SQL statements across all requests, ranked: runs, failures, slow runs, average, maximum and total time. Statements have placeholders and never parameter values. Use it to find slow or failing queries.
+	 *
+	 * @limit how many statements, 1 to 30
+	 * @sort slowest, total, count or failures
+	 */
+	@AITool
+	any function queryStats( numeric limit = 10, string sort = "slowest" ) {
+		return variables.toolbox.call( "queryStats", arguments )
+	}
+
+	/**
+	 * The thread pools (executors) of the runtime with utilization, queue size and capacity, the runtime's own health report, and findings with concrete recommendations such as a new pool size or queue capacity. Use it to answer 'how healthy are the executors and how do I improve them'.
+	 *
+	 * @onlyProblems true to list only executors that are not healthy
+	 */
+	@AITool
+	any function executors( boolean onlyProblems = false ) {
+		return variables.toolbox.call( "executors", arguments )
+	}
+
+	/**
+	 * The scheduled tasks and their schedulers: status, schedule, last and next run, runs and failures.
+	 */
+	@AITool
+	any function tasks() {
+		return variables.toolbox.call( "tasks", arguments )
+	}
+
+	/**
+	 * The database connection pools: active, idle and waiting connections, maximum size, timeouts, and findings when a pool is saturated. No URLs and no user names.
+	 */
+	@AITool
+	any function datasources() {
+		return variables.toolbox.call( "datasources", arguments )
+	}
+
+	/**
+	 * The caches: names, provider, object count, hits, misses, hit rate, evictions and size limits. Statistics only, never the values.
+	 */
+	@AITool
+	any function caches() {
+		return variables.toolbox.call( "caches", arguments )
+	}
+
+	/**
+	 * The loaded BoxLang modules with their versions, and the Lens integrations (for example ORM) with their status.
+	 */
+	@AITool
+	any function modules() {
+		return variables.toolbox.call( "modules", arguments )
+	}
+
+	/**
+	 * The effective BoxLang runtime configuration by area, secrets hidden. Pass filter to find a setting by name or value.
+	 *
+	 * @filter text to look for in the setting names and values
+	 */
+	@AITool
+	any function configuration( string filter = "" ) {
+		return variables.toolbox.call( "configuration", arguments )
+	}
+
+	/**
+	 * Facts about Lens itself and this server: the server identity (host name, address, id), the Lens version, collect level, the license state, the Plus features that are on and the live Lens settings.
+	 */
+	@AITool
+	any function lensInfo() {
+		return variables.toolbox.call( "lensInfo", arguments )
+	}
+
+	/**
+	 * Search the Lens documentation and return the best matching sections with their page names. Use it for questions about what a page or setting does and how to configure Lens.
+	 *
+	 * @question the question or the words to look for
+	 */
+	@AITool
+	any function searchDocs( required string question ) {
+		return variables.toolbox.call( "searchDocs", arguments )
+	}
+
+	/**
+	 * JVM and host numbers: CPU, heap and non-heap memory, memory pools, garbage collectors, class loading, thread counts, disks, uptime and JVM flags. Admin only.
+	 */
+	@AITool
+	any function system() {
+		return variables.toolbox.call( "system", arguments )
+	}
+
+	/**
+	 * Thread counts by state (RUNNABLE, BLOCKED, WAITING, TIMED_WAITING), how many are blocked on a monitor, deadlocked threads, the largest thread pools and findings. Use it for 'do we have any blocked threads'. Admin only.
+	 */
+	@AITool
+	any function threadsSummary() {
+		return variables.toolbox.call( "threadsSummary", arguments )
+	}
+
+	/**
+	 * Threads that are blocked or waiting on a lock, with the lock each one waits for, who holds it and the top of the stack, and deadlock detection: the threads in a deadlock with their locks and owners. Admin only.
+	 */
+	@AITool
+	any function blockedThreads() {
+		return variables.toolbox.call( "blockedThreads", arguments )
+	}
+
+	/**
+	 * The threads that used the most CPU time since they started, with their pool and top frames. Call it twice a few seconds apart to see which one is burning CPU now. Admin only.
+	 *
+	 * @limit how many threads, 1 to 30
+	 */
+	@AITool
+	any function topCpuThreads( numeric limit = 10 ) {
+		return variables.toolbox.call( "topCpuThreads", arguments )
+	}
+
+	/**
+	 * Threads grouped by pool name (the thread name without its number) with the count per state. Use it to see which pool has too many threads or is stuck. Admin only.
+	 */
+	@AITool
+	any function threadPools() {
+		return variables.toolbox.call( "threadPools", arguments )
+	}
+
+	/**
+	 * The stack of one thread by name, with the locks it holds and the lock it waits for. Get names from blockedThreads, threadPools or inFlight. Admin only.
+	 *
+	 * @name the thread name, or part of it
+	 */
+	@AITool
+	any function threadStack( required string name ) {
+		return variables.toolbox.call( "threadStack", arguments )
+	}
+
+	/**
+	 * Garbage collection pressure: heap use, heap after the last collection, the share of time spent collecting and findings. Admin only.
+	 */
+	@AITool
+	any function gcPressure() {
+		return variables.toolbox.call( "gcPressure", arguments )
+	}
+
+	/**
+	 * A health sweep that checks threads, executors, heap and garbage collection, datasources, error rate, slow requests and running requests, and returns findings sorted by severity with the evidence and the next step. Start here for 'is the server healthy' and 'what is slow right now'. A viewer gets the parts a viewer may see.
+	 */
+	@AITool
+	any function diagnose() {
+		return variables.toolbox.call( "diagnose", arguments )
+	}
+
+	/**
+	 * Read the server logs. Without a file it lists the log files. With a file it returns the latest lines, optionally those that contain a text or a level. Secrets are hidden. Admin only.
+	 *
+	 * @file a log file name from the list, empty to list the files
+	 * @query only lines that contain this text
+	 * @lines how many lines, 1 to 300
+	 * @level only this level, for example ERROR or WARN
+	 */
+	@AITool
+	any function logs( string file = "", string query = "", numeric lines = 100, string level = "" ) {
+		return variables.toolbox.call( "logs", arguments )
+	}
+
+	/**
+	 * The environment of the runtime: Java and OS facts, JVM arguments, environment variables and system properties, with secret values hidden. Admin only.
+	 */
+	@AITool
+	any function environment() {
+		return variables.toolbox.call( "environment", arguments )
+	}
+
+	/**
+	 * List the tables and views of a datasource from the JDBC metadata, with an approximate row count where the driver reports one. No SQL is run. Admin only.
+	 *
+	 * @datasource the datasource name from datasources
+	 * @filter only tables whose name contains this text
+	 */
+	@AITool
+	any function dbTables( required string datasource, string filter = "" ) {
+		return variables.toolbox.call( "dbTables", arguments )
+	}
+
+	/**
+	 * List the columns of one table (name, type, size, nullable) and its primary key from the JDBC metadata. No SQL is run. Admin only.
+	 *
+	 * @datasource the datasource name
+	 * @table the table name from dbTables
+	 */
+	@AITool
+	any function dbColumns( required string datasource, required string table ) {
+		return variables.toolbox.call( "dbColumns", arguments )
+	}
+
+	/**
+	 * Open a connection to a datasource, validate it and report how long that took. Admin only.
+	 *
+	 * @datasource the datasource name
+	 */
+	@AITool
+	any function dbTest( required string datasource ) {
+		return variables.toolbox.call( "dbTest", arguments )
+	}
+
+	/**
+	 * CHANGES THE SERVER. Run now, pause, resume or reload a scheduled task. The administrator must approve it first. Use it only when the person asked for it.
+	 *
+	 * @scheduler the scheduler name from tasks
+	 * @task the task name, not needed for reload
+	 * @action run, pause, resume or reload
+	 */
+	@AITool
+	any function taskAction( required string scheduler, string task = "", required string action ) {
+		return variables.toolbox.call( "taskAction", arguments )
+	}
+
+	/**
+	 * CHANGES THE SERVER. Evict one key, reap expired objects or clear a whole cache. The administrator must approve it first. Use it only when the person asked for it.
+	 *
+	 * @cache the cache name from caches
+	 * @action evict, reap or clear
+	 * @key the key to evict, only for evict
+	 */
+	@AITool
+	any function cacheAction( required string cache, required string action, string key = "" ) {
+		return variables.toolbox.call( "cacheAction", arguments )
+	}
+
+	/**
+	 * CHANGES THE SERVER. Run a garbage collection now. It can pause the application for a moment. The administrator must approve it first.
+	 */
+	@AITool
+	any function runGc() {
+		return variables.toolbox.call( "runGc", arguments )
+	}
+
+	/**
+	 * CHANGES THE SERVER. Turn a Lens integration (for example orm) on or off. The administrator must approve it first.
+	 *
+	 * @id the integration id from modules
+	 * @enabled true to turn it on, false to turn it off
+	 */
+	@AITool
+	any function setIntegration( required string id, required boolean enabled ) {
+		return variables.toolbox.call( "setIntegration", arguments )
+	}
+
+	/**
+	 * CHANGES THE SERVER. Change one live Lens setting, for example thresholds.slowQueryMs. Settings about AI, access, the console and the disk store cannot be changed. The administrator must approve it first.
+	 *
+	 * @key the setting name, for example thresholds.slowQueryMs
+	 * @value the new value
+	 */
+	@AITool
+	any function changeSetting( required string key, required string value ) {
+		return variables.toolbox.call( "changeSetting", arguments )
+	}
+
+}

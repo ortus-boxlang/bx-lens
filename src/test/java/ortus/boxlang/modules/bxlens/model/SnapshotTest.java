@@ -180,4 +180,25 @@ public class SnapshotTest {
 		assertThat( ( ( Map<String, Object> ) Snapshot.build( bad, LensConfig.defaults() ).get( "request" ) ).get( "state" ) ).isEqualTo( "crit" );
 	}
 
+	@SuppressWarnings( "unchecked" )
+	@Test
+	@DisplayName( "The summary and the detail of a request carry the server that handled it" )
+	public void server() {
+		LensRequest req = new LensRequest();
+		req.method		= "GET";
+		req.uri			= "/a";
+		req.serverHost	= "web-1";
+		req.serverIp	= "10.0.0.7";
+		req.serverId	= "abc12345";
+		Map<String, Object> sum = Snapshot.summary( req, LensConfig.defaults() );
+		assertThat( sum.get( "serverId" ) ).isEqualTo( "abc12345" );
+		assertThat( sum.get( "serverHost" ) ).isEqualTo( "web-1" );
+		assertThat( sum.get( "serverIp" ) ).isEqualTo( "10.0.0.7" );
+		Map<String, Object> r = ( Map<String, Object> ) Snapshot.build( req, LensConfig.defaults(), true ).get( "request" );
+		assertThat( r.get( "serverId" ) ).isEqualTo( "abc12345" );
+		assertThat( r.get( "serverHost" ) ).isEqualTo( "web-1" );
+		assertThat( r.get( "serverIp" ) ).isEqualTo( "10.0.0.7" );
+		Map<String, Object> bar = ( Map<String, Object> ) Snapshot.build( req, LensConfig.defaults(), false ).get( "request" );
+		assertThat( bar.get( "serverHost" ) ).isEqualTo( "web-1" );
+	}
 }

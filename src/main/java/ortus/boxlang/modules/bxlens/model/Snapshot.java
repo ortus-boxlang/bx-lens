@@ -54,6 +54,9 @@ public final class Snapshot {
 		r.put( "type", classify( req.contentType ) );
 		r.put( "remoteAddr", req.remoteAddr );
 		r.put( "host", req.host );
+		r.put( "serverHost", req.serverHost );
+		r.put( "serverIp", req.serverIp );
+		r.put( "serverId", req.serverId );
 		r.put( "userAgent", clean.text( req.userAgent ) );
 		r.put( "app", req.appName );
 		r.put( "template", req.template );
@@ -197,6 +200,9 @@ public final class Snapshot {
 		s.put( "ms", Span.ms( req.durationNs() ) );
 		s.put( "queries", req.queries.size() );
 		s.put( "at", req.startMillis );
+		s.put( "serverHost", req.serverHost );
+		s.put( "serverIp", req.serverIp );
+		s.put( "serverId", req.serverId );
 		s.put( "state", req.unfinished ? "unfinished" : barState( req ) );
 		return s;
 	}

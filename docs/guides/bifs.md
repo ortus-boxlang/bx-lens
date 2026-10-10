@@ -28,6 +28,7 @@ These functions work whenever the module is loaded. When Lens is not collecting 
 | [`lensInflight`](#lensinflight) | `()` | array of structs |
 | [`lensLicense`](#lenslicense) | `()` | struct |
 | [`lensDiagnostics`](#lensdiagnostics) | `()` | struct |
+| [`lensServer`](#lensserver) | `()` | struct |
 | [`lensRequestId`](#lensrequestid) | `()` | string |
 
 `lensConsole()` also exists. It serves the [console](../console/index.md) and is called only by the module's own `index.bxm`. Do not call it from your code.
@@ -197,7 +198,7 @@ for ( group in lensErrors( 5 ) ) {
 | `count` | `count` |
 | `failures` | `failures` |
 
-Each row has `sql`, `datasource`, `count`, `failures`, `slow`, `avgMs`, `maxMs`, `minMs`, `totalMs`, `rows`, `firstSeen`, `lastSeen`, `file`, `line`, `lastError`, `slowestRequest` and `lastRequest`. The SQL has placeholders, never parameter values.
+Each row has `sql`, `datasource`, `count`, `failures`, `slow`, `avgMs`, `maxMs`, `minMs`, `totalMs`, `rows`, `firstSeen`, `lastSeen`, `file`, `line`, `lastError`, `slowestRequest`, `lastRequest` and `serverId`. The SQL has placeholders, never parameter values.
 
 ```javascript
 top = lensQueries( 3, "total" );
@@ -206,7 +207,7 @@ writeOutput( top[ 1 ].sql & " took " & top[ 1 ].totalMs & " ms in total" );
 
 ### lensInflight
 
-`lensInflight()` returns the requests Lens tracks that are running now, longest first. Each entry has `id`, `method`, `uri`, `queryString`, `app`, `remoteAddr`, `startedAt`, `elapsedMs`, `thread`, `threadState` and `queries` (the number run so far). It is an empty array when nothing is running.
+`lensInflight()` returns the requests Lens tracks that are running now, longest first. Each entry has `id`, `method`, `uri`, `queryString`, `app`, `remoteAddr`, `serverHost`, `serverIp`, `serverId`, `startedAt`, `elapsedMs`, `thread`, `threadState` and `queries` (the number run so far). It is an empty array when nothing is running.
 
 ```javascript
 stuck = lensInflight().filter( ( r ) => r.elapsedMs > 5000 );
@@ -232,7 +233,17 @@ if ( lensLicense().state == "expired" ) {
 
 ### lensDiagnostics
 
-`lensDiagnostics()` shows how Lens itself is doing: `version`, `enabled`, `collectLevel`, `history` (`size`, `capacity`) and `async`, the state of the [work queue](production.md#work-off-the-request-thread): `enabled`, `depth` (waiting), `capacity`, `processed`, `dropped` (refused because the queue was full) and `failed` (tasks that threw).
+`lensDiagnostics()` shows how Lens itself is doing: `version`, `enabled`, `collectLevel`, `history` (`size`, `capacity`) and `server` (the identity of this server) and `async`, the state of the [work queue](production.md#work-off-the-request-thread): `enabled`, `depth` (waiting), `capacity`, `processed`, `dropped` (refused because the queue was full) and `failed` (tasks that threw).
+
+### lensServer
+
+`lensServer()` returns the identity of this server, the one every request, error, report, statistic and audit line carries: `host`, `ip` (the primary address), `addresses` (all usable addresses), `id` (the id of this instance, stable for one JVM start) and `runtime` (the BoxLang runtime instance name, empty when there is none). It is detected once, not on every call. See [`server`](../configuration.md#server).
+
+```javascript
+writeOutput( "Served by " & lensServer().host & " (" & lensServer().id & ")" );
+```
+
+The arrays of `lensErrors()`, `lensQueries()` and `lensInflight()` keep their shape, so each row carries its own `serverId` (and `serverHost` and `serverIp` for in flight requests) instead of a wrapper. `lensReport()` and `lensDiagnostics()` have a `server` key.
 
 ### lensRequestId
 

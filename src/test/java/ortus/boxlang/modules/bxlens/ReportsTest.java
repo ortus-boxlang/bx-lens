@@ -84,4 +84,14 @@ public class ReportsTest {
 		assertThat( ( ( java.util.List<?> ) many.snapshot( false ).get( "busiestUrls" ) ) ).hasSize( 10 );
 	}
 
+	@Test
+	@DisplayName( "totals and the saved file name the server" )
+	@SuppressWarnings( "unchecked" )
+	void server() {
+		Reports reports = new Reports();
+		reports.identify( () -> Map.of( "id", "abc12345", "host", "web-1" ) );
+		reports.record( request( "/a", 200 ), 500 );
+		assertThat( ( Map<String, Object> ) reports.snapshot( false ).get( "server" ) ).containsEntry( "host", "web-1" );
+		assertThat( ( Map<String, Object> ) reports.toPersist().get( "server" ) ).containsEntry( "id", "abc12345" );
+	}
 }

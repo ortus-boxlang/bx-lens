@@ -7,7 +7,6 @@ package ortus.boxlang.modules.bxlens;
 
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
-import java.net.InetAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,7 +47,6 @@ public final class ConsoleRouter {
 	    + "connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 	private final LensService			service;
-	private volatile String				hostName;
 
 	public ConsoleRouter( LensService service ) {
 		this.service = service;
@@ -238,13 +236,14 @@ public final class ConsoleRouter {
 			json( context, ex, 403, Map.of( "error", "Bad CSRF token" ) );
 			return;
 		}
-		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && !route.startsWith( "ai/" ) && !route.endsWith( "/test" )
+		if ( !method.equals( "GET" ) && !route.startsWith( "heapdump" ) && !route.startsWith( "ai/" ) && !route.startsWith( "agent/" )
+		    && !route.endsWith( "/test" )
 		    && service.getConfig().getBool( "console.readOnly", false ) ) {
 			service.getAudit().log( "denied.readonly", s.role, ex.remoteAddr(), method + " " + route );
 			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
 			return;
 		}
-		if ( !isAdmin( s ) && ( !method.equals( "GET" ) || ADMIN_ONLY.stream().anyMatch( route::startsWith ) ) ) {
+		if ( !isAdmin( s ) && ( !method.equals( "GET" ) && !VIEWER_POST.contains( route ) || ADMIN_ONLY.stream().anyMatch( route::startsWith ) ) ) {
 			service.getAudit().log( "denied", s.role, ex.remoteAddr(), method + " " + route );
 			json( context, ex, 403, Map.of( "ok", false, "error", "The viewer role cannot do this. Sign in as admin." ) );
 			return;
@@ -254,7 +253,8 @@ public final class ConsoleRouter {
 		} else if ( route.equals( "overview" ) && method.equals( "GET" ) ) {
 			json( context, ex, 200, overview() );
 		} else if ( route.equals( "requests" ) && method.equals( "GET" ) ) {
-			json( context, ex, 200, Map.of( "requests", service.getStore().summaries( true ), "capacity", service.getStore().capacity() ) );
+			json( context, ex, 200, Map.of( "requests", service.getStore().summaries( true ), "capacity", service.getStore().capacity(), "servers",
+			    service.getStore().serverCount(), "server", service.getIdentity().get().toMap() ) );
 		} else if ( route.startsWith( "requests/" ) && method.equals( "GET" ) ) {
 			RequestStore.Entry e = service.getStore().get( route.substring( "requests/".length() ) );
 			if ( e == null ) {
@@ -372,6 +372,8 @@ public final class ConsoleRouter {
 			service.getReports().reset();
 			service.getAudit().log( "reports.reset", s.role, ex.remoteAddr(), "" );
 			json( context, ex, 200, service.getReports().snapshot( service.diskStoreOn() ) );
+		} else if ( route.startsWith( "agent/" ) ) {
+			agent( context, ex, method, route, s );
 		} else if ( route.startsWith( "ai" ) && ( route.equals( "ai" ) || route.startsWith( "ai/" ) ) ) {
 			ai( context, ex, method, route, s );
 		} else if ( route.equals( "tasks" ) && method.equals( "GET" ) && panelOn( "tasks" ) ) {
@@ -412,13 +414,16 @@ public final class ConsoleRouter {
 	 * overview, requests, in flight, queries, errors, reports, executors, tasks, datasources, cache statistics and modules.
 	 */
 	static final List<String>											ADMIN_ONLY		= List.of( "threads", "heapdump", "logfiles", "bundle", "cachevalue",
-	    "environment", "system" );
+	    "environment", "system", "ai/config" );
+
+	/** The POST routes a viewer may call: the chat with the ops agent, which has only the tools a viewer may use. */
+	static final Set<String>											VIEWER_POST		= Set.of( "agent/chat", "agent/reset", "agent/approve" );
 
 	/** Console pages a viewer does not get. */
-	static final Set<String>											ADMIN_PAGES		= Set.of( "logfiles", "environment", "system", "threads" );
+	static final Set<String>											ADMIN_PAGES		= Set.of( "logfiles", "environment", "system", "threads", "ai" );
 
 	/** Settings whose value a viewer does not see. */
-	static final Set<String>											ADMIN_SETTINGS	= Set.of( "console.access", "access.proxypeers" );
+	public static final Set<String>										ADMIN_SETTINGS	= Set.of( "console.access", "access.proxypeers" );
 
 	private final java.util.concurrent.ConcurrentHashMap<String, Long>	refusals		= new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -466,7 +471,8 @@ public final class ConsoleRouter {
 		LensConfig			cfg	= service.getConfig();
 		Map<String, Object>	m	= new LinkedHashMap<>();
 		m.put( "version", service.getVersion() );
-		m.put( "host", hostName() );
+		m.put( "host", service.getIdentity().get().host() );
+		m.put( "server", service.getIdentity().get().toMap() );
 		m.put( "boxlang", boxlangVersion() );
 		m.put( "jvmUptimeSeconds", ManagementFactory.getRuntimeMXBean().getUptime() / 1000 );
 		m.put( "csrf", s.csrf );
@@ -512,6 +518,7 @@ public final class ConsoleRouter {
 		    { "system", "System", "cpu", "Runtime" },
 		    { "threads", "Threads", "tree-structure", "Runtime" },
 		    { "designer", "Bar designer", "layout", "Config" },
+		    { "ai", "AI", "robot", "Config" },
 		    { "settings", "Settings", "gear", "Config" }
 		};
 		for ( String[] t : catalog ) {
@@ -635,6 +642,18 @@ public final class ConsoleRouter {
 			return;
 		}
 		try {
+			if ( route.equals( "ai/config" ) ) {
+				aiConfig( context, ex, method, s );
+				return;
+			}
+			if ( route.equals( "ai/test" ) && method.equals( "POST" ) ) {
+				if ( plusOnly( context, ex, "ai", "The AI connection test" ) ) {
+					return;
+				}
+				service.getAudit().log( "ai.test", s.role, ex.remoteAddr(), "provider=" + ai.provider() + " model=" + ai.model() );
+				json( context, ex, 200, ai.ping() );
+				return;
+			}
 			if ( route.equals( "ai/prompt" ) && method.equals( "GET" ) ) {
 				if ( "deadlock".equals( ex.urlParam( "kind" ) ) && !isAdmin( s ) ) {
 					service.getAudit().log( "denied", s.role, ex.remoteAddr(), "ai/prompt deadlock" );
@@ -718,6 +737,213 @@ public final class ConsoleRouter {
 			default :
 				return null;
 		}
+	}
+
+	// ---------------------------------------------------------------------------------------------
+	// The ops agent and its settings
+	// ---------------------------------------------------------------------------------------------
+
+	/**
+	 * <code>GET agent/status</code>, <code>POST agent/chat</code> (server sent events), <code>POST agent/approve</code> and
+	 * <code>POST agent/reset</code>.
+	 * Every one needs a session. A POST needs the CSRF token (checked before). A viewer may chat: the agent then has only the tools a viewer may use.
+	 */
+	private void agent( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
+		ortus.boxlang.modules.bxlens.ops.AgentService agents = service.getAgents();
+		if ( route.equals( "agent/status" ) && method.equals( "GET" ) ) {
+			json( context, ex, 200, agents.status( s ) );
+		} else if ( route.equals( "agent/chat" ) && method.equals( "POST" ) ) {
+			agentChat( context, ex, s );
+		} else if ( route.equals( "agent/reset" ) && method.equals( "POST" ) ) {
+			agents.reset( s.id );
+			service.getAudit().log( "ai.reset", s.role, ex.remoteAddr(), "" );
+			json( context, ex, 200, Map.of( "ok", true ) );
+		} else if ( route.equals( "agent/approve" ) && method.equals( "POST" ) ) {
+			String	id		= ex.formParam( "id" );
+			String	flag	= ex.formParam( "approve" );
+			if ( id == null || !"true".equals( flag ) && !"false".equals( flag ) ) {
+				json( context, ex, 400, Map.of( "ok", false, "error", "Send the id and approve=true or approve=false" ) );
+				return;
+			}
+			boolean												yes		= "true".equals( flag );
+			ortus.boxlang.modules.bxlens.ops.Approvals.Pending	p		= agents.approvals().find( id );
+			ortus.boxlang.modules.bxlens.ops.Approvals.Decision	d		= agents.approvals().decide( id, s.id, yes );
+			String												tool	= p == null || !p.sessionId.equals( s.id ) ? "?" : p.tool;
+			switch ( d ) {
+				case OK -> {
+					service.getAudit().log( yes ? "ai.approve" : "ai.deny", s.role, ex.remoteAddr(), "id=" + id + " tool=" + tool );
+					json( context, ex, 200, Map.of( "ok", true, "approved", yes ) );
+				}
+				case UNKNOWN -> json( context, ex, 404, Map.of( "ok", false, "error", "That request is not waiting any more" ) );
+				case WRONG_SESSION -> {
+					service.getAudit().log( "denied.approval", s.role, ex.remoteAddr(), "id=" + id + " another session" );
+					json( context, ex, 403, Map.of( "ok", false, "error", "That request belongs to another session" ) );
+				}
+				case EXPIRED -> {
+					service.getAudit().log( "ai.deny", s.role, ex.remoteAddr(), "id=" + id + " tool=" + tool + " expired" );
+					json( context, ex, 410, Map.of( "ok", false, "error", "That request expired after five minutes. Ask again." ) );
+				}
+				default -> json( context, ex, 409, Map.of( "ok", false, "error", "That request was already decided" ) );
+			}
+		} else {
+			json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+		}
+	}
+
+	/**
+	 * Start a chat turn and stream it as server sent events: token, tool_call, approval_request, tool_result, done or error. When the browser goes
+	 * away the turn is cancelled.
+	 */
+	private void agentChat( IBoxContext context, WebExchange ex, ConsoleAuth.Session s ) {
+		String message = ex.formParam( "message" );
+		if ( message == null ) {
+			message = bodyField( ex, "message" );
+		}
+		ortus.boxlang.modules.bxlens.ops.ChatTurn turn;
+		try {
+			turn = service.getAgents().chat( s, ex.remoteAddr(), message );
+		} catch ( ortus.boxlang.modules.bxlens.ops.AgentService.Refusal r ) {
+			service.getAudit().log( "denied.ai", s.role, ex.remoteAddr(), "chat " + r.status + " " + r.getMessage() );
+			Map<String, Object> m = new LinkedHashMap<>();
+			m.put( "ok", false );
+			m.put( "error", r.getMessage() );
+			if ( r.plus ) {
+				m.put( "plus", true );
+			}
+			json( context, ex, r.status, m );
+			return;
+		}
+		service.getAudit().log( "ai.chat", s.role, ex.remoteAddr(), "chars=" + message.trim().length() + " provider=" + service.getAi().provider() );
+		try {
+			ex.setStatus( 200 );
+			ex.setResponseHeader( "Content-Type", "text/event-stream; charset=UTF-8" );
+			ex.setResponseHeader( "Cache-Control", "no-cache, no-transform" );
+			ex.setResponseHeader( "X-Accel-Buffering", "no" );
+			ex.setResponseHeader( "X-Content-Type-Options", "nosniff" );
+			context.writeToBuffer( ": connected\n\n" );
+			context.flushBuffer( true );
+			int idle = 0;
+			while ( !Thread.currentThread().isInterrupted() ) {
+				ortus.boxlang.modules.bxlens.ops.ChatTurn.Event e = turn.poll( 500 );
+				if ( e == null ) {
+					if ( ++idle % 20 == 0 ) {
+						context.writeToBuffer( ": ping\n\n" );
+						context.flushBuffer( true );
+						if ( ex.writeFailed() ) {
+							break;
+						}
+					}
+					continue;
+				}
+				idle = 0;
+				context.writeToBuffer( "event: " + e.type() + "\ndata: " + Json.write( e.data() ) + "\n\n" );
+				context.flushBuffer( true );
+				if ( ex.writeFailed() ) {
+					break;
+				}
+				if ( e.type().equals( "done" ) || e.type().equals( "error" ) ) {
+					break;
+				}
+			}
+		} catch ( InterruptedException e ) {
+			Thread.currentThread().interrupt();
+		} catch ( Throwable t ) {
+			// The browser went away
+		} finally {
+			if ( !turn.finished() ) {
+				turn.cancel( "" );
+			}
+		}
+	}
+
+	/**
+	 * <code>GET ai/config</code> (admin) shows the AI settings, where the key is read from (never the key) and a checklist of what is needed.
+	 * <code>POST ai/config</code> (admin, Plus, not read only) changes the live AI settings. Only <code>ai.*</code> names are accepted and the
+	 * key itself is not one of them.
+	 */
+	private void aiConfig( IBoxContext context, WebExchange ex, String method, ConsoleAuth.Session s ) {
+		if ( method.equals( "GET" ) ) {
+			json( context, ex, 200, aiConfigView( s ) );
+			return;
+		}
+		if ( !method.equals( "POST" ) ) {
+			json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+			return;
+		}
+		if ( plusOnly( context, ex, "ai", "Changing the AI settings" ) ) {
+			return;
+		}
+		if ( !canChange( s ) ) {
+			service.getAudit().log( "denied.readonly", s.role, ex.remoteAddr(), "POST ai/config" );
+			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
+			return;
+		}
+		try {
+			Object parsed = JSONUtil.fromJSON( ex.formParam( "changes" ) );
+			if ( ! ( parsed instanceof Map<?, ?> in ) ) {
+				json( context, ex, 400, Map.of( "ok", false, "error", "Expected a map of changes" ) );
+				return;
+			}
+			Map<String, Object> changes = new LinkedHashMap<>();
+			for ( Map.Entry<?, ?> e : in.entrySet() ) {
+				String k = e.getKey() instanceof Key key ? key.getName() : String.valueOf( e.getKey() );
+				if ( !k.toLowerCase( java.util.Locale.ROOT ).startsWith( "ai." ) || k.equalsIgnoreCase( "ai.apiKey" ) ) {
+					json( context, ex, 400,
+					    Map.of( "ok", false, "error", k + " cannot be changed here. The API key stays a bxsecret: value in boxlang.json." ) );
+					return;
+				}
+				changes.put( k, e.getValue() );
+			}
+			service.changeSettings( changes );
+			service.getAudit().log( "ai.config", s.role, ex.remoteAddr(), "keys=" + changes.keySet() );
+			json( context, ex, 200, aiConfigView( s ) );
+		} catch ( IllegalArgumentException e ) {
+			json( context, ex, 400, Map.of( "ok", false, "error", e.getMessage() ) );
+		} catch ( java.io.IOException e ) {
+			json( context, ex, 500, Map.of( "ok", false, "error", "Could not save the settings: " + e.getMessage() ) );
+		} catch ( Throwable t ) {
+			json( context, ex, 400, Map.of( "ok", false, "error", "Could not read the changes" ) );
+		}
+	}
+
+	private Map<String, Object> aiConfigView( ConsoleAuth.Session s ) {
+		AiService			ai		= service.getAi();
+		LensConfig			cfg		= service.getConfig();
+		Map<String, Object>	m		= new LinkedHashMap<>();
+		Map<String, Object>	values	= new LinkedHashMap<>();
+		for ( Map<String, Object> row : service.settingsView() ) {
+			String key = String.valueOf( row.get( "key" ) );
+			if ( key.startsWith( "ai." ) && !"secret".equals( row.get( "type" ) ) ) {
+				values.put( key, row.get( "value" ) );
+			}
+		}
+		m.put( "values", values );
+		m.put( "defaults",
+		    Map.of( "ai.provider", "ollama", "ai.model", "llama3.2", "ai.baseUrl", "http://localhost:11434", "ai.embeddingModel", "nomic-embed-text" ) );
+		m.put( "providers", SettingsRegistry.AI_PROVIDERS );
+		m.put( "keySource", ai.keySource() );
+		m.put( "canChange", canChange( s ) && service.getLicensing().has( "ai" ) );
+		m.put( "locked", !service.getLicensing().has( "ai" ) );
+		List<Map<String, Object>> req = new ArrayList<>();
+		req.add( check( "bx-ai present", ai.installed(), ai.installed() ? "The module ships inside Lens." : "The bx-ai module is not installed." ) );
+		req.add( check( "BoxLang+", service.getLicensing().has( "ai" ),
+		    service.getLicensing().has( "ai" ) ? "License or trial found." : "The ops agent needs a license or trial." ) );
+		req.add( check( "Enabled", cfg.getBool( "ai.enabled", false ), "ai.enabled" ) );
+		Map<String, Object> last = ai.lastTest();
+		req.add( check( "Provider reachable", last != null && Boolean.TRUE.equals( last.get( "ok" ) ),
+		    last == null ? "Not tested yet. Press Test connection." : String.valueOf( last.get( "message" ) ) ) );
+		m.put( "requirements", req );
+		m.put( "lastTest", last );
+		m.put( "status", service.getAgents().status( s ) );
+		return m;
+	}
+
+	private static Map<String, Object> check( String name, boolean ok, String note ) {
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put( "name", name );
+		m.put( "ok", ok );
+		m.put( "note", note );
+		return m;
 	}
 
 	private void heapDump( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
@@ -821,83 +1047,8 @@ public final class ConsoleRouter {
 		}
 	}
 
-	/**
-	 * Aggregates over the requests in memory: counts, errors, percentiles and the slowest routes.
-	 */
 	private Map<String, Object> overview() {
-		List<Map<String, Object>>	all		= service.getStore().summaries();
-		long						now		= System.currentTimeMillis();
-		long						cutoff	= now - 5 * 60_000L;
-		List<Map<String, Object>>	win		= new ArrayList<>();
-		for ( Map<String, Object> r : all ) {
-			if ( num( r.get( "at" ) ) >= cutoff ) {
-				win.add( r );
-			}
-		}
-		List<Map<String, Object>>	use	= win.isEmpty() ? all : win;
-		Map<String, Object>			m	= new LinkedHashMap<>();
-		m.put( "windowMinutes", win.isEmpty() ? 0 : 5 );
-		m.put( "requests", use.size() );
-		int										errors	= 0;
-		double									queries	= 0;
-		double[]								times	= new double[ use.size() ];
-		Map<String, List<Map<String, Object>>>	routes	= new TreeMap<>();
-		int										i		= 0;
-		for ( Map<String, Object> r : use ) {
-			if ( num( r.get( "status" ) ) >= 500 ) {
-				errors++;
-			}
-			queries			+= num( r.get( "queries" ) );
-			times[ i++ ]	= num( r.get( "ms" ) );
-			String	url	= String.valueOf( r.get( "url" ) );
-			int		q	= url.indexOf( '?' );
-			routes.computeIfAbsent( q > 0 ? url.substring( 0, q ) : url, k -> new ArrayList<>() ).add( r );
-		}
-		java.util.Arrays.sort( times );
-		m.put( "errors", errors );
-		m.put( "errorRate", use.isEmpty() ? 0 : Math.round( errors * 1000.0 / use.size() ) / 10.0 );
-		m.put( "medianMs", percentile( times, 0.5 ) );
-		m.put( "p95Ms", percentile( times, 0.95 ) );
-		m.put( "queriesPerRequest", use.isEmpty() ? 0 : Math.round( queries * 10.0 / use.size() ) / 10.0 );
-		m.put( "perSecond", win.isEmpty() ? 0 : Math.round( win.size() * 10.0 / 300 ) / 10.0 );
-		List<Map<String, Object>> slow = new ArrayList<>();
-		routes.forEach( ( route, rs ) -> {
-			double[]			t	= rs.stream().mapToDouble( r -> num( r.get( "ms" ) ) ).sorted().toArray();
-			long				err	= rs.stream().filter( r -> num( r.get( "status" ) ) >= 500 ).count();
-			Map<String, Object>	rm	= new LinkedHashMap<>();
-			rm.put( "route", route );
-			rm.put( "p95Ms", percentile( t, 0.95 ) );
-			rm.put( "calls", rs.size() );
-			rm.put( "errors", err );
-			slow.add( rm );
-		} );
-		slow.sort( Comparator.comparingDouble( ( Map<String, Object> r ) -> num( r.get( "p95Ms" ) ) ).reversed() );
-		m.put( "slowest", slow.size() > 6 ? slow.subList( 0, 6 ) : slow );
-		// Series for the sparkline: requests per 5 second bucket over the last 5 minutes
-		int[] buckets = new int[ 60 ];
-		for ( Map<String, Object> r : all ) {
-			long age = now - ( long ) num( r.get( "at" ) );
-			if ( age >= 0 && age < 300_000 ) {
-				buckets[ 59 - ( int ) ( age / 5000 ) ]++;
-			}
-		}
-		List<Integer> series = new ArrayList<>();
-		for ( int b : buckets ) {
-			series.add( b );
-		}
-		m.put( "series", series );
-		m.put( "lens", service.asyncStats() );
-		// Attention list from what we know today: failing routes and slow routes
-		List<Map<String, Object>> attention = new ArrayList<>();
-		for ( Map<String, Object> r : slow ) {
-			if ( num( r.get( "errors" ) ) > 0 ) {
-				attention.add( item( "crit", r.get( "route" ) + " returned " + r.get( "errors" ) + " server errors", "requests" ) );
-			} else if ( num( r.get( "p95Ms" ) ) >= service.getConfig().slowRequestMs ) {
-				attention.add( item( "warn", r.get( "route" ) + " p95 is " + Math.round( num( r.get( "p95Ms" ) ) ) + " ms", "requests" ) );
-			}
-		}
-		m.put( "attention", attention.size() > 6 ? attention.subList( 0, 6 ) : attention );
-		return m;
+		return OverviewData.build( service );
 	}
 
 	// ---------------------------------------------------------------------------------------------
@@ -1147,6 +1298,7 @@ public final class ConsoleRouter {
 				}
 				if ( want.contains( "requests" ) ) {
 					tick.put( "requests", service.getStore().summaries( true ) );
+					tick.put( "servers", service.getStore().serverCount() );
 					tick.put( "overview", overview() );
 				}
 				context.writeToBuffer( "event: tick\ndata: " + Json.write( tick ) + "\n\n" );
@@ -1167,14 +1319,6 @@ public final class ConsoleRouter {
 
 	private static String decode( String s ) {
 		return java.net.URLDecoder.decode( s, StandardCharsets.UTF_8 );
-	}
-
-	private Map<String, Object> item( String sev, String text, String go ) {
-		Map<String, Object> m = new LinkedHashMap<>();
-		m.put( "severity", sev );
-		m.put( "text", text );
-		m.put( "go", go );
-		return m;
 	}
 
 	private ConsoleAuth.Session session( WebExchange ex ) {
@@ -1234,19 +1378,6 @@ public final class ConsoleRouter {
 		}
 	}
 
-	private String hostName() {
-		String h = hostName;
-		if ( h == null ) {
-			try {
-				h = InetAddress.getLocalHost().getHostName();
-			} catch ( Exception e ) {
-				h = "localhost";
-			}
-			hostName = h;
-		}
-		return h;
-	}
-
 	private String boxlangVersion() {
 		try {
 			Object v = BoxRuntime.getInstance().getVersionInfo().get( Key.of( "version" ) );
@@ -1254,18 +1385,6 @@ public final class ConsoleRouter {
 		} catch ( Throwable t ) {
 			return "";
 		}
-	}
-
-	private static double percentile( double[] sorted, double p ) {
-		if ( sorted.length == 0 ) {
-			return 0;
-		}
-		int idx = ( int ) Math.min( sorted.length - 1, Math.ceil( p * sorted.length ) - 1 );
-		return Math.round( sorted[ Math.max( 0, idx ) ] * 10.0 ) / 10.0;
-	}
-
-	private static double num( Object o ) {
-		return o instanceof Number n ? n.doubleValue() : 0;
 	}
 
 	private static String escape( String s ) {

@@ -61,4 +61,28 @@ public class RequestStoreTest {
 		assertThat( store.get( "b" ) ).isNotNull();
 	}
 
+	@Test
+	@DisplayName( "The store counts the distinct servers it has seen, so the console shows a Server column only for more than one" )
+	public void serverCount() {
+		RequestStore store = new RequestStore( 10 );
+		store.add( entry( "a" ).server( "s1" ) );
+		store.add( entry( "b" ).server( "s1" ) );
+		assertThat( store.serverCount() ).isEqualTo( 1 );
+		store.add( entry( "c" ).server( "s2" ) );
+		assertThat( store.serverCount() ).isEqualTo( 2 );
+		store.add( entry( "d" ) );
+		assertThat( store.serverCount() ).isEqualTo( 2 );
+		store.clear();
+		assertThat( store.serverCount() ).isEqualTo( 0 );
+	}
+
+	@Test
+	@DisplayName( "The set of server ids is capped" )
+	public void serverCap() {
+		RequestStore store = new RequestStore( 5 );
+		for ( int i = 0; i < RequestStore.MAX_SERVERS + 20; i++ ) {
+			store.add( entry( "r" + i ).server( "server" + i ) );
+		}
+		assertThat( store.serverCount() ).isEqualTo( RequestStore.MAX_SERVERS );
+	}
 }

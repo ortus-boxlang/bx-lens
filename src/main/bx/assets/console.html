@@ -12,7 +12,7 @@
 <div class="shell" x-data="lensApp()" x-init="init()" x-cloak>
   <header class="top">
     <span class="mark" aria-hidden="true"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#bx-mark"/></svg></span><b>BxLens</b>
-    <span class="hostinfo" x-show="state" x-text="state ? state.host + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
+    <span class="hostinfo" id="serverinfo" x-show="state" :title="state && state.server ? 'Server id ' + state.server.id : ''" x-text="state ? state.host + (state.server ? ' (' + state.server.ip + ')' : '') + ' · BoxLang ' + state.boxlang + ' · up ' + Math.floor(state.jvmUptimeSeconds / 60) + ' min' : ''"></span>
     <span class="spacer"></span>
     <span class="chipx hid" x-show="state" x-text="state ? state.role : ''" style="margin-right:6px"></span>
     <span class="lic" :class="licenseClass()" x-show="state" x-text="state ? state.license.label : ''"></span>
@@ -38,7 +38,7 @@
 
       <!-- Overview -->
       <section x-show="tab === 'overview'">
-        <h1 class="h1">Overview <small>this server only, last <span x-text="overview && overview.windowMinutes ? overview.windowMinutes + ' minutes' : 'requests in memory'"></span></small></h1>
+        <h1 class="h1">Overview <small>this server only (<span id="overview-server" x-text="state && state.server ? state.server.host + ', ' + state.server.ip : ''"></span>), last <span x-text="overview && overview.windowMinutes ? overview.windowMinutes + ' minutes' : 'requests in memory'"></span></small></h1>
         <template x-if="overview">
           <div>
             <div class="tiles">
@@ -72,19 +72,20 @@
           <input type="search" placeholder="Filter by URL" aria-label="Filter requests" x-model="rq">
         </div>
         <div class="split">
-          <div class="card scroll" style="padding:0"><table><thead><tr><th>Time</th><th>Method</th><th>URL</th><th class="num">Status</th><th class="num">Time</th><th class="num">SQL</th><th class="num">Issues</th></tr></thead><tbody>
+          <div class="card scroll" style="padding:0"><table><thead><tr><th>Time</th><th>Method</th><th>URL</th><th x-show="servers > 1" id="server-col">Server</th><th class="num">Status</th><th class="num">Time</th><th class="num">SQL</th><th class="num">Issues</th></tr></thead><tbody>
             <template x-for="r in filtered()" :key="r.id"><tr class="row" :class="rsel === r.id ? 'sel' : ''" tabindex="0" @click="pick(r.id)" @keydown.enter="pick(r.id)">
               <td class="mono" x-text="time(r.at)"></td><td x-text="r.method"></td><td class="mono" x-text="r.url"></td>
+              <td class="mono" x-show="servers > 1" x-text="r.serverHost + ' ' + r.serverId"></td>
               <td class="num"><span class="pill" :class="r.state === 'unfinished' ? 'crit' : statusClass(r.status)" x-text="r.state === 'unfinished' ? 'unfinished' : r.status"></span></td><td class="num" x-text="fmt(r.ms)"></td><td class="num" x-text="r.queries"></td>
               <td class="num" :style="r.issues ? 'color:var(--warn)' : ''" x-text="r.issues"></td></tr></template>
-            <tr x-show="!filtered().length"><td colspan="7" class="empty">No requests match.</td></tr></tbody></table></div>
+            <tr x-show="!filtered().length"><td colspan="8" class="empty">No requests match.</td></tr></tbody></table></div>
           <div class="card">
             <div class="empty" x-show="!detail && !detailErr">Pick a request.</div>
             <div class="empty" x-show="detailErr" x-text="detailErr"></div>
             <template x-if="detail">
               <div>
                 <h3><span class="mono" style="color:var(--ink)" x-text="detail.request.method + ' ' + detail.request.uri"></span><span x-text="time(Date.parse(detail.request.startedAt))"></span></h3>
-                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.state === 'unfinished' ? 'unfinished' : detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-show="detail.cost && detail.cost.cpuMs !== null" x-text="'cpu ' + fmt(detail.cost ? detail.cost.cpuMs : 0)"></span><span class="pill" x-show="detail.cost && detail.cost.allocBytes !== null" x-text="'alloc ' + bytes(detail.cost ? detail.cost.allocBytes : 0)"></span><span class="pill" x-text="detail.request.remoteAddr"></span><span class="pill mono" title="Request id" x-text="'id ' + detail.request.id"></span></div>
+                <div class="tools"><span class="pill" :class="statusClass(detail.request.status)" x-text="detail.request.state === 'unfinished' ? 'unfinished' : detail.request.status"></span><span class="pill" x-text="fmt(detail.request.durationMs)"></span><span class="pill" x-text="detail.counts.queries + ' queries'"></span><span class="pill" x-text="detail.counts.templates + ' templates'"></span><span class="pill" x-show="detail.cost && detail.cost.cpuMs !== null" x-text="'cpu ' + fmt(detail.cost ? detail.cost.cpuMs : 0)"></span><span class="pill" x-show="detail.cost && detail.cost.allocBytes !== null" x-text="'alloc ' + bytes(detail.cost ? detail.cost.allocBytes : 0)"></span><span class="pill" x-text="detail.request.remoteAddr"></span><span class="pill mono" id="detail-server" title="The server that handled this request" x-text="'server ' + detail.request.serverHost + ' ' + detail.request.serverIp + ' (' + detail.request.serverId + ')'"></span><span class="pill mono" title="Request id" x-text="'id ' + detail.request.id"></span></div>
                 <div class="tools"><button class="btn mini" @click="copyJson()"><svg class="ic"><use href="#ph-copy"/></svg>Copy JSON</button><button class="btn mini" @click="downloadJson()"><svg class="ic"><use href="#ph-download-simple"/></svg>Download JSON</button><button class="btn mini" @click="copyCurl()"><svg class="ic"><use href="#ph-terminal-window"/></svg>Copy as cURL</button></div>
                 <template x-for="i in detail.issues" :key="i.title + i.detail + i.line"><div class="issue" :class="i.severity === 'crit' ? 'crit' : (i.severity === 'info' ? 'note' : '')"><b x-text="i.severity === 'crit' ? 'Error' : (i.severity === 'info' ? 'Note' : 'Warn')"></b><span x-text="i.title + (i.detail ? ': ' + i.detail : '')"></span></div></template>
                 <template x-if="detail.slowSample"><div><h3 style="margin-top:8px">Where it was at <span x-text="detail.slowSample.atMs + ' ms'"></span></h3><ul class="frames" style="max-height:160px"><template x-for="(f, i) in detail.slowSample.frames" :key="i"><li :class="f.bx ? 'bx' : ''" x-text="f.text"></li></template></ul></div></template>
@@ -417,7 +418,7 @@
 
       <!-- Queries -->
       <section x-show="tab === 'queries'">
-        <h1 class="h1">Queries <small>every statement seen since <span x-text="qs ? new Date(qs.since).toLocaleTimeString() : ''"></span>, in memory</small></h1>
+        <h1 class="h1">Queries <small>every statement seen since <span x-text="qs ? new Date(qs.since).toLocaleTimeString() : ''"></span>, in memory<span x-show="qs && qs.server && qs.server.host" x-text="qs && qs.server ? ' on ' + qs.server.host : ''"></span></small></h1>
         <template x-if="qs">
           <div>
             <div class="tiles">
@@ -461,7 +462,7 @@
               <div class="tools" x-show="egroup && egroup.samples.length > 1"><template x-for="(sm, i) in (egroup ? egroup.samples : [])" :key="i"><button class="btn mini" :class="esample === i ? 'primary' : ''" @click="esample = i" x-text="'Sample ' + (i + 1)"></button></template></div>
               <template x-if="cur()">
                 <div>
-                  <dl class="kv"><dt>Request</dt><dd class="mono" x-text="cur().method + ' ' + cur().uri + (cur().query ? '?' + cur().query : '')"></dd><dt>Status</dt><dd x-text="cur().status + ' after ' + cur().ms + ' ms'"></dd><dt>From</dt><dd class="mono" x-text="cur().remoteAddr"></dd><dt>When</dt><dd x-text="new Date(cur().at).toLocaleString()"></dd><dt x-show="cur().template">Template</dt><dd class="mono" x-show="cur().template" x-text="cur().template"></dd><dt x-show="cur().sql">Statement</dt><dd class="mono" x-show="cur().sql" x-text="cur().sql"></dd></dl>
+                  <dl class="kv"><dt>Request</dt><dd class="mono" x-text="cur().method + ' ' + cur().uri + (cur().query ? '?' + cur().query : '')"></dd><dt>Status</dt><dd x-text="cur().status + ' after ' + cur().ms + ' ms'"></dd><dt>From</dt><dd class="mono" x-text="cur().remoteAddr"></dd><dt>Server</dt><dd class="mono" id="sample-server" x-text="cur().serverHost + ' ' + cur().serverIp + ' (' + cur().serverId + ')'"></dd><dt>When</dt><dd x-text="new Date(cur().at).toLocaleString()"></dd><dt x-show="cur().template">Template</dt><dd class="mono" x-show="cur().template" x-text="cur().template"></dd><dt x-show="cur().sql">Statement</dt><dd class="mono" x-show="cur().sql" x-text="cur().sql"></dd></dl>
                   <p x-show="cur().detail" class="sub" x-text="cur().detail"></p>
                   <h3 style="margin-top:10px">Stack</h3>
                   <pre class="code" style="max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all"><template x-for="(f, i) in (cur().frames || [])" :key="'b' + i"><div style="color:var(--cyan)" x-text="(f.file || '') + ':' + (f.line || '') + (f.name ? '  ' + f.name : '')"></div></template><template x-for="(j, i) in (cur().java || [])" :key="'j' + i"><div style="color:var(--dim)" x-text="j"></div></template></pre>
@@ -478,7 +479,7 @@
 
       <!-- Reports -->
       <section x-show="tab === 'reports'">
-        <h1 class="h1">Reports <small>totals for this server</small></h1>
+        <h1 class="h1">Reports <small>totals for this server<span id="reports-server" x-show="rep && rep.server" x-text="rep && rep.server ? ' (' + rep.server.host + ', ' + rep.server.ip + ', id ' + rep.server.id + ')' : ''"></span></small></h1>
         <div class="msg" style="margin:0 0 10px;background:var(--input)" x-show="rep && !rep.persisted">Totals are since the server started and are kept in memory. BoxLang+ keeps totals since first install across restarts.</div>
         <template x-if="rep">
           <div>
@@ -509,11 +510,13 @@
       <!-- Ask Lens -->
       <section x-show="tab === 'ask'">
         <h1 class="h1">Ask Lens <small>ask about this server in plain words</small></h1>
-        <div class="card" style="max-width:820px">
+        <div id="agent-page" class="agentpage" x-show="agentOn()"></div>
+        <div class="card" style="max-width:820px" :style="agentOn() ? 'margin-top:12px' : ''">
+          <h3 x-show="agentOn()">Prefer another chat?</h3>
           <p class="sub" x-show="aiInfo && !aiInfo.licensed">Asking a model from the server is a BoxLang+ feature (a license or a trial). Copy prompt and the chat links work without it.</p>
           <p class="sub" x-show="aiInfo && aiInfo.licensed && !aiInfo.canCall">The server is not set to call a model (<span class="mono">ai.enabled</span> and the <span class="mono">bx-ai</span> module). You can still copy the prompt with a redacted summary of this server and paste it into a chat of your choice.</p>
-          <textarea x-model="askQ" rows="3" maxlength="1000" placeholder="Why was the server slow in the last few minutes?" style="width:100%;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px"></textarea>
-          <div class="tools" style="margin-top:8px"><button class="btn primary" x-show="aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy || !askQ.trim()" @click="ask()"><svg class="ic"><use href="#ph-sparkle"/></svg>Ask</button>
+          <textarea id="askq" x-model="askQ" rows="3" maxlength="1000" placeholder="Why was the server slow in the last few minutes?" style="width:100%;background:var(--input);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px"></textarea>
+          <div class="tools" style="margin-top:8px"><button class="btn primary" x-show="!agentOn() && aiInfo && aiInfo.canCall && state && state.role === 'admin'" :disabled="aiBusy || !askQ.trim()" @click="ask()"><svg class="ic"><use href="#ph-sparkle"/></svg>Ask</button>
             <button class="btn" :disabled="!askQ.trim()" @click="copyPrompt('ask', askQ, '')"><svg class="ic"><use href="#ph-copy"/></svg>Copy prompt</button>
             <button class="btn" x-show="aiInfo && aiInfo.links" :disabled="!askQ.trim()" @click="sendPrompt('chatgpt', 'ask', askQ, '')">Ask ChatGPT</button><button class="btn" x-show="aiInfo && aiInfo.links" :disabled="!askQ.trim()" @click="sendPrompt('claude', 'ask', askQ, '')">Ask Claude</button></div>
           <p class="sub">The summary holds uptime, heap, request totals, recent error messages, slow statements and executor health. Passwords, parameter values and the configuration are never included.</p>
@@ -644,6 +647,72 @@
         </template>
       </section>
 
+      <!-- AI -->
+      <section x-show="tab === 'ai'">
+        <h1 class="h1">AI <small>the ops assistant and the model behind it</small></h1>
+        <template x-if="aic">
+          <div>
+            <div class="msg plusnote" style="margin:0 0 10px" x-show="aic.locked"><span class="chipx plus">BoxLang+</span> The ops assistant, Explain with AI and Ask Lens need a BoxLang+ license or trial. You can look at the settings, but they cannot be changed here.</div>
+            <div class="grid2">
+              <div class="card" id="ai-status">
+                <h3>Status</h3>
+                <ul class="checks"><template x-for="c in aic.requirements" :key="c.name"><li :class="c.ok ? 'ok' : 'no'"><svg class="ic"><use :href="c.ok ? '#ph-check-circle' : '#ph-warning-circle'"/></svg><b x-text="c.name"></b><span class="dim" x-text="c.note"></span></li></template></ul>
+                <dl class="kv" style="margin-top:8px">
+                  <dt>Tools</dt><dd x-text="aic.status.tools + ' for your role (' + aic.status.role + ')'"></dd>
+                  <dt>Documentation search</dt><dd x-text="aic.status.rag.mode === 'off' ? 'off' : aic.status.rag.mode === 'none' ? 'built on first use' : aic.status.rag.mode + ', ' + aic.status.rag.chunks + ' sections'"></dd>
+                  <dt>API key</dt><dd x-text="aic.keySource.source === 'none' ? 'none (not needed for a local model)' : (aic.keySource.source === 'environment' ? 'environment variable ' + aic.keySource.name : aic.keySource.name) + (aic.keySource.source !== 'none' ? (aic.keySource.present ? ' (found)' : ' (not found)') : '')"></dd>
+                </dl>
+                <div class="tools" style="margin-top:10px">
+                  <button class="btn primary" id="ai-test" :disabled="aic.locked || aiTesting" @click="testAi()"><svg class="ic"><use href="#ph-pulse"/></svg><span x-text="aiTesting ? 'Testing...' : 'Test connection'"></span></button>
+                </div>
+                <template x-if="aiTestOut">
+                  <div id="ai-test-out" style="margin-top:8px">
+                    <div :class="aiTestOut.ok ? 'okbox' : 'msg err'" x-text="(aiTestOut.ok ? 'Works: ' : 'Failed: ') + aiTestOut.message"></div>
+                    <dl class="kv" x-show="aiTestOut.chat" style="margin-top:6px"><dt>Chat</dt><dd x-text="aiTestOut.chat ? (aiTestOut.chat.ok ? 'ok' : 'failed') + ' in ' + aiTestOut.chat.ms + ' ms. ' + aiTestOut.chat.message : ''"></dd>
+                      <dt>Embeddings</dt><dd x-text="aiTestOut.embeddings ? (aiTestOut.embeddings.skipped ? 'skipped. ' : aiTestOut.embeddings.ok ? 'ok. ' : 'failed. ') + aiTestOut.embeddings.message : ''"></dd></dl>
+                  </div>
+                </template>
+              </div>
+              <div class="card">
+                <h3>What leaves this server</h3>
+                <p class="sub">Every question you ask and every tool result the assistant reads (request data, error messages, thread names, settings, log lines) is sent to the provider, after Lens has hidden secrets and capped the size. Nothing is sent until you ask a question.</p>
+                <p class="sub"><b>Local Ollama keeps it inside your network.</b> A hosted provider (OpenAI, Claude, Gemini and the like) receives it. Pick the provider with that in mind. The assistant cannot run SQL, restart the server, take a heap dump or read files, and every change it proposes waits for your Approve click.</p>
+              </div>
+            </div>
+            <div class="card" style="margin-top:12px">
+              <h3>Settings <span x-show="aiDirty().length" class="chipx" x-text="aiDirty().length + ' unsaved'"></span></h3>
+              <div class="aigrid">
+                <div class="aitoggle"><span>Enable the assistant</span><label class="sw"><input type="checkbox" id="ai-enabled" :checked="aiForm['ai.enabled'] === true" :disabled="!aic.canChange" @change="aiForm['ai.enabled'] = $event.target.checked"><span></span></label></div>
+                <div class="aitoggle"><span>Let it propose actions (each needs an approval)</span><label class="sw"><input type="checkbox" id="ai-actions" :checked="aiForm['ai.actions'] === true" :disabled="!aic.canChange" @change="aiForm['ai.actions'] = $event.target.checked"><span></span></label></div>
+                <div class="aitoggle"><span>Search the Lens documentation</span><label class="sw"><input type="checkbox" id="ai-rag" :checked="aiForm['ai.rag'] === true" :disabled="!aic.canChange" @change="aiForm['ai.rag'] = $event.target.checked"><span></span></label></div>
+                <label class="aifield"><span>Provider</span><select id="ai-provider" :disabled="!aic.canChange" @change="aiForm['ai.provider'] = $event.target.value"><template x-for="p in aic.providers" :key="p"><option :value="p" :selected="aiForm['ai.provider'] === p" x-text="p"></option></template></select></label>
+                <label class="aifield"><span>Model</span><input type="text" id="ai-model" :value="aiForm['ai.model']" :disabled="!aic.canChange" @input="aiForm['ai.model'] = $event.target.value" placeholder="llama3.2"></label>
+                <label class="aifield"><span>Address of the model server</span><input type="text" id="ai-baseurl" :value="aiForm['ai.baseUrl']" :disabled="!aic.canChange" @input="aiForm['ai.baseUrl'] = $event.target.value" placeholder="http://localhost:11434"></label>
+                <label class="aifield"><span>Embedding model (documentation search)</span><input type="text" id="ai-embed" :value="aiForm['ai.embeddingModel']" :disabled="!aic.canChange" @input="aiForm['ai.embeddingModel'] = $event.target.value" placeholder="nomic-embed-text"></label>
+                <label class="aifield"><span>Temperature (0 to 2)</span><input type="text" id="ai-temp" :value="aiForm['ai.temperature']" :disabled="!aic.canChange" @input="aiForm['ai.temperature'] = $event.target.value"></label>
+                <label class="aifield"><span>Seconds an answer may take</span><input type="number" min="10" max="600" :value="aiForm['ai.timeoutSeconds']" :disabled="!aic.canChange" @input="aiForm['ai.timeoutSeconds'] = Number($event.target.value)"></label>
+                <label class="aifield"><span>Tool calls per answer</span><input type="number" min="1" max="20" :value="aiForm['ai.maxToolCalls']" :disabled="!aic.canChange" @input="aiForm['ai.maxToolCalls'] = Number($event.target.value)"></label>
+                <label class="aifield"><span>Messages remembered per conversation</span><input type="number" min="2" max="100" :value="aiForm['ai.memoryMessages']" :disabled="!aic.canChange" @input="aiForm['ai.memoryMessages'] = Number($event.target.value)"></label>
+                <label class="aifield"><span>Chats at once on this server</span><input type="number" min="1" max="20" :value="aiForm['ai.maxConcurrentChats']" :disabled="!aic.canChange" @input="aiForm['ai.maxConcurrentChats'] = Number($event.target.value)"></label>
+              </div>
+              <h3 style="margin-top:14px">API key</h3>
+              <p class="sub">A key is never typed in here. Pick where Lens reads it from.</p>
+              <div class="aikey">
+                <label class="aifield"><span>Environment variable that holds the key</span><input type="text" id="ai-keyenv" :value="aiForm['ai.apiKeyEnv']" :disabled="!aic.canChange" @input="aiForm['ai.apiKeyEnv'] = $event.target.value" placeholder="OPENAI_API_KEY"></label>
+                <div class="sub">Or keep it in <span class="mono">boxlang.json</span> as an encrypted value, which this page cannot change:</div>
+                <pre class="code">"ai": { "apiKey": "bxsecret:..." }</pre>
+              </div>
+              <p class="msg err" x-show="aiError" x-text="aiError"></p>
+              <div class="tools" style="margin-top:10px">
+                <button class="btn primary" id="ai-save" :disabled="!aic.canChange || !aiDirty().length || aiSaving" @click="saveAiConfig()">Apply and save</button>
+                <button class="btn" :disabled="!aiDirty().length" @click="aiForm = Object.assign({}, aic.values); aiError = ''">Discard</button>
+                <span class="sub" x-show="!aic.canChange && !aic.locked">The console is read-only (console.readOnly).</span>
+              </div>
+            </div>
+          </div>
+        </template>
+      </section>
+
       <!-- Settings -->
       <section x-show="tab === 'settings'">
         <h1 class="h1">Settings <small>changes apply at once and are saved, so they survive a restart</small></h1>
@@ -688,6 +757,64 @@
     <div class="aipanel" x-show="aiOut.open" x-cloak><div class="rowbar"><b>AI answer</b><button class="btn mini" @click="aiOut.open = false">Close</button></div>
       <p class="sub" x-show="aiBusy">Thinking...</p><p class="msg err" x-show="aiOut.error" x-text="aiOut.error"></p><div class="aitext" x-text="aiOut.text"></div></div>
   </div>
+  <div id="agent-float" class="agentfloat">
+    <aside id="agent" class="agent" :class="tab === 'ask' ? 'pagemode' : 'drawer'" x-show="agentShown()" x-cloak aria-label="Ops assistant">
+      <header class="ahead">
+        <b><svg class="ic"><use href="#ph-robot"/></svg> Ops assistant</b>
+        <span class="spacer"></span>
+        <button class="btn mini" id="agent-reset" @click="resetAgent()" title="Forget this conversation"><svg class="ic"><use href="#ph-arrow-counter-clockwise"/></svg>Reset conversation</button>
+        <button class="btn mini" x-show="tab !== 'ask'" @click="closeAgent()" aria-label="Close the assistant"><svg class="ic"><use href="#ph-x"/></svg></button>
+      </header>
+      <div class="astatus mono" id="agent-status" x-text="agent.st ? agent.st.provider + ' / ' + agent.st.model + ' · ' + agentRag() + ' · ' + agent.st.tools + ' tools' : ''"></div>
+      <div id="agent-list" class="alist" aria-live="polite">
+        <div class="aempty" x-show="!agent.msgs.length">
+          <p>Ask about this server. I can look at requests, errors, queries, executors, threads and memory, and search the Lens documentation.</p>
+          <div class="aex"><template x-for="q in agentExamples" :key="q"><button class="btn" @click="sendAgent(q)" x-text="q"></button></template></div>
+        </div>
+        <template x-for="(m, mi) in agent.msgs" :key="mi">
+          <div class="amsg" :class="m.role">
+            <div class="ubub" x-show="m.role === 'user'" x-text="m.text"></div>
+            <template x-if="m.role === 'assistant'">
+              <div>
+                <template x-for="(p, pi) in m.parts" :key="pi">
+                  <div>
+                    <template x-if="p.type === 'text'"><div class="abub md" x-effect="mdTo($el, p.text)"></div></template>
+                    <template x-if="p.type === 'tool'">
+                      <div class="tchip" :class="p.ok === false ? 'bad' : (p.ok === null ? 'run' : '')">
+                        <button class="chipbtn" @click="p.open = !p.open" :aria-expanded="p.open"><svg class="ic"><use :href="p.readOnly ? '#ph-eye' : '#ph-lightning'"/></svg><b x-text="p.name"></b><span class="dim" x-text="p.ok === null ? 'running...' : p.summary"></span></button>
+                        <pre class="targs mono" x-show="p.open" x-text="toolLabel(p)"></pre>
+                      </div>
+                    </template>
+                    <template x-if="p.type === 'approval'">
+                      <div class="acard" :class="p.state">
+                        <b>Approval needed</b>
+                        <div x-text="p.summary"></div>
+                        <pre class="targs mono" x-text="p.tool + ' ' + JSON.stringify(p.args)"></pre>
+                        <div class="tools">
+                          <button class="btn primary" data-act="approve" :disabled="p.state !== 'pending'" @click="decideAgent(p, true)">Approve</button>
+                          <button class="btn" data-act="deny" :disabled="p.state !== 'pending'" @click="decideAgent(p, false)">Deny</button>
+                          <span class="dim" x-text="p.state === 'pending' ? 'expires in ' + agentLeft(p) + ' s' : (p.state === 'approved' ? 'Approved' : p.state === 'denied' ? 'Denied' : p.state === 'expired' ? 'Expired' : p.state === 'sending' ? '...' : 'Closed') + (p.error ? '. ' + p.error : '')"></span>
+                        </div>
+                      </div>
+                    </template>
+                    <template x-if="p.type === 'error'"><div class="msg err" x-text="p.text"></div></template>
+                  </div>
+                </template>
+                <div class="dim" x-show="!m.done && !m.parts.length">Thinking...</div>
+              </div>
+            </template>
+          </div>
+        </template>
+      </div>
+      <form class="ainput" @submit.prevent="sendAgent()">
+        <textarea id="agent-input" x-model="agent.input" rows="2" maxlength="2000" placeholder="Ask about this server (Alt+K opens and closes this)" @keydown="agentKey($event)" aria-label="Message to the ops assistant"></textarea>
+        <button class="btn primary" type="submit" id="agent-send" :disabled="agent.busy || !agent.input.trim()" aria-label="Send"><svg class="ic"><use href="#ph-paper-plane-right"/></svg></button>
+        <button class="btn" type="button" id="agent-stop" x-show="agent.busy" @click="stopAgent()" aria-label="Stop"><svg class="ic"><use href="#ph-stop"/></svg></button>
+      </form>
+      <div class="adata">What the assistant reads is sent to <span x-text="agent.st ? agent.st.provider : 'the provider'"></span>. It never gets more than your role can see.</div>
+    </aside>
+  </div>
+  <button class="fab" id="agent-launch" x-show="agentOn() && tab !== 'ask' && !agent.open" x-cloak @click="openAgent()" aria-label="Open the ops assistant (Alt+K)" title="Ask the ops assistant (Alt+K)"><svg class="ic"><use href="#ph-robot"/></svg></button>
   <div class="toast" x-show="toastMsg" x-text="toastMsg" role="status"></div>
 </div>
 </body>

@@ -37,11 +37,15 @@ public final class SettingsRegistry {
 		}
 	}
 
-	public static final List<String>	GROUPS	= List.of( "Bar", "Collection", "Collectors", "Thresholds", "Checks", "Interface", "Limits", "Editor",
-	    "Console", "Access" );
+	public static final List<String>	GROUPS			= List.of( "Bar", "Collection", "Collectors", "Thresholds", "Checks", "Interface", "Limits", "Editor",
+	    "Console", "Access", "AI" );
 
-	private final List<Def>				defs	= new ArrayList<>();
-	private final Map<String, Def>		byKey	= new LinkedHashMap<>();
+	/** The providers of bx-ai that can chat with tools. Bedrock needs a credentials struct, so it is not offered. */
+	public static final List<String>	AI_PROVIDERS	= List.of( "ollama", "openai", "claude", "gemini", "mistral", "groq", "grok", "deepseek", "openrouter",
+	    "openai-compatible", "cohere", "docker" );
+
+	private final List<Def>				defs			= new ArrayList<>();
+	private final Map<String, Def>		byKey			= new LinkedHashMap<>();
 
 	/**
 	 * @param collectorIds the collector ids, each one gets an on/off switch
@@ -94,17 +98,56 @@ public final class SettingsRegistry {
 		add( "store.dir", "string", "Console", "Disk store folder", false, "" );
 		add( "store.retentionHours", "int", "Console", "Keep saved data (hours)", false, 72 );
 		add( "store.maxMB", "int", "Console", "Disk store size limit (MB)", false, 50 );
-		add( "ai.enabled", "bool", "Console", "AI: let the server call a model (Plus)", false, false );
-		add( "ai.provider", "string", "Console", "AI provider", false, "" );
-		add( "ai.model", "string", "Console", "AI model", false, "" );
-		add( "ai.apiKey", "secret", "Console", "AI API key", false, "" );
-		add( "ai.links", "bool", "Console", "AI: show copy and chat links", false, true );
+		add( "ai.enabled", "bool", "AI", "AI: let the server call a model (Plus)", true, false );
+		add( "ai.provider", "enum", "AI", "AI provider", true, "ollama", AI_PROVIDERS );
+		add( "ai.model", "string", "AI", "AI model (empty: llama3.2 for Ollama, else the provider default)", true, "llama3.2" );
+		add( "ai.baseUrl", "string", "AI", "Address of the model server (empty: http://localhost:11434 for Ollama)", true, "http://localhost:11434" );
+		add( "ai.embeddingModel", "string", "AI", "Embedding model for the documentation search", true, "nomic-embed-text" );
+		add( "ai.temperature", "string", "AI", "Temperature (0 to 2)", true, "0.2" );
+		add( "ai.timeoutSeconds", "int", "AI", "Seconds an answer may take", true, 120, 10, 600 );
+		add( "ai.maxToolCalls", "int", "AI", "Tool calls allowed per answer", true, 8, 1, 20 );
+		add( "ai.memoryMessages", "int", "AI", "Messages the conversation remembers", true, 20, 2, 100 );
+		add( "ai.maxConcurrentChats", "int", "AI", "Chats that may run at once on this server", true, 3, 1, 20 );
+		add( "ai.actions", "bool", "AI", "Let the agent propose actions (each one needs an approval)", true, true );
+		add( "ai.rag", "bool", "AI", "Let the agent search the Lens documentation", true, true );
+		add( "ai.apiKeyEnv", "string", "AI", "Name of the environment variable that holds the API key", true, "" );
+		add( "ai.apiKey", "secret", "AI", "AI API key (a bxsecret: value in boxlang.json only)", false, "" );
+		add( "ai.links", "bool", "AI", "AI: show copy and chat links", false, true );
 		add( "collectors.http.propagateId", "bool", "Collectors", "HTTP: add X-Request-Id to outgoing calls", false, false );
 		add( "async.enabled", "bool", "Console", "Run statistics and history on a worker thread", false, true );
 		add( "async.queueSize", "int", "Console", "Work queue size", false, 2000 );
 		add( "bar.access", "string", "Access", "Who sees the bar", false, "local" );
 		add( "bar.allowAllIPs", "bool", "Access", "Confirm bar.access all", false, false );
 		add( "history.maxRequests", "int", "Access", "Requests kept in memory", false, 50 );
+	}
+
+	/**
+	 * An address the agent may be pointed at: http or https, a host, no user name and password in it.
+	 */
+	public static boolean isSafeBaseUrl( String url ) {
+		try {
+			java.net.URI u = java.net.URI.create( url );
+			return ( "http".equals( u.getScheme() ) || "https".equals( u.getScheme() ) ) && u.getHost() != null && u.getUserInfo() == null
+			    && url.length() <= 300;
+		} catch ( IllegalArgumentException e ) {
+			return false;
+		}
+	}
+
+	/**
+	 * Is this the name of an environment variable? Letters, digits and underscores, not starting with a digit.
+	 */
+	public static boolean isEnvName( String name ) {
+		if ( name.isEmpty() || name.length() > 100 || Character.isDigit( name.charAt( 0 ) ) ) {
+			return false;
+		}
+		for ( int i = 0; i < name.length(); i++ ) {
+			char ch = name.charAt( i );
+			if ( !Character.isLetterOrDigit( ch ) && ch != '_' || ch > 127 ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private void add( String key, String type, String group, String label, boolean live, Object def ) {
@@ -195,6 +238,40 @@ public final class SettingsRegistry {
 				String str = value == null ? "" : value.toString();
 				if ( str.length() > 500 ) {
 					throw new IllegalArgumentException( d.key() + " is too long" );
+				}
+				str = str.trim();
+				switch ( d.key().toLowerCase( Locale.ROOT ) ) {
+					case "ai.baseurl" :
+						if ( !str.isEmpty() && !isSafeBaseUrl( str ) ) {
+							throw new IllegalArgumentException( d.key() + " must be an http or https address without a user name or password" );
+						}
+						break;
+					case "ai.temperature" :
+						try {
+							double t = Double.parseDouble( str );
+							if ( t < 0 || t > 2 || Double.isNaN( t ) ) {
+								throw new NumberFormatException();
+							}
+						} catch ( NumberFormatException e ) {
+							throw new IllegalArgumentException( d.key() + " must be a number from 0 to 2" );
+						}
+						break;
+					case "ai.apikeyenv" :
+						if ( !str.isEmpty() && !isEnvName( str ) ) {
+							throw new IllegalArgumentException(
+							    d.key() + " is the NAME of an environment variable: letters, digits and underscores. Do not type the key itself here" );
+						}
+						break;
+					case "ai.model", "ai.embeddingmodel" :
+						for ( int i = 0; i < str.length(); i++ ) {
+							char ch = str.charAt( i );
+							if ( ch < 0x21 || ch > 0x7e ) {
+								throw new IllegalArgumentException( d.key() + " is a model name without spaces or special characters" );
+							}
+						}
+						break;
+					default :
+						break;
 				}
 				if ( "editor.linkPattern".equalsIgnoreCase( d.key() ) && !LensConfig.isSafeEditorLink( str ) ) {
 					throw new IllegalArgumentException(
