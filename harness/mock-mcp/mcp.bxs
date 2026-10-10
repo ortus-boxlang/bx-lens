@@ -103,13 +103,16 @@ msg = {}
 try {
 	msg = jsonDeserialize( raw )
 } catch ( any e ) {
+	application.log.append( { "server" : id, "method" : "parse error", "tool" : "", "session" : "", "accept" : left( toString( raw ), 300 ) } )
 	respond( 400, "application/json", '{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"parse error"}}' )
 	return
 }
 method = msg.method ?: ""
 tool = msg.params.name ?: ""
+requestHeaders = getHTTPRequestData( false ).headers
 lock name="mockmcplog" type="exclusive" timeout=5 {
-	application.log.append( { "server" : id, "method" : method, "tool" : tool, "session" : ( cgi.http_mcp_session_id ?: "" ), "accept" : ( cgi.http_accept ?: "" ) } )
+	application.log = application.log ?: []
+	application.log.append( { "server" : id, "method" : method, "tool" : tool, "session" : ( requestHeaders[ "Mcp-Session-Id" ] ?: "" ), "accept" : ( requestHeaders[ "Accept" ] ?: "" ) } )
 	if ( application.log.len() > 500 ) {
 		application.log.deleteAt( 1 )
 	}

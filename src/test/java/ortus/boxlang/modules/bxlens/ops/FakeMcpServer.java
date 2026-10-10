@@ -29,15 +29,15 @@ import ortus.boxlang.modules.bxlens.util.Plain;
 public final class FakeMcpServer implements AutoCloseable {
 
 	private final HttpServer		http;
-	public final List<String>		calls			= new CopyOnWriteArrayList<>();
-	public final List<String>		methods			= new CopyOnWriteArrayList<>();
-	public final List<String>		sessions		= new CopyOnWriteArrayList<>();
-	public final AtomicInteger		listCount		= new AtomicInteger();
-	public volatile int				status			= 200;
+	public final List<String>		calls		= new CopyOnWriteArrayList<>();
+	public final List<String>		methods		= new CopyOnWriteArrayList<>();
+	public final List<String>		sessions	= new CopyOnWriteArrayList<>();
+	public final AtomicInteger		listCount	= new AtomicInteger();
+	public volatile int				status		= 200;
 	public volatile boolean			refuseInitialize;
 	public volatile int				redirectTo;
 	public volatile long			listDelayMs;
-	public volatile List<String>	toolNames		= List.of( "searchDocumentation", "getPage" );
+	public volatile List<String>	toolNames	= List.of( "searchDocumentation", "getPage" );
 
 	public FakeMcpServer() throws IOException {
 		this.http = HttpServer.create( new InetSocketAddress( InetAddress.getLoopbackAddress(), 0 ), 0 );
@@ -121,7 +121,7 @@ public final class FakeMcpServer implements AutoCloseable {
 		} else {
 			reply = "{\"jsonrpc\":\"2.0\",\"id\":" + msg.get( "id" ) + ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
 		}
-		boolean plain = id.equals( "plain" );
+		boolean	plain	= id.equals( "plain" );
 		byte[]	out		= ( plain ? reply : "event: message\ndata: " + reply + "\n\n" ).getBytes( StandardCharsets.UTF_8 );
 		ex.getResponseHeaders().add( "Content-Type", plain ? "application/json" : "text/event-stream" );
 		ex.sendResponseHeaders( 200, out.length );

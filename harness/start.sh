@@ -37,6 +37,12 @@ sed -i "s|\"reloadAssets\": true|\"reloadAssets\": ${LENS_RELOAD_ASSETS:-true}|"
 sed -i "s|@LENS_LICENSE@|${LENS_LICENSE:-}|g" "$RUN/home/config/boxlang.json"
 # LENS_SERVER_HEADER=true also sends X-BxLens-Server. LENS_SERVER_NAME and LENS_SERVER_ADDRESS (environment) set the server identity
 sed -i "s|@LENS_SERVER_HEADER@|${LENS_SERVER_HEADER:-false}|g" "$RUN/home/config/boxlang.json"
+# LENS_READONLY=true starts the console read only. LENS_SEED_OVERRIDES=/path/file.json is copied in as the saved settings (config/bxlens-settings.json),
+# which is how a read only console gets MCP servers switched on.
+sed -i "s|@LENS_READONLY@|${LENS_READONLY:-false}|g" "$RUN/home/config/boxlang.json"
+if [ -n "${LENS_SEED_OVERRIDES:-}" ]; then
+	cp "$LENS_SEED_OVERRIDES" "$RUN/home/config/bxlens-settings.json"
+fi
 # LENS_MCP_BASE=http://127.0.0.1:11435/mcp.bxs serves the builtin MCP documentation servers from the mock (harness/start-mock-mcp.sh) at base/id,
 # so nothing needs the internet. Empty uses the real servers.
 sed -i "s|@LENS_MCP_BASE@|${LENS_MCP_BASE:-}|g" "$RUN/home/config/boxlang.json"

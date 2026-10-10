@@ -211,3 +211,4 @@ tr.row.sel td { background: var(--sel); }
 .mcppicker { display: flex; flex-direction: column; gap: 4px; background: var(--input); border-radius: 6px; padding: 8px; } .mcptool { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .mcpadd { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; } .mcpadd .aifield { flex: 1; min-width: 200px; }
 .srvbadge { font: 600 10px var(--mono); background: var(--sel); color: var(--cyan); border: 1px solid var(--cyan); border-radius: 8px; padding: 0 6px; margin-right: 4px; }
+.msg.mcperr { background: var(--tint-crit); color: var(--crit); }

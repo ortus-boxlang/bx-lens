@@ -21,20 +21,22 @@ import org.junit.jupiter.api.Test;
 public class McpUrlsTest {
 
 	/** Known names map to addresses; anything else must be an address literal. */
-	private static final Map<String, String> NAMES = Map.of( "docs.example.com", "93.184.216.34", "intranet.example.com", "10.1.2.3", "lan.example.com",
+	private static final Map<String, String>	NAMES		= Map.of( "docs.example.com", "93.184.216.34", "intranet.example.com", "10.1.2.3",
+	    "lan.example.com",
 	    "192.168.1.20", "meta.example.com", "169.254.169.254", "rebind.example.com", "127.0.0.1", "ula.example.com", "fd12:3456::1", "cgnat.example.com",
 	    "100.64.1.1", "v6.example.com", "2606:4700::1111", "linklocal6.example.com", "fe80::1" );
 
-	private static final McpUrls.Resolver RESOLVER = host -> {
-		String ip = NAMES.get( host );
-		if ( ip != null ) {
-			return new InetAddress[] { InetAddress.getByName( ip ) };
-		}
-		if ( host.indexOf( '.' ) > 0 && host.chars().allMatch( c -> c >= '0' && c <= '9' || c == '.' ) || host.indexOf( ':' ) >= 0 ) {
-			return new InetAddress[] { InetAddress.getByName( host ) };
-		}
-		throw new UnknownHostException( host );
-	};
+	private static final McpUrls.Resolver		RESOLVER	= host -> {
+																String ip = NAMES.get( host );
+																if ( ip != null ) {
+																	return new InetAddress[] { InetAddress.getByName( ip ) };
+																}
+																if ( host.indexOf( '.' ) > 0 && host.chars().allMatch( c -> c >= '0' && c <= '9' || c == '.' )
+																    || host.indexOf( ':' ) >= 0 ) {
+																	return new InetAddress[] { InetAddress.getByName( host ) };
+																}
+																throw new UnknownHostException( host );
+															};
 
 	private static String why( String url ) {
 		return assertThrows( IllegalArgumentException.class, () -> McpUrls.check( url, RESOLVER ) ).getMessage();

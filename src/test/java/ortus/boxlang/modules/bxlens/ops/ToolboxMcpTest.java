@@ -43,9 +43,9 @@ public class ToolboxMcpTest {
 		BoxRuntime.getInstance( true );
 		this.svc.setLicensing( new Licensing( "plus" ) );
 		this.svc.setConfig( new LensConfig( Map.of() ) );
-		this.fake = new FakeMcpServer();
-		this.fake.toolNames = List.of( "searchDocumentation", "getPage", "leak", "injected", "big" );
-		this.mcp = new McpService( new SettingsStore( null, new SettingsRegistry( List.of() ) ), this.fake::base );
+		this.fake			= new FakeMcpServer();
+		this.fake.toolNames	= List.of( "searchDocumentation", "getPage", "leak", "injected", "big" );
+		this.mcp			= new McpService( new SettingsStore( null, new SettingsRegistry( List.of() ) ), this.fake::base );
 		this.svc.setMcp( this.mcp );
 		this.acme = this.mcp.add( "Acme", this.fake.url( "acme" ) );
 		this.mcp.enable( "boxlang", true );
@@ -178,15 +178,16 @@ public class ToolboxMcpTest {
 	@Test
 	@DisplayName( "arguments are checked against the schema the server published: required, types, unknown names dropped, length" )
 	void arguments() {
-		Toolbox box = box( "admin" );
-		Toolbox.Result missing = box.callMcp( wire( "boxlang", "searchDocumentation" ), Map.of() );
+		Toolbox			box		= box( "admin" );
+		Toolbox.Result	missing	= box.callMcp( wire( "boxlang", "searchDocumentation" ), Map.of() );
 		assertThat( missing.status() ).isEqualTo( "denied" );
 		assertThat( missing.text() ).contains( "[query] is required" );
 		assertThat( box.callMcp( wire( "boxlang", "searchDocumentation" ), Map.of( "query", "q".repeat( 2001 ) ) ).text() ).contains( "longer than" );
 		assertThat( box.callMcp( wire( "boxlang", "searchDocumentation" ), Map.of( "query", "a\u0000b" ) ).text() ).contains( "control character" );
 		assertThat( box.callMcp( wire( "boxlang", "searchDocumentation" ), Map.of( "query", "x", "limit", "lots" ) ).text() ).contains( "whole number" );
 		assertThat( this.fake.calls ).isEmpty();
-		Toolbox.Result ok = box.callMcp( wire( "boxlang", "searchDocumentation" ), Map.of( "query", "x", "limit", "3", "deep", "true", "injectedArg", "dropped", "_chatRequest", "x" ) );
+		Toolbox.Result ok = box.callMcp( wire( "boxlang", "searchDocumentation" ),
+		    Map.of( "query", "x", "limit", "3", "deep", "true", "injectedArg", "dropped", "_chatRequest", "x" ) );
 		assertThat( ok.status() ).isEqualTo( "ok" );
 		assertThat( this.fake.calls ).containsExactly( "boxlang.searchDocumentation {query=x, limit=3, deep=true}" );
 	}
@@ -219,15 +220,16 @@ public class ToolboxMcpTest {
 		assertThat( r.status() ).isEqualTo( "ok" );
 		assertThat( this.approvals.pendingCount( null ) ).isEqualTo( 0 );
 		this.mcp.update( this.acme.id(), false, null );
-		assertThat( box( "admin" ).mcpTools().stream().filter( t -> t.serverId().equals( this.acme.id() ) ).allMatch( McpService.Tool::needsApproval ) ).isTrue();
+		assertThat( box( "admin" ).mcpTools().stream().filter( t -> t.serverId().equals( this.acme.id() ) ).allMatch( McpService.Tool::needsApproval ) )
+		    .isTrue();
 	}
 
 	@Test
 	@DisplayName( "a call that is not known to be safe is refused when the console is read only or actions are off; trusted and builtin calls are not" )
 	void readOnlyRules() throws Exception {
 		settings( Map.of( "console", Map.of( "readOnly", true ) ) );
-		Toolbox box = box( "admin" );
-		Toolbox.Result custom = box.callMcp( wire( this.acme.id(), "getPage" ), Map.of() );
+		Toolbox			box		= box( "admin" );
+		Toolbox.Result	custom	= box.callMcp( wire( this.acme.id(), "getPage" ), Map.of() );
 		assertThat( custom.status() ).isEqualTo( "denied" );
 		assertThat( custom.text() ).contains( "read only" );
 		assertThat( this.approvals.pendingCount( null ) ).isEqualTo( 0 );
@@ -251,8 +253,8 @@ public class ToolboxMcpTest {
 		assertThat( third.text() ).contains( "limit" );
 		assertThat( this.fake.calls ).hasSize( 1 );
 		settings( Map.of( "ai", Map.of( "maxToolCalls", 20 ) ) );
-		Toolbox minute = box( "admin" );
-		int refused = 0;
+		Toolbox	minute	= box( "admin" );
+		int		refused	= 0;
 		for ( int i = 0; i < Toolbox.CALLS_PER_MINUTE + 5; i++ ) {
 			minute.beginTurn( Sink.NONE );
 			if ( minute.callMcp( wire( "boxlang", "getPage" ), Map.of() ).text().contains( "Too many tool calls" ) ) {
@@ -266,8 +268,8 @@ public class ToolboxMcpTest {
 	@DisplayName( "what a server returns is redacted and cut like any other result, and instructions inside it stay data" )
 	void resultsAreGuarded() throws Exception {
 		this.mcp.update( this.acme.id(), true, null );
-		Toolbox box = box( "admin" );
-		Toolbox.Result leak = box.callMcp( wire( this.acme.id(), "leak" ), Map.of() );
+		Toolbox			box		= box( "admin" );
+		Toolbox.Result	leak	= box.callMcp( wire( this.acme.id(), "leak" ), Map.of() );
 		assertThat( leak.text() ).doesNotContain( "sk-live-0123456789supersecret" );
 		assertThat( leak.text() ).doesNotContain( "hunter2hunter2" );
 		Toolbox.Result big = box.callMcp( wire( this.acme.id(), "big" ), Map.of() );
@@ -290,8 +292,8 @@ public class ToolboxMcpTest {
 		Toolbox.Result down = box.callMcp( wire( "boxlang", "getPage" ), Map.of() );
 		assertThat( down.status() ).isEqualTo( "error" );
 		assertThat( down.text() ).contains( "HTTP 500" );
-		this.fake.status = 200;
-		this.fake.redirectTo = this.fake.port();
+		this.fake.status		= 200;
+		this.fake.redirectTo	= this.fake.port();
 		Toolbox.Result redirected = box.callMcp( wire( "boxlang", "getPage" ), Map.of() );
 		assertThat( redirected.status() ).isEqualTo( "error" );
 		assertThat( redirected.text() ).contains( "redirect" );
@@ -316,7 +318,7 @@ public class ToolboxMcpTest {
 	@Test
 	@DisplayName( "the server turned off while a call waits for its click means the call is not sent" )
 	void turnedOffWhileWaiting() throws Exception {
-		Toolbox			box	= box( "admin" );
+		Toolbox				box	= box( "admin" );
 		Toolbox.Result[]	out	= new Toolbox.Result[ 1 ];
 		Thread				t	= new Thread( () -> out[ 0 ] = box.callMcp( wire( this.acme.id(), "getPage" ), Map.of() ) );
 		t.start();

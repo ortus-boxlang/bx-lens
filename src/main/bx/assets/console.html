@@ -715,8 +715,8 @@
               <div class="msg warn" id="mcp-privacy" style="margin:0 0 10px"><b>Privacy.</b> When Lensy uses a server, the words it puts in the tool arguments (usually your question) are sent to that server. The servers listed here are outside this server, on the internet. Turn on only the ones you accept that for. No password or API key is ever sent to a server: this version has no way to add authentication headers.</div>
               <template x-if="mcp">
                 <div>
-                  <div class="msg err" style="margin:0 0 10px" x-show="mcp.problems.length"><template x-for="pr in mcp.problems" :key="pr"><div x-text="pr"></div></template></div>
-                  <div class="msg err" id="mcp-error" style="margin:0 0 10px" x-show="mcpError" x-text="mcpError"></div>
+                  <div class="msg mcperr" style="margin:0 0 10px" x-show="mcp.problems.length"><template x-for="pr in mcp.problems" :key="pr"><div x-text="pr"></div></template></div>
+                  <div class="msg mcperr" id="mcp-error" style="margin:0 0 10px" x-show="mcpError" x-text="mcpError"></div>
                   <div class="msg" id="mcp-confirm" style="margin:0 0 10px;background:var(--input);border:1px solid var(--cyan)" x-show="mcpConfirm">
                     <b x-text="mcpConfirm ? 'Turn on ' + mcpConfirm.name + '?' : ''"></b>
                     <div>Lensy will send the words of a question to <span class="mono" x-text="mcpConfirm ? mcpConfirm.url : ''"></span> when it uses this server. Nothing is sent until somebody asks Lensy something that needs it.</div>

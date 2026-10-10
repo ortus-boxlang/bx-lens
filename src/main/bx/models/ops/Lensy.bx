@@ -129,6 +129,13 @@ class {
 	}
 
 	/**
+	 * One of the agent's tools by name, for tests.
+	 */
+	function getTool( required string name ) {
+		return variables.tools.filter( ( t ) => t.getName() == name )[ 1 ]
+	}
+
+	/**
 	 * The names of the tools the agent has.
 	 */
 	array function toolNames() {

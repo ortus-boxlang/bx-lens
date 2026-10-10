@@ -32,25 +32,25 @@ import ortus.boxlang.modules.bxlens.util.Json;
  */
 public class McpServiceTest {
 
-	private static final McpUrls.Resolver RESOLVER = host -> {
-		if ( host.equals( "mcp.example.com" ) ) {
-			return new InetAddress[] { InetAddress.getByName( "93.184.216.34" ) };
-		}
-		if ( host.equals( "inside.example.com" ) ) {
-			return new InetAddress[] { InetAddress.getByName( "10.0.0.9" ) };
-		}
-		if ( host.equals( "localhost" ) ) {
-			return new InetAddress[] { InetAddress.getLoopbackAddress() };
-		}
-		throw new UnknownHostException( host );
-	};
+	private static final McpUrls.Resolver	RESOLVER	= host -> {
+															if ( host.equals( "mcp.example.com" ) ) {
+																return new InetAddress[] { InetAddress.getByName( "93.184.216.34" ) };
+															}
+															if ( host.equals( "inside.example.com" ) ) {
+																return new InetAddress[] { InetAddress.getByName( "10.0.0.9" ) };
+															}
+															if ( host.equals( "localhost" ) ) {
+																return new InetAddress[] { InetAddress.getLoopbackAddress() };
+															}
+															throw new UnknownHostException( host );
+														};
 
 	@TempDir
-	Path					dir;
-	private final SettingsRegistry	registry	= new SettingsRegistry( List.of( "queries" ) );
-	private FakeMcpServer		fake;
-	private SettingsStore		store;
-	private McpService			mcp;
+	Path									dir;
+	private final SettingsRegistry			registry	= new SettingsRegistry( List.of( "queries" ) );
+	private FakeMcpServer					fake;
+	private SettingsStore					store;
+	private McpService						mcp;
 
 	@BeforeEach
 	void start() throws Exception {
@@ -72,11 +72,13 @@ public class McpServiceTest {
 	@Test
 	@DisplayName( "the default list is the eleven Ortus documentation servers, all built in, all off, every tool allowed, with the real addresses" )
 	void defaults() {
-		McpService real = new McpService( new SettingsStore( null, this.registry ), () -> "", RESOLVER, null );
-		List<McpServer> all = real.list();
+		McpService		real	= new McpService( new SettingsStore( null, this.registry ), () -> "", RESOLVER, null );
+		List<McpServer>	all		= real.list();
 		assertThat( all ).hasSize( 11 );
-		assertThat( all.stream().map( McpServer::id ).toList() ).containsExactly( "boxlang", "coldbox", "commandbox", "testbox", "wirebox", "logbox", "cachebox",
-		    "contentbox", "qb", "quick", "cbauth" ).inOrder();
+		assertThat( all.stream().map( McpServer::id ).toList() )
+		    .containsExactly( "boxlang", "coldbox", "commandbox", "testbox", "wirebox", "logbox", "cachebox",
+		        "contentbox", "qb", "quick", "cbauth" )
+		    .inOrder();
 		for ( McpServer s : all ) {
 			assertThat( s.builtin() ).isTrue();
 			assertThat( s.enabled() ).isFalse();
@@ -95,8 +97,8 @@ public class McpServiceTest {
 		Files.writeString( this.dir.resolve( "o.json" ), Json.write( Map.of( "overrides", Map.of(), "mcp",
 		    Map.of( "servers", List.of( Map.of( "id", "boxlang", "name", "Evil", "url", "https://evil.example.com/mcp", "builtin", true, "enabled", true,
 		        "trusted", true, "allowedTools", List.of( "*" ) ) ) ) ) ) );
-		McpService again = reload();
-		McpServer b = again.get( "boxlang" );
+		McpService	again	= reload();
+		McpServer	b		= again.get( "boxlang" );
 		assertThat( b.url() ).isEqualTo( this.fake.base() + "/boxlang" );
 		assertThat( b.name() ).isEqualTo( "BoxLang docs" );
 		assertThat( b.enabled() ).isTrue();
@@ -210,7 +212,7 @@ public class McpServiceTest {
 			assertThat( t.builtin() ).isTrue();
 		}
 		assertThat( McpService.wireName( "acme", "get page.v2/x" ) ).isEqualTo( "acme__get_page_v2_x" );
-		assertThat( McpService.wireName( "acme", "x".repeat(100) ) ).hasLength( 64 );
+		assertThat( McpService.wireName( "acme", "x".repeat( 100 ) ) ).hasLength( 64 );
 		assertThat( this.mcp.find( "boxlang__getPage", true ).tool() ).isEqualTo( "getPage" );
 		assertThat( this.mcp.find( "boxlang.getPage", true ).tool() ).isEqualTo( "getPage" );
 		assertThat( this.mcp.find( "getPage", true ) ).isNull();
@@ -220,17 +222,17 @@ public class McpServiceTest {
 	@Test
 	@DisplayName( "the schema handed to the model keeps simple types, short descriptions and the required names, and nothing else" )
 	void schemaCleaned() {
-		Map<String, Object> raw = Map.of( "type", "object", "$schema", "http://x", "additionalProperties", true, "properties",
+		Map<String, Object>	raw		= Map.of( "type", "object", "$schema", "http://x", "additionalProperties", true, "properties",
 		    Map.of( "q", Map.of( "type", "string", "description", "d".repeat( 400 ), "pattern", "(a+)+", "default", "x" ), "n", Map.of( "type", "integer" ),
 		        "o", Map.of( "type", "object" ), "_hidden", Map.of( "type", "string" ) ),
 		    "required", List.of( "q", "ghost" ) );
-		Map<String, Object> clean = McpService.cleanSchema( raw );
-		Map<String, Object> props = (Map<String, Object>) clean.get( "properties" );
+		Map<String, Object>	clean	= McpService.cleanSchema( raw );
+		Map<String, Object>	props	= ( Map<String, Object> ) clean.get( "properties" );
 		assertThat( props.keySet() ).containsExactly( "q", "n", "o" );
-		assertThat( (Map<String, Object>) props.get( "q" ) ).containsKey( "description" );
-		assertThat( ( (Map<String, Object>) props.get( "q" ) ).get( "description" ).toString().length() ).isLessThan( 310 );
-		assertThat( (Map<String, Object>) props.get( "q" ) ).doesNotContainKey( "pattern" );
-		assertThat( ( (Map<String, Object>) props.get( "o" ) ).get( "type" ) ).isEqualTo( "string" );
+		assertThat( ( Map<String, Object> ) props.get( "q" ) ).containsKey( "description" );
+		assertThat( ( ( Map<String, Object> ) props.get( "q" ) ).get( "description" ).toString().length() ).isLessThan( 310 );
+		assertThat( ( Map<String, Object> ) props.get( "q" ) ).doesNotContainKey( "pattern" );
+		assertThat( ( ( Map<String, Object> ) props.get( "o" ) ).get( "type" ) ).isEqualTo( "string" );
 		assertThat( clean.get( "required" ) ).isEqualTo( List.of( "q" ) );
 		assertThat( clean ).doesNotContainKey( "$schema" );
 	}
@@ -244,8 +246,10 @@ public class McpServiceTest {
 		this.mcp.refreshStale();
 		assertThat( this.mcp.tools( true ).stream().map( McpService.Tool::serverId ).distinct().toList() ).containsExactly( "boxlang" );
 		this.mcp.update( custom.id(), null, List.of( "getPage" ) );
-		assertThat( this.mcp.tools( true ).stream().map( McpService.Tool::display ).toList() ).containsExactly( "boxlang.searchDocumentation", "boxlang.getPage",
-		    custom.id() + ".getPage" ).inOrder();
+		assertThat( this.mcp.tools( true ).stream().map( McpService.Tool::display ).toList() )
+		    .containsExactly( "boxlang.searchDocumentation", "boxlang.getPage",
+		        custom.id() + ".getPage" )
+		    .inOrder();
 		this.mcp.update( "boxlang", null, List.of( "searchDocumentation" ) );
 		assertThat( this.mcp.tools( true ).stream().map( McpService.Tool::display ).toList() ).containsExactly( "boxlang.searchDocumentation",
 		    custom.id() + ".getPage" ).inOrder();
@@ -286,8 +290,8 @@ public class McpServiceTest {
 		this.mcp.enable( "boxlang", true );
 		this.mcp.enable( dead.id(), true );
 		this.mcp.refreshStale();
-		Map<String, Object> view = this.mcp.view( true );
-		Map<String, Object> row = rows( view ).get( dead.id() );
+		Map<String, Object>	view	= this.mcp.view( true );
+		Map<String, Object>	row		= rows( view ).get( dead.id() );
 		assertThat( row.get( "status" ) ).isEqualTo( "unreachable" );
 		assertThat( row.get( "reason" ).toString() ).contains( "could not connect" );
 		assertThat( row.get( "reason" ).toString() ).doesNotContain( "localhost" );
@@ -295,8 +299,8 @@ public class McpServiceTest {
 		assertThat( this.mcp.tools( true ).stream().map( McpService.Tool::serverId ).distinct().toList() ).containsExactly( "boxlang" );
 		this.fake.status = 503;
 		assertThat( this.mcp.discover( "boxlang" ).reason() ).isEqualTo( "HTTP 503" );
-		this.fake.status = 200;
-		this.fake.redirectTo = this.fake.port();
+		this.fake.status		= 200;
+		this.fake.redirectTo	= this.fake.port();
 		McpService.Discovery redirected = this.mcp.discover( "boxlang" );
 		assertThat( redirected.status() ).isEqualTo( "unreachable" );
 		assertThat( redirected.reason() ).contains( "redirect" );
@@ -324,8 +328,8 @@ public class McpServiceTest {
 	@Test
 	@DisplayName( "tools are looked for again only after five minutes" )
 	void cache() throws Exception {
-		long[] now = { 1_000_000L };
-		McpService m = new McpService( new SettingsStore( null, this.registry ), this.fake::base, RESOLVER, () -> now[ 0 ] );
+		long[]		now	= { 1_000_000L };
+		McpService	m	= new McpService( new SettingsStore( null, this.registry ), this.fake::base, RESOLVER, () -> now[ 0 ] );
 		m.enable( "boxlang", true );
 		m.refreshStale();
 		m.refreshStale();
@@ -342,8 +346,8 @@ public class McpServiceTest {
 	@Test
 	@DisplayName( "a console session may test ten times a minute" )
 	void testRate() {
-		long[] now = { 5_000_000L };
-		McpService m = new McpService( new SettingsStore( null, this.registry ), () -> "", RESOLVER, () -> now[ 0 ] );
+		long[]		now	= { 5_000_000L };
+		McpService	m	= new McpService( new SettingsStore( null, this.registry ), () -> "", RESOLVER, () -> now[ 0 ] );
 		for ( int i = 0; i < McpService.TESTS_PER_MINUTE; i++ ) {
 			assertThat( m.testAllowed( "s1" ) ).isTrue();
 		}
@@ -356,8 +360,8 @@ public class McpServiceTest {
 	@SuppressWarnings( "unchecked" )
 	private static Map<String, Map<String, Object>> rows( Map<String, Object> view ) {
 		Map<String, Map<String, Object>> out = new java.util.LinkedHashMap<>();
-		for ( Object o : (List<Object>) view.get( "servers" ) ) {
-			Map<String, Object> m = (Map<String, Object>) o;
+		for ( Object o : ( List<Object> ) view.get( "servers" ) ) {
+			Map<String, Object> m = ( Map<String, Object> ) o;
 			out.put( String.valueOf( m.get( "id" ) ), m );
 		}
 		return out;

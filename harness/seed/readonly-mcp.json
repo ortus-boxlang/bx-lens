@@ -1,0 +1,10 @@
+{
+	"overrides": {},
+	"mcp": {
+		"servers": [
+			{ "id": "boxlang", "builtin": true, "name": "BoxLang docs", "url": "https://boxlang.ortusbooks.com/~gitbook/mcp", "enabled": true, "trusted": false, "allowedTools": [ "*" ] },
+			{ "id": "acme", "builtin": false, "name": "Acme", "url": "http://127.0.0.1:11435/mcp.bxs/acme", "enabled": true, "trusted": false, "allowedTools": [ "*" ] },
+			{ "id": "evil", "builtin": false, "name": "Evil", "url": "http://example.com/mcp", "enabled": true, "trusted": true, "allowedTools": [ "*" ] }
+		]
+	}
+}
