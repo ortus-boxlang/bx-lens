@@ -649,10 +649,10 @@
 
       <!-- AI -->
       <section x-show="tab === 'ai'">
-        <h1 class="h1">AI <small>the ops assistant and the model behind it</small></h1>
+        <h1 class="h1">AI <small>Lensy and the model behind it</small></h1>
         <template x-if="aic">
           <div>
-            <div class="msg plusnote" style="margin:0 0 10px" x-show="aic.locked"><span class="chipx plus">BoxLang+</span> The ops assistant, Explain with AI and Ask Lens need a BoxLang+ license or trial. You can look at the settings, but they cannot be changed here.</div>
+            <div class="msg plusnote" style="margin:0 0 10px" x-show="aic.locked"><span class="chipx plus">BoxLang+</span> Lensy, Explain with AI and Ask Lens need a BoxLang+ license or trial. You can look at the settings, but they cannot be changed here.</div>
             <div class="grid2">
               <div class="card" id="ai-status">
                 <h3>Status</h3>
@@ -758,9 +758,9 @@
       <p class="sub" x-show="aiBusy">Thinking...</p><p class="msg err" x-show="aiOut.error" x-text="aiOut.error"></p><div class="aitext" x-text="aiOut.text"></div></div>
   </div>
   <div id="agent-float" class="agentfloat">
-    <aside id="agent" class="agent" :class="tab === 'ask' ? 'pagemode' : 'drawer'" x-show="agentShown()" x-cloak aria-label="Ops assistant">
+    <aside id="agent" class="agent" :class="tab === 'ask' ? 'pagemode' : 'drawer'" x-show="agentShown()" x-cloak aria-label="Lensy">
       <header class="ahead">
-        <b><svg class="ic"><use href="#ph-robot"/></svg> Ops assistant</b>
+        <b><svg class="ic"><use href="#ph-robot"/></svg> Lensy</b>
         <span class="spacer"></span>
         <button class="btn mini" id="agent-reset" @click="resetAgent()" title="Forget this conversation"><svg class="ic"><use href="#ph-arrow-counter-clockwise"/></svg>Reset conversation</button>
         <button class="btn mini" x-show="tab !== 'ask'" @click="closeAgent()" aria-label="Close the assistant"><svg class="ic"><use href="#ph-x"/></svg></button>
@@ -807,14 +807,14 @@
         </template>
       </div>
       <form class="ainput" @submit.prevent="sendAgent()">
-        <textarea id="agent-input" x-model="agent.input" rows="2" maxlength="2000" placeholder="Ask about this server (Alt+K opens and closes this)" @keydown="agentKey($event)" aria-label="Message to the ops assistant"></textarea>
+        <textarea id="agent-input" x-model="agent.input" rows="2" maxlength="2000" placeholder="Ask about this server (Alt+K opens and closes this)" @keydown="agentKey($event)" aria-label="Message to Lensy"></textarea>
         <button class="btn primary" type="submit" id="agent-send" :disabled="agent.busy || !agent.input.trim()" aria-label="Send"><svg class="ic"><use href="#ph-paper-plane-right"/></svg></button>
         <button class="btn" type="button" id="agent-stop" x-show="agent.busy" @click="stopAgent()" aria-label="Stop"><svg class="ic"><use href="#ph-stop"/></svg></button>
       </form>
       <div class="adata">What the assistant reads is sent to <span x-text="agent.st ? agent.st.provider : 'the provider'"></span>. It never gets more than your role can see.</div>
     </aside>
   </div>
-  <button class="fab" id="agent-launch" x-show="agentOn() && tab !== 'ask' && !agent.open" x-cloak @click="openAgent()" aria-label="Open the ops assistant (Alt+K)" title="Ask the ops assistant (Alt+K)"><svg class="ic"><use href="#ph-robot"/></svg></button>
+  <button class="fab" id="agent-launch" x-show="agentOn() && tab !== 'ask' && !agent.open" x-cloak @click="openAgent()" aria-label="Open Lensy (Alt+K)" title="Ask Lensy (Alt+K)"><svg class="ic"><use href="#ph-robot"/></svg></button>
   <div class="toast" x-show="toastMsg" x-text="toastMsg" role="status"></div>
 </div>
 </body>

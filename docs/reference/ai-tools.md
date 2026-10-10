@@ -1,13 +1,13 @@
 ---
-title: Ops agent tools
+title: Lensy tools
 order: 3
-description: Every tool the ops assistant can use, who may use it and what it does.
+description: Every tool Lensy can use, who may use it and what it does.
 icon: lucide:wrench
 ---
 
-# Ops agent tools
+# Lensy tools
 
-The [ops assistant](../console/ai.md) answers by calling these tools. A tool is either **LOOK** (it reads what the console already shows) or **ACT** (it changes something and waits for your Approve click). The **Role** column says who may use it: `viewer and admin` means both console roles, `admin` means only the admin role. A viewer is not even offered the admin tools, and the server refuses them if the model asks anyway.
+The [Lensy](../console/ai.md) answers by calling these tools. A tool is either **LOOK** (it reads what the console already shows) or **ACT** (it changes something and waits for your Approve click). The **Role** column says who may use it: `viewer and admin` means both console roles, `admin` means only the admin role. A viewer is not even offered the admin tools, and the server refuses them if the model asks anyway.
 
 Every call, whoever makes it, goes through one gate (the Toolbox): the license is checked (BoxLang+), the role, the read only mode and `console.actions`, the arguments are checked against the tool, the result is stripped of secrets and cut to 12,000 characters, and an `ai.tool` line is written to the [audit log](../security.md#audit-log). See the [threat model](../security.md#ops-assistant-threat-model).
 
@@ -78,4 +78,4 @@ An argument with a question mark is optional. `diagnose` is open to the viewer r
 
 ## Adding a tool
 
-A new tool goes through the Toolbox, is audited and role checked. Add it in three places and a test checks that they agree: the method with `@AITool` in `models/ops/LensTools.bx` (its comment is what the model reads), the entry in `ops/Tools.java` (name, role, kind, arguments) and a row in this table. An ACT tool must also be admin only and needs an approval.
+A new tool goes through the Toolbox, is audited and role checked. Add it in three places and a test checks that they agree: the method with `@AITool` in `models/ops/LensyTools.bx` (its comment is what the model reads), the entry in `ops/Tools.java` (name, role, kind, arguments) and a row in this table. An ACT tool must also be admin only and needs an approval.

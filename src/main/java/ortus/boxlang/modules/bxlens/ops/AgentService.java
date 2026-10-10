@@ -33,10 +33,10 @@ import ortus.boxlang.runtime.types.IStruct;
 import ortus.boxlang.runtime.types.Struct;
 
 /**
- * The ops agent of a server. It owns one conversation per console session (memory in the JVM, gone at logout, expiry or reset), the bounded
+ * Lensy of a server. It owns one conversation per console session (memory in the JVM, gone at logout, expiry or reset), the bounded
  * number of chats that may run at once, their deadlines, and the index of the documentation.
  * <p>
- * The agent itself is the BoxLang class <code>models/ops/OpsAgent.bx</code>, built on bx-ai. Everything it can do goes through the
+ * The agent itself is the BoxLang class <code>models/ops/Lensy.bx</code>, built on bx-ai. Everything it can do goes through the
  * {@link Toolbox} of the session, which applies the rules of the console to the user who is logged in.
  */
 public final class AgentService {
@@ -130,7 +130,7 @@ public final class AgentService {
 		m.put( "licensed", licensed );
 		m.put( "available", installed && enabled && licensed );
 		m.put( "reason",
-		    installed ? !licensed ? "The ops agent is a BoxLang+ feature. A license or trial is needed." : !enabled ? "The ops agent is off (ai.enabled)." : ""
+		    installed ? !licensed ? "Lensy is a BoxLang+ feature. A license or trial is needed." : !enabled ? "Lensy is off (ai.enabled)." : ""
 		        : "The bx-ai module is not installed." );
 		m.put( "provider", this.service.getAi().provider() );
 		m.put( "model", this.service.getAi().model() );
@@ -177,13 +177,13 @@ public final class AgentService {
 			throw new Refusal( 400, "Ask a question of up to " + MAX_MESSAGE + " characters.", false );
 		}
 		if ( !this.service.getLicensing().has( "ai" ) ) {
-			throw new Refusal( 409, "The ops agent is a BoxLang+ feature. A license or trial is needed.", true );
+			throw new Refusal( 409, "Lensy is a BoxLang+ feature. A license or trial is needed.", true );
 		}
 		if ( !this.service.getAi().installed() ) {
 			throw new Refusal( 409, "The bx-ai module is not installed.", false );
 		}
 		if ( !cfg.getBool( "ai.enabled", false ) ) {
-			throw new Refusal( 409, "The ops agent is off. Turn on ai.enabled.", false );
+			throw new Refusal( 409, "Lensy is off. Turn on ai.enabled.", false );
 		}
 		Conversation c = conversation( s, ip );
 		synchronized ( c ) {
@@ -236,7 +236,7 @@ public final class AgentService {
 				while ( root.getCause() != null && root.getCause() != root ) {
 					root = root.getCause();
 				}
-				this.service.getLogger().warn( "bx-lens ops agent failed: {}", root.toString() );
+				this.service.getLogger().warn( "bx-lens Lensy failed: {}", root.toString() );
 				turn.error( friendly( root ) );
 			}
 		} finally {
@@ -266,7 +266,7 @@ public final class AgentService {
 		synchronized ( c ) {
 			if ( c.agent == null || !key.equals( c.configKey ) ) {
 				IBoxContext ctx = context();
-				c.agent		= instantiate( ctx, "models.ops.OpsAgent", c.toolbox, settingsStruct(), c.toolbox.toolNames() );
+				c.agent		= instantiate( ctx, "models.ops.Lensy", c.toolbox, settingsStruct(), c.toolbox.toolNames() );
 				c.configKey	= key;
 			}
 			return c.agent;

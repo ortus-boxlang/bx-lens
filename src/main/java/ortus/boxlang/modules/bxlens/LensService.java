@@ -1063,7 +1063,7 @@ public final class LensService {
 	}
 
 	/**
-	 * The ops agent: conversations, approvals, the documentation index.
+	 * Lensy: conversations, approvals, the documentation index.
 	 */
 	public ortus.boxlang.modules.bxlens.ops.AgentService getAgents() {
 		return agents;

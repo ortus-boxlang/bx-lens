@@ -1,13 +1,13 @@
 ---
 title: Set up Ollama for the assistant
 order: 4
-description: Run a local model so the ops assistant keeps everything inside your network.
+description: Run a local model so Lensy keeps everything inside your network.
 icon: lucide:cpu
 ---
 
 # Set up Ollama for the assistant
 
-The [ops assistant](../console/ai.md) uses a model on this machine by default. [Ollama](https://ollama.com) runs it. Nothing leaves your network.
+The [Lensy](../console/ai.md) uses a model on this machine by default. [Ollama](https://ollama.com) runs it. Nothing leaves your network.
 
 ## 1. Install Ollama and pull the two models
 

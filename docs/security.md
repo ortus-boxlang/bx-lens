@@ -157,7 +157,7 @@ The events are:
 | Group | Events |
 |---|---|
 | Access | `login.ok`, `login.fail`, `login.locked`, `logout`, `denied` |
-| Ops assistant | `ai.chat`, `ai.tool` (tool, a short argument summary and `ok`, `denied` or `error`; an action also logs `approval requested`, `approved` and `denied`), `ai.approve`, `ai.deny`, `ai.act`, `ai.reset`, `ai.config`, `ai.test`, `denied.ai`, `denied.approval` |
+| Lensy | `ai.chat`, `ai.tool` (tool, a short argument summary and `ok`, `denied` or `error`; an action also logs `approval requested`, `approved` and `denied`), `ai.approve`, `ai.deny`, `ai.act`, `ai.reset`, `ai.config`, `ai.test`, `denied.ai`, `denied.approval` |
 | Settings | `settings.change`, `settings.reset`, `bar.layout`, `bar.reset` |
 | Tasks | `task.<action>`, for example `task.run` |
 | Downloads | `threads.dump`, `logfile.download`, `bundle.download`, `heapdump.download`, `cache.value` |
@@ -191,11 +191,11 @@ What a prompt holds is limited to data Lens has already redacted: stack frames, 
 
 Two limits you should know. Exception messages and SQL text are included as the application produced them, so data your code puts into a message is in the prompt. The question you type on the Ask Lens page is sent as you typed it.
 
-The [ops assistant](console/ai.md) goes further: it sends tool results as well as questions, see the [threat model](#ops-assistant-threat-model). A local provider, such as Ollama, keeps the prompt inside your network. A hosted provider receives it, so check its terms. The API key is a `bxsecret:` value and is never shown. Calls are limited to 10 per minute and one at a time, and each is in the audit log without its content. See [Ask Lens and AI help](console/ask-lens-and-ai.md).
+The [Lensy](console/ai.md) goes further: it sends tool results as well as questions, see the [threat model](#ops-assistant-threat-model). A local provider, such as Ollama, keeps the prompt inside your network. A hosted provider receives it, so check its terms. The API key is a `bxsecret:` value and is never shown. Calls are limited to 10 per minute and one at a time, and each is in the audit log without its content. See [Ask Lens and AI help](console/ask-lens-and-ai.md).
 
-## Ops assistant threat model
+## Lensy threat model
 
-The [ops assistant](console/ai.md) lets a language model call tools on your server. Treat the model as untrusted, and what it reads as untrusted too.
+The [Lensy](console/ai.md) lets a language model call tools on your server. Treat the model as untrusted, and what it reads as untrusted too.
 
 | Threat | What stops it |
 |---|---|

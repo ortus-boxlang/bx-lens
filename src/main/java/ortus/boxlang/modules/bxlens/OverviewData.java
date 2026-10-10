@@ -14,7 +14,7 @@ import java.util.TreeMap;
 
 /**
  * The numbers of the Overview page: aggregates over the requests in memory, counts, errors, percentiles and the slowest routes. The console
- * and the ops agent read the same figures.
+ * and Lensy read the same figures.
  */
 public final class OverviewData {
 

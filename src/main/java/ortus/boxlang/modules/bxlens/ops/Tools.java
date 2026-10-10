@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The catalog of what the ops agent may do. One entry per tool: its name, whether it needs the admin role, whether it changes something
+ * The catalog of what Lensy may do. One entry per tool: its name, whether it needs the admin role, whether it changes something
  * (an ACT tool) and the arguments it takes. The model never decides what is allowed: {@link Toolbox} checks every call against this catalog,
  * the role of the signed in user and the console settings, whatever tool the model asks for and with whatever arguments.
  * <p>
- * The text the model reads (what each tool does) lives in <code>models/ops/LensTools.bx</code>, next to the <code>@AITool</code> annotation. A
+ * The text the model reads (what each tool does) lives in <code>models/ops/LensyTools.bx</code>, next to the <code>@AITool</code> annotation. A
  * test keeps that file and this catalog in step.
  */
 public final class Tools {

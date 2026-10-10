@@ -327,7 +327,7 @@ test.describe( '@screens documentation screenshots', () => {
 		await consoleShot( page, 'console-free-locked' );
 	} );
 
-	test( 'console ops assistant, approval card and AI page', async ( { page, request } ) => {
+	test( 'console Lensy, approval card and AI page', async ( { page, request } ) => {
 		await consoleLogin( page );
 		const csrf = await page.evaluate( () => document.body.dataset.csrf! );
 		const set = ( changes: Record<string, any> ) => page.request.post( `${ CONSOLE }/api/ai/config`, { headers: { 'X-Lens-CSRF': csrf }, form: { changes: JSON.stringify( changes ) } } );

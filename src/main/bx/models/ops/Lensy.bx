@@ -4,7 +4,7 @@
  * Copyright [2026] [Ortus Solutions, Corp]
  */
 /**
- * The ops agent: a bx-ai agent with the tools of LensTools.bx and a window of memory, one per console session. It answers by streaming, and
+ * Lensy: a bx-ai agent with the tools of LensyTools.bx and a window of memory, one per console session. It answers by streaming, and
  * everything it reads or changes goes through the Java Toolbox of the session, which applies the rules of the console to the user who is
  * logged in. The model is never trusted: see the Toolbox for what is checked on every call.
  */
@@ -23,7 +23,7 @@ class {
 		// must not be found by another session or another module
 		var registry = aiToolRegistry()
 		var scope    = "bxlens-" & createUUID()
-		var found    = registry.scanClass( new LensTools( arguments.toolbox ), scope )
+		var found    = registry.scanClass( new LensyTools( arguments.toolbox ), scope )
 		registry.unregisterByModule( scope )
 		var allowed = arguments.toolNames
 		variables.tools = found.filter( ( t ) => allowed.contains( t.getName() ) )
@@ -45,7 +45,7 @@ class {
 			modelArgs.apiKey = variables.settings.apiKey
 		}
 		variables.agent = aiAgent(
-			name         = "BxLens Ops",
+			name         = "Lensy",
 			description  = "Answers questions about one BoxLang server using the tools of BX Lens.",
 			instructions = instructions(),
 			model        = aiModel( argumentCollection = modelArgs ),

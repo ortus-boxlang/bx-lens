@@ -21,8 +21,8 @@ import ortus.boxlang.modules.bxlens.util.Secrets;
 import ortus.boxlang.runtime.scopes.Key;
 
 /**
- * The only door between the agent and the server. The agent is a BoxLang class (<code>models/ops/OpsAgent.bx</code>) and its tools are
- * methods of <code>LensTools.bx</code>; every one of them calls {@link #call}. Nothing the model says is trusted. For each call this class:
+ * The only door between the agent and the server. The agent is a BoxLang class (<code>models/ops/Lensy.bx</code>) and its tools are
+ * methods of <code>LensyTools.bx</code>; every one of them calls {@link #call}. Nothing the model says is trusted. For each call this class:
  * <ol>
  * <li>looks the tool up in the {@link Tools} catalog (an unknown name is refused),</li>
  * <li>checks BoxLang+ (<code>ai</code>), the role of the signed in user (an admin tool needs the admin role), and for an ACT tool also
@@ -130,7 +130,7 @@ public final class Toolbox {
 	String reasonRefused( Tools.Tool t ) {
 		LensConfig cfg = this.service.getConfig();
 		if ( !licensed() ) {
-			return "The ops agent is a BoxLang+ feature. A license or trial is needed.";
+			return "Lensy is a BoxLang+ feature. A license or trial is needed.";
 		}
 		if ( "searchDocs".equals( t.name() ) && !cfg.getBool( "ai.rag", true ) ) {
 			return "The documentation search is off (ai.rag).";

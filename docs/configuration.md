@@ -278,7 +278,7 @@ The disk store keeps errors and reports across restarts. It needs BoxLang+ or a 
 
 ## `ai`
 
-Optional help from a language model: the [ops assistant](console/ai.md), Explain with AI and Ask Lens. Off by default. See [Ask Lens and AI help](console/ask-lens-and-ai.md), [Set up Ollama](guides/ollama.md) and the [data flow](security.md#ai-data-flow). Everything but `apiKey` and `links` can be changed live from the AI page.
+Optional help from a language model: the [Lensy](console/ai.md), Explain with AI and Ask Lens. Off by default. See [Ask Lens and AI help](console/ask-lens-and-ai.md), [Set up Ollama](guides/ollama.md) and the [data flow](security.md#ai-data-flow). Everything but `apiKey` and `links` can be changed live from the AI page.
 
 | Key | Type | Default | Description |
 |---|---|---|---|

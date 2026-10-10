@@ -79,7 +79,7 @@ class {
 
 			// Optional help from a language model through the bx-ai module (it ships inside Lens). Off by default: when on, redacted prompts and
 			// tool results leave this server for the provider. The default is a model on this machine (Ollama), which keeps everything inside your
-			// network: ollama pull llama3.2 and ollama pull nomic-embed-text. The ops agent, Explain with AI and Ask Lens are BoxLang+ features.
+			// network: ollama pull llama3.2 and ollama pull nomic-embed-text. Lensy, Explain with AI and Ask Lens are BoxLang+ features.
 			// apiKey takes a bxsecret: value. apiKeyEnv names an environment variable that holds the key. A key is never typed into the console
 			ai : {
 				enabled           : false,

@@ -4,7 +4,7 @@
  * Copyright [2026] [Ortus Solutions, Corp]
  */
 /**
- * The tools of the ops agent. Each method is a tool: the @AITool annotation makes it one, the comment above it is what the model reads to
+ * The tools of Lensy. Each method is a tool: the @AITool annotation makes it one, the comment above it is what the model reads to
  * decide when to use it, and the @name lines describe the arguments. Every method only calls the Java Toolbox of the console session, which
  * checks the role, the license, the read only mode and the arguments, asks for approval for the tools that change something, redacts the
  * result and writes the audit line. Add a tool here, in ops/Tools.java and in docs/reference/ai-tools.md together: a test checks that the

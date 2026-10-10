@@ -87,7 +87,7 @@ public final class ConsoleAuth {
 	private final long										idleMs;
 	private final int										maxAttempts;
 	private final long										lockoutMs;
-	/** Told the id of every session that ends: logout, expiry, being pushed out. The ops agent forgets its conversation then. */
+	/** Told the id of every session that ends: logout, expiry, being pushed out. Lensy forgets its conversation then. */
 	private volatile java.util.function.Consumer<String>	onEnd			= id -> {
 																			};
 

@@ -56,7 +56,7 @@ test.describe( 'Free: what is open and what is locked', () => {
 		await expect( sec.locator( '.plusnote' ) ).toContainText( 'BoxLang+' );
 	} );
 
-	test( 'the ops assistant is locked: no tools, a chat is refused and the AI settings cannot change', async ( { request } ) => {
+	test( 'Lensy is locked: no tools, a chat is refused and the AI settings cannot change', async ( { request } ) => {
 		const { csrf } = await session( request );
 		const st = await ( await request.get( `${ API }/agent/status` ) ).json();
 		expect( st ).toMatchObject( { licensed: false, available: false, tools: 0 } );

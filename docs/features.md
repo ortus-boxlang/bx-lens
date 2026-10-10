@@ -49,7 +49,7 @@ One page at `/~bxlens/index.bxm`, with its own password, an optional second view
 | Errors | Errors grouped by cause with counts, where, and a stack and request context per sample. Redacted prompt copy for an AI chat | Free in memory, saved to disk with Plus |
 | Reports | Totals, error rate, p95 and p99, status codes, busiest and slowest URLs, a minute series | Free for 60 minutes, longer and saved with Plus |
 | Queries | Statements ranked by slowest, total time, count and failures, across every request | Free |
-| Ask Lens | Ask about this server in plain words. Copy prompt, Ask ChatGPT and Ask Claude buttons are free. With BoxLang+ it is the full page of the [ops assistant](console/ai.md) | Free copy, Plus assistant |
+| Ask Lens | Ask about this server in plain words. Copy prompt, Ask ChatGPT and Ask Claude buttons are free. With BoxLang+ it is the full page of the [Lensy](console/ai.md) | Free copy, Plus assistant |
 
 ### Runtime
 
@@ -72,10 +72,10 @@ One page at `/~bxlens/index.bxm`, with its own password, an optional second view
 | Page | What it does | Tier |
 |---|---|---|
 | Bar designer | Choose and order the bar tabs | Save Plus |
-| AI | Status, requirements, live settings and a connection test for the ops assistant. The key is never typed in: an environment variable name or a `bxsecret:` value | View Free, change Plus |
+| AI | Status, requirements, live settings and a connection test for Lensy. The key is never typed in: an environment variable name or a `bxsecret:` value | View Free, change Plus |
 | Settings | Change thresholds, collectors, interface and limits live, with a reset, saved to a small overrides file. Passwords, access rules, `console.*`, `store.*` and the AI key stay in `boxlang.json` | Free |
 
-### The ops assistant
+### Lensy
 
 A chat in a drawer on every console page (and the full page of Ask Lens) that answers by calling tools: overview, requests, errors, queries, executors with concrete pool recommendations, threads, blocked threads and deadlocks, garbage collection pressure, datasources, logs, database metadata and a `diagnose` health sweep, plus a search of these docs. Actions (tasks, caches, run GC, integrations, a live setting) wait for an Approve click. Default model: Ollama on this machine. BoxLang+. See [the AI page](console/ai.md), [the tool list](reference/ai-tools.md) and the [threat model](security.md#ops-assistant-threat-model).
 

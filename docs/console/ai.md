@@ -1,13 +1,13 @@
 ---
-title: The AI page and the ops assistant
+title: The AI page and Lensy
 order: 9
 description: A chat that looks at your server with the tools of Lens, on a local model or a provider you choose. BoxLang+ only.
 icon: lucide:bot
 ---
 
-# The AI page and the ops assistant
+# The AI page and Lensy
 
-The ops assistant is a chat inside the console. You ask in plain words ("Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "What is slow right now?") and it answers by looking at the server through a set of [tools](../reference/ai-tools.md): requests, errors, queries, executors, threads, memory, datasources and the Lens documentation. It never gets more than the user who is signed in. It is a **BoxLang+** feature. Copy prompt and the ChatGPT and Claude buttons of [Ask Lens](ask-lens-and-ai.md) stay free.
+Lensy is a chat inside the console. You ask in plain words ("Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "What is slow right now?") and it answers by looking at the server through a set of [tools](../reference/ai-tools.md): requests, errors, queries, executors, threads, memory, datasources and the Lens documentation. It never gets more than the user who is signed in. It is a **BoxLang+** feature. Copy prompt and the ChatGPT and Claude buttons of [Ask Lens](ask-lens-and-ai.md) stay free.
 
 ![The assistant with a tool call and an answer](../assets/screenshots/console-agent.png)
 

@@ -78,4 +78,23 @@
 </g>
 <path d="M66 66 L84 84" stroke="url(#bxg)" stroke-width="12" stroke-linecap="round" fill="none"/>
 <rect x="52" y="74" width="5.5" height="5.5" rx="1.6" transform="rotate(35 54.7 76.7)" fill="#1af5b0"/></symbol>
+<defs>
+<linearGradient id="lensy-g" x1="6" y1="6" x2="58" y2="58" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1af5b0"/><stop offset=".5" stop-color="#00d4ff"/><stop offset="1" stop-color="#2f6bff"/></linearGradient>
+<linearGradient id="lensy-lid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1af5b0"/><stop offset="1" stop-color="#00d4ff"/></linearGradient>
+</defs>
+<symbol id="lensy-idle" viewBox="0 0 64 64"><rect x="9" y="19" width="46" height="37" rx="9" fill="#0b1d33" stroke="url(#lensy-g)" stroke-width="3"/>
+<rect x="6" y="9" width="52" height="13" rx="5" fill="url(#lensy-lid)"/>
+<rect x="29" y="9" width="6" height="13" fill="#060f1b" opacity=".28"/><circle cx="40" cy="37" r="10.5" fill="#060f1b" stroke="url(#lensy-g)" stroke-width="3.5"/><circle cx="40" cy="37" r="5.6" fill="#00d4ff"/><circle cx="40" cy="37" r="2.7" fill="#060f1b"/><circle cx="42.2" cy="34.6" r="1.7" fill="#ffffff"/><circle cx="22" cy="36" r="3.4" fill="#1af5b0"/><path d="M22 47.5 Q32 54.5 42 47.5" fill="none" stroke="#1af5b0" stroke-width="3" stroke-linecap="round"/></symbol>
+<symbol id="lensy-think" viewBox="0 0 64 64"><rect x="9" y="19" width="46" height="37" rx="9" fill="#0b1d33" stroke="url(#lensy-g)" stroke-width="3"/>
+<rect x="6" y="9" width="52" height="13" rx="5" fill="url(#lensy-lid)"/>
+<rect x="29" y="9" width="6" height="13" fill="#060f1b" opacity=".28"/><circle cx="40" cy="37" r="10.5" fill="#060f1b" stroke="url(#lensy-g)" stroke-width="3.5"/><circle cx="40" cy="37" r="5.6" fill="#00d4ff"><animate attributeName="r" values="5.6;5.6;0.8;5.6" keyTimes="0;.82;.9;1" dur="2.8s" repeatCount="indefinite"/></circle><circle cx="40" cy="37" r="2.7" fill="#060f1b"/><circle cx="42.2" cy="34.6" r="1.7" fill="#ffffff"/><circle cx="22" cy="36" r="3.4" fill="#1af5b0"/><path d="M26 49 H38" fill="none" stroke="#1af5b0" stroke-width="3" stroke-linecap="round"/><circle cx="52" cy="6" r="1.8" fill="#00d4ff"/><circle cx="57" cy="3" r="1.3" fill="#00d4ff" opacity=".7"/></symbol>
+<symbol id="lensy-think-still" viewBox="0 0 64 64"><rect x="9" y="19" width="46" height="37" rx="9" fill="#0b1d33" stroke="url(#lensy-g)" stroke-width="3"/>
+<rect x="6" y="9" width="52" height="13" rx="5" fill="url(#lensy-lid)"/>
+<rect x="29" y="9" width="6" height="13" fill="#060f1b" opacity=".28"/><circle cx="40" cy="37" r="10.5" fill="#060f1b" stroke="url(#lensy-g)" stroke-width="3.5"/><circle cx="40" cy="37" r="5.6" fill="#00d4ff"></circle><circle cx="40" cy="37" r="2.7" fill="#060f1b"/><circle cx="42.2" cy="34.6" r="1.7" fill="#ffffff"/><circle cx="22" cy="36" r="3.4" fill="#1af5b0"/><path d="M26 49 H38" fill="none" stroke="#1af5b0" stroke-width="3" stroke-linecap="round"/><circle cx="52" cy="6" r="1.8" fill="#00d4ff"/><circle cx="57" cy="3" r="1.3" fill="#00d4ff" opacity=".7"/></symbol>
+<symbol id="lensy-happy" viewBox="0 0 64 64"><rect x="9" y="19" width="46" height="37" rx="9" fill="#0b1d33" stroke="url(#lensy-g)" stroke-width="3"/>
+<rect x="6" y="9" width="52" height="13" rx="5" fill="url(#lensy-lid)"/>
+<rect x="29" y="9" width="6" height="13" fill="#060f1b" opacity=".28"/><circle cx="40" cy="37" r="10.5" fill="#060f1b" stroke="url(#lensy-g)" stroke-width="3.5"/><circle cx="40" cy="37" r="6" fill="#00d4ff"/><circle cx="40" cy="37" r="2.7" fill="#060f1b"/><circle cx="42.2" cy="34.6" r="1.7" fill="#ffffff"/><circle cx="35.5" cy="40.5" r="1" fill="#ffffff"/><path d="M18.5 37.5 Q22 32.5 25.5 37.5" fill="none" stroke="#1af5b0" stroke-width="3" stroke-linecap="round"/><path d="M20 45.5 Q32 58.5 44 45.5 Z" fill="#1af5b0"/></symbol>
+<symbol id="lensy-error" viewBox="0 0 64 64"><rect x="9" y="19" width="46" height="37" rx="9" fill="#0b1d33" stroke="url(#lensy-g)" stroke-width="3"/>
+<rect x="6" y="9" width="52" height="13" rx="5" fill="url(#lensy-lid)"/>
+<rect x="29" y="9" width="6" height="13" fill="#060f1b" opacity=".28"/><circle cx="40" cy="37" r="10.5" fill="#060f1b" stroke="url(#lensy-g)" stroke-width="3.5"/><circle cx="40" cy="37" r="4.2" fill="#ff5d6c"/><circle cx="40" cy="37" r="1.9" fill="#060f1b"/><circle cx="41.6" cy="35.4" r="1.2" fill="#ffffff"/><path d="M19.5 33 L24.5 39 M24.5 33 L19.5 39" fill="none" stroke="#ff5d6c" stroke-width="3" stroke-linecap="round"/><path d="M22 51 Q27 46 32 51 T42 51" fill="none" stroke="#ff5d6c" stroke-width="3" stroke-linecap="round"/></symbol>
 </svg>

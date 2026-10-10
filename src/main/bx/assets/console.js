@@ -184,7 +184,7 @@
 					} finally { this.aiBusy = false; }
 				},
 				openAgentWhenReady: function () { var self = this; this.loadAgent().then(function () { self.openAgent(); }); },
-				// ---- the ops agent: a floating drawer on every page, and the full page of Ask Lens ----
+				// ---- Lensy: a floating drawer on every page, and the full page of Ask Lens ----
 				agent: { st: null, open: false, msgs: [], busy: false, input: "", ctl: null },
 				agentExamples: ["Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "How many requests did we serve and what is the error rate?", "What is slow right now?"],
 				agentOn: function () { return !!(this.agent.st && this.agent.st.available); },

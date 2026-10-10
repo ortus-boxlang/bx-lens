@@ -18,7 +18,7 @@ import ortus.boxlang.modules.bxlens.BaseIntegrationTest;
 import ortus.boxlang.runtime.scopes.Key;
 
 /**
- * Scans the real LensTools class with the bx-ai tool registry and reads the schemas the model would be shown.
+ * Scans the real LensyTools class with the bx-ai tool registry and reads the schemas the model would be shown.
  */
 public class AgentToolsIntegrationTest extends BaseIntegrationTest {
 
@@ -31,7 +31,7 @@ public class AgentToolsIntegrationTest extends BaseIntegrationTest {
 		runtime.executeSource(
 		    """
 		    registry = aiToolRegistry();
-		    tools = registry.scanClass( new %s.models.ops.LensTools( { call : ( n, a ) => n } ), "lens-test-scan" );
+		    tools = registry.scanClass( new %s.models.ops.LensyTools( { call : ( n, a ) => n } ), "lens-test-scan" );
 		    registry.unregisterByModule( "lens-test-scan" );
 		    schemas = tools.map( t => t.getSchema() );
 		    left = registry.getKeys().filter( k => k contains "lens-test-scan" ).len();

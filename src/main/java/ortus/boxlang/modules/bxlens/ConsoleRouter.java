@@ -416,7 +416,7 @@ public final class ConsoleRouter {
 	static final List<String>											ADMIN_ONLY		= List.of( "threads", "heapdump", "logfiles", "bundle", "cachevalue",
 	    "environment", "system", "ai/config" );
 
-	/** The POST routes a viewer may call: the chat with the ops agent, which has only the tools a viewer may use. */
+	/** The POST routes a viewer may call: the chat with Lensy, which has only the tools a viewer may use. */
 	static final Set<String>											VIEWER_POST		= Set.of( "agent/chat", "agent/reset", "agent/approve" );
 
 	/** Console pages a viewer does not get. */
@@ -740,7 +740,7 @@ public final class ConsoleRouter {
 	}
 
 	// ---------------------------------------------------------------------------------------------
-	// The ops agent and its settings
+	// Lensy and its settings
 	// ---------------------------------------------------------------------------------------------
 
 	/**
@@ -927,7 +927,7 @@ public final class ConsoleRouter {
 		List<Map<String, Object>> req = new ArrayList<>();
 		req.add( check( "bx-ai present", ai.installed(), ai.installed() ? "The module ships inside Lens." : "The bx-ai module is not installed." ) );
 		req.add( check( "BoxLang+", service.getLicensing().has( "ai" ),
-		    service.getLicensing().has( "ai" ) ? "License or trial found." : "The ops agent needs a license or trial." ) );
+		    service.getLicensing().has( "ai" ) ? "License or trial found." : "Lensy needs a license or trial." ) );
 		req.add( check( "Enabled", cfg.getBool( "ai.enabled", false ), "ai.enabled" ) );
 		Map<String, Object> last = ai.lastTest();
 		req.add( check( "Provider reachable", last != null && Boolean.TRUE.equals( last.get( "ok" ) ),

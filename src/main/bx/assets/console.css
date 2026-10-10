@@ -159,7 +159,7 @@ tr.row.sel td { background: var(--sel); }
 .plusnote { background: var(--input); display: flex; gap: 8px; align-items: center; }
 
 .wf .cut { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.35) 0 4px, transparent 4px 8px); outline: 1px dashed var(--crit); }
-/* the ops assistant: a floating button and drawer on every page, the same chat inline on Ask Lens */
+/* Lensy: a floating button and drawer on every page, the same chat inline on Ask Lens */
 .fab { position: fixed; right: 18px; bottom: 18px; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--cyan); background: var(--sel); color: var(--cyan); cursor: pointer; display: grid; place-items: center; box-shadow: 0 6px 24px rgba(0,0,0,.35); z-index: 30; }
 .fab .ic { width: 22px; height: 22px; } .fab:hover { background: var(--raise); }
 .agentfloat { position: fixed; right: 16px; bottom: 16px; z-index: 31; }
