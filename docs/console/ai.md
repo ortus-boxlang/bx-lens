@@ -7,11 +7,13 @@ icon: lucide:bot
 
 # The AI page and Lensy
 
-![Lensy](../assets/lensy.svg){ width=96 }
-
 **Lensy is the Box Agent for your BoxLang server.** It is a chat inside the console. You ask in plain words ("Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "What is slow right now?") and it answers by looking at the server through a set of [tools](../reference/ai-tools.md): requests, errors, queries, executors, threads, memory, datasources and the Lens documentation. It never gets more than the user who is signed in. It is a **BoxLang+** feature. Copy prompt and the ChatGPT and Claude buttons of [Ask Lens](ask-lens-and-ai.md) stay free.
 
 ![The assistant with a tool call and an answer](../assets/screenshots/console-agent.png)
+
+Lensy has four faces: idle, thinking (a slow blink and a small wiggle while an answer is written, still when your system asks for reduced motion), happy (after an answer) and worried (after an error). The face is in the floating button, the drawer header, next to each answer, on the AI page and in the bar's Ask link.
+
+![Lensy idle, thinking, happy and worried](../assets/screenshots/lensy-states.png)
 
 ## What you need
 
@@ -62,6 +64,8 @@ An MCP server gives Lensy more tools. Lens lists the eleven Ortus documentation 
 | Trusted, read only | Custom servers only. A custom server's calls ask for your Approve click every time. Mark it trusted to say its tools only read, and they run without a click. |
 | Test | Connects and lists the tools again (ten tests a minute for each session). |
 
+![The MCP servers table on the AI page](../assets/screenshots/console-ai-mcp.png)
+
 Rules for a custom server:
 
 - The name is 1 to 40 characters. At most 20 custom servers.
@@ -75,6 +79,8 @@ Names: Lensy shows a tool as `server.tool` (for example `boxlang.searchDocumenta
 Who can use them: the admin can use every enabled server. A viewer can use the tools of enabled **built-in** servers, and nothing else, and cannot see or change the list. All changes are admin only, need BoxLang+, are refused when the console is read only, and are in the audit log as `ai.mcp.change`. Every call is in the audit log as `ai.mcp` with the server, the tool, `ok` or `denied`, and the milliseconds (never the arguments).
 
 What comes back from a server is **untrusted content from the internet**. Lens wraps it as data, hides secrets in it, cuts it to 12,000 characters, and the system prompt tells Lensy not to follow instructions found in it. Read the [threat model](../security.md#mcp-servers) before turning a server on.
+
+![Lensy answering with a tool of a documentation server, shown with the server's name](../assets/screenshots/console-agent-mcp.png)
 
 ## The settings
 
