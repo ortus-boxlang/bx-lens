@@ -327,7 +327,7 @@ test.describe( '@screens documentation screenshots', () => {
 		await consoleShot( page, 'console-free-locked' );
 	} );
 
-	test( 'console ops assistant, approval card and AI page', async ( { page, request } ) => {
+	test( 'console Lensy, approval card and AI page', async ( { page, request } ) => {
 		await consoleLogin( page );
 		const csrf = await page.evaluate( () => document.body.dataset.csrf! );
 		const set = ( changes: Record<string, any> ) => page.request.post( `${ CONSOLE }/api/ai/config`, { headers: { 'X-Lens-CSRF': csrf }, form: { changes: JSON.stringify( changes ) } } );
@@ -353,7 +353,42 @@ test.describe( '@screens documentation screenshots', () => {
 			await page.click( '#ai-test' );
 			await expect( page.locator( '#ai-test-out' ) ).toContainText( 'Works' );
 			await consoleShot( page, 'console-ai' );
+			// The face of Lensy in its four states, on the navy of the console
+			await page.evaluate( () => {
+				const box = document.createElement( 'div' );
+				box.id = 'lensy-states';
+				box.setAttribute( 'style', 'position:fixed;left:20px;top:20px;z-index:99;display:flex;gap:28px;padding:18px 26px;background:#060f1b;border:1px solid #1f3552;border-radius:12px;font:12px monospace;color:#9fb3c8' );
+				for ( const [ id, label ] of [ [ 'idle', 'idle' ], [ 'think-still', 'thinking' ], [ 'happy', 'happy' ], [ 'error', 'error' ] ] ) {
+					box.insertAdjacentHTML( 'beforeend', `<div style="text-align:center"><svg width="96" height="96"><use href="#lensy-${ id }"/></svg><div>${ label }</div></div>` );
+				}
+				document.body.appendChild( box );
+			} );
+			await page.waitForTimeout( 300 );
+			await page.locator( '#lensy-states' ).screenshot( { path: path.join( OUT, 'lensy-states.png' ) } );
+			await page.evaluate( () => document.getElementById( 'lensy-states' )!.remove() );
+			// MCP servers: the documentation server on, a custom one that asks first, and Lensy using the first
+			const mcpPost = ( route: string, form: Record<string, string> ) => page.request.post( `${ CONSOLE }/api/ai/mcp${ route }`, { headers: { 'X-Lens-CSRF': csrf }, form } );
+			expect( ( await mcpPost( '/boxlang/enable', { enabled: 'true' } ) ).status() ).toBe( 200 );
+			expect( ( await mcpPost( '', { name: 'Acme knowledge base', url: 'http://127.0.0.1:11435/mcp.bxs/acme' } ) ).status() ).toBe( 200 );
+			expect( ( await mcpPost( '/acme-knowledge-base/enable', { enabled: 'true' } ) ).status() ).toBe( 200 );
+			expect( ( await mcpPost( '', { id: 'acme-knowledge-base', tools: JSON.stringify( [ 'lookup' ] ) } ) ).status() ).toBe( 200 );
+			await page.reload();
+			await page.click( '.nav:has-text("AI")' );
+			await expect( page.locator( '.mcprow[data-id="boxlang"] .mcpstatus' ) ).toHaveText( 'ok' );
+			await page.locator( '.mcprow[data-id="acme-knowledge-base"] .mcp-pick' ).click();
+			await page.locator( '#mcp-card' ).scrollIntoViewIfNeeded();
+			await page.waitForTimeout( 300 );
+			await page.locator( '#mcp-card' ).screenshot( { path: path.join( OUT, 'console-ai-mcp.png' ) } );
+			await page.click( '#agent-launch' );
+			await page.fill( '#agent-input', 'force:boxlang__searchDocumentation' );
+			await page.click( '#agent-send' );
+			await expect( page.locator( '.abub' ).last() ).toContainText( 'Mock boxlang documentation' );
+			await page.waitForTimeout( 400 );
+			await consoleShot( page, 'console-agent-mcp' );
+			await page.click( '#agent-reset' );
 		} finally {
+			await page.request.delete( `${ CONSOLE }/api/ai/mcp/acme-knowledge-base`, { headers: { 'X-Lens-CSRF': csrf } } );
+			await page.request.post( `${ CONSOLE }/api/ai/mcp/boxlang/enable`, { headers: { 'X-Lens-CSRF': csrf }, form: { enabled: 'false' } } );
 			for ( const k of [ 'ai.enabled' ] ) {
 				await page.request.post( `${ CONSOLE }/api/settings/reset`, { headers: { 'X-Lens-CSRF': csrf }, form: { key: k } } );
 			}

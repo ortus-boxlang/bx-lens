@@ -11,13 +11,13 @@
 		<button class="chip" :class="d.counts.exceptions ? 'crit' : ''" x-show="d.counts.exceptions" @click="open('exceptions')" title="Exceptions"><svg class="ic"><use href="#bxlens-ph-warning"/></svg> <b x-text="d.counts.exceptions + (d.counts.exceptions === 1 ? ' exception' : ' exceptions')"></b></button>
 		<button class="chip" @click="copy(r.id, 'Request id')" title="Request id (click to copy)">id <b x-text="r.id"></b></button>
 		<span class="grow"></span>
-		<a class="abtn ask" x-show="ui.consoleUrl && ui.agent" :href="ui.consoleUrl + '#agent'" target="_blank" rel="noopener noreferrer" title="Ask the ops assistant in the console">Ask</a>
+		<a class="abtn ask" x-show="ui.consoleUrl && ui.agent" :href="ui.consoleUrl + '#agent'" target="_blank" rel="noopener noreferrer" title="Ask Lensy in the console"><svg class="ic lensy-ic" aria-hidden="true"><use href="#bxlens-lensy"/></svg> Ask</a>
 		<a class="abtn console" x-show="ui.consoleUrl" :href="ui.consoleUrl + '#requests/' + r.id" target="_blank" rel="noopener noreferrer" title="Open this request in the console"><svg class="ic"><use href="#bxlens-ph-arrow-square-out"/></svg> Console</a>
 		<span class="more"><button class="ibtn" @click="toggleMenu($event)" title="More" aria-haspopup="menu" :aria-expanded="menu"><svg class="ic"><use href="#bxlens-ph-dots-three"/></svg></button>
 			<span class="menu" x-show="menu" :style="menuStyle" @click.outside="menu = false" role="menu">
 				<button role="menuitem" @click="copy(JSON.stringify(d, null, 2), 'Request JSON'); menu = false">Copy request as JSON</button>
 				<button role="menuitem" @click="copy(r.id, 'Request id'); menu = false">Copy request id</button>
-				<a role="menuitem" class="menuask" x-show="ui.consoleUrl && ui.agent" :href="ui.consoleUrl + '#agent'" target="_blank" rel="noopener noreferrer" @click="menu = false">Ask the ops assistant</a>
+				<a role="menuitem" class="menuask" x-show="ui.consoleUrl && ui.agent" :href="ui.consoleUrl + '#agent'" target="_blank" rel="noopener noreferrer" @click="menu = false">Ask Lensy</a>
 				<button role="menuitem" x-show="ui.allowDetach && !collapsed" @click="toggleDetach(); menu = false" x-text="detached ? 'Dock to the bottom' : 'Detach as a floating window'"></button>
 			</span></span>
 		<button class="ibtn" @click="toggleTheme()" title="Toggle theme"><svg class="ic"><use href="#bxlens-ph-circle-half"/></svg></button>

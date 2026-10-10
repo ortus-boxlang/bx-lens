@@ -146,3 +146,5 @@
 /* A span whose end event never came: striped, so nobody reads its end as measured */
 #bxlens .seg.cut { background-image: repeating-linear-gradient(135deg, rgba(0,0,0,.35) 0 4px, transparent 4px 8px); outline: 1px dashed var(--crit); }
 #bxlens .abtn.console { display: inline-flex; align-items: center; gap: 5px; }
+
+#bxlens .abtn.ask { display: inline-flex; align-items: center; gap: 5px; } #bxlens .lensy-ic { width: 18px; height: 18px; }

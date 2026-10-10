@@ -414,9 +414,9 @@ public final class ConsoleRouter {
 	 * overview, requests, in flight, queries, errors, reports, executors, tasks, datasources, cache statistics and modules.
 	 */
 	static final List<String>											ADMIN_ONLY		= List.of( "threads", "heapdump", "logfiles", "bundle", "cachevalue",
-	    "environment", "system", "ai/config" );
+	    "environment", "system", "ai/config", "ai/mcp" );
 
-	/** The POST routes a viewer may call: the chat with the ops agent, which has only the tools a viewer may use. */
+	/** The POST routes a viewer may call: the chat with Lensy, which has only the tools a viewer may use. */
 	static final Set<String>											VIEWER_POST		= Set.of( "agent/chat", "agent/reset", "agent/approve" );
 
 	/** Console pages a viewer does not get. */
@@ -646,6 +646,10 @@ public final class ConsoleRouter {
 				aiConfig( context, ex, method, s );
 				return;
 			}
+			if ( route.equals( "ai/mcp" ) || route.startsWith( "ai/mcp/" ) ) {
+				aiMcp( context, ex, method, route, s );
+				return;
+			}
 			if ( route.equals( "ai/test" ) && method.equals( "POST" ) ) {
 				if ( plusOnly( context, ex, "ai", "The AI connection test" ) ) {
 					return;
@@ -740,7 +744,7 @@ public final class ConsoleRouter {
 	}
 
 	// ---------------------------------------------------------------------------------------------
-	// The ops agent and its settings
+	// Lensy and its settings
 	// ---------------------------------------------------------------------------------------------
 
 	/**
@@ -857,6 +861,119 @@ public final class ConsoleRouter {
 	}
 
 	/**
+	 * The MCP servers Lensy may ask. All of it is for the admin role. <code>GET ai/mcp</code> lists them. The changes need BoxLang+ and a console
+	 * that is not read only: <code>POST ai/mcp</code> adds a custom server (name, url) or, with an id, sets its allowed tools (tools, a JSON
+	 * list) and trusted flag; <code>POST ai/mcp/{id}/enable</code> (enabled=true|false); <code>DELETE ai/mcp/{id}</code> removes a custom
+	 * server; <code>POST ai/mcp/{id}/test</code> connects and lists the tools (ten a minute for each session). Every change is audited as
+	 * <code>ai.mcp.change</code>.
+	 */
+	private void aiMcp( IBoxContext context, WebExchange ex, String method, String route, ConsoleAuth.Session s ) {
+		ortus.boxlang.modules.bxlens.ops.McpService mcp = service.getMcp();
+		if ( route.equals( "ai/mcp" ) && method.equals( "GET" ) ) {
+			json( context, ex, 200, mcpView( s ) );
+			return;
+		}
+		if ( method.equals( "GET" ) ) {
+			json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+			return;
+		}
+		if ( plusOnly( context, ex, "ai", "Managing the MCP servers" ) ) {
+			return;
+		}
+		if ( !canChange( s ) ) {
+			service.getAudit().log( "denied.readonly", s.role, ex.remoteAddr(), method + " " + route );
+			json( context, ex, 403, Map.of( "ok", false, "error", "The console is read-only (console.readOnly)" ) );
+			return;
+		}
+		String	rest	= route.length() > "ai/mcp/".length() ? route.substring( "ai/mcp/".length() ) : "";
+		String	id		= rest;
+		String	action	= "";
+		int		slash	= rest.indexOf( '/' );
+		if ( slash >= 0 ) {
+			id		= rest.substring( 0, slash );
+			action	= rest.substring( slash + 1 );
+		}
+		id = decode( id );
+		try {
+			if ( route.equals( "ai/mcp" ) && method.equals( "POST" ) ) {
+				String sid = ex.formParam( "id" );
+				if ( sid == null || sid.isBlank() ) {
+					ortus.boxlang.modules.bxlens.ops.McpServer added = mcp.add( ex.formParam( "name" ), ex.formParam( "url" ) );
+					service.getAudit().log( "ai.mcp.change", s.role, ex.remoteAddr(), "added server=" + added.id() + " url=" + hostOnly( added.url() ) );
+				} else {
+					String			trusted	= ex.formParam( "trusted" );
+					String			tools	= ex.formParam( "tools" );
+					List<String>	allowed	= null;
+					if ( tools != null && !tools.isBlank() ) {
+						allowed = new ArrayList<>();
+						Object parsed = JSONUtil.fromJSON( tools );
+						if ( ! ( parsed instanceof List<?> l ) ) {
+							throw new IllegalArgumentException( "tools must be a list of names." );
+						}
+						for ( Object o : l ) {
+							allowed.add( String.valueOf( o ) );
+						}
+					}
+					if ( trusted != null && !"true".equals( trusted ) && !"false".equals( trusted ) ) {
+						throw new IllegalArgumentException( "trusted must be true or false." );
+					}
+					mcp.update( sid, trusted == null ? null : Boolean.valueOf( trusted ), allowed );
+					service.getAudit().log( "ai.mcp.change", s.role, ex.remoteAddr(),
+					    "updated server=" + sid + ( trusted == null ? "" : " trusted=" + trusted ) + ( allowed == null ? "" : " tools=" + allowed.size() ) );
+				}
+			} else if ( action.equals( "enable" ) && method.equals( "POST" ) ) {
+				String flag = ex.formParam( "enabled" );
+				if ( !"true".equals( flag ) && !"false".equals( flag ) ) {
+					throw new IllegalArgumentException( "Send enabled=true or enabled=false." );
+				}
+				mcp.enable( id, "true".equals( flag ) );
+				service.getAudit().log( "ai.mcp.change", s.role, ex.remoteAddr(), ( "true".equals( flag ) ? "enabled" : "disabled" ) + " server=" + id );
+				if ( "true".equals( flag ) ) {
+					mcp.discover( id );
+				}
+			} else if ( action.isEmpty() && method.equals( "DELETE" ) && !id.isEmpty() ) {
+				mcp.remove( id );
+				service.getAudit().log( "ai.mcp.change", s.role, ex.remoteAddr(), "removed server=" + id );
+			} else if ( action.equals( "test" ) && method.equals( "POST" ) ) {
+				if ( mcp.get( id ) == null ) {
+					throw new IllegalArgumentException( "There is no such server." );
+				}
+				if ( !mcp.testAllowed( s.id ) ) {
+					json( context, ex, 429, Map.of( "ok", false, "error", "Too many connection tests in a minute. Wait a little." ) );
+					return;
+				}
+				var d = mcp.discover( id );
+				service.getAudit().log( "ai.mcp.change", s.role, ex.remoteAddr(), "tested server=" + id + " result=" + d.status() );
+			} else {
+				json( context, ex, 404, Map.of( "error", "Unknown route" ) );
+				return;
+			}
+			// The page shows the agent anew with the tools that are on now
+			json( context, ex, 200, mcpView( s ) );
+		} catch ( IllegalArgumentException e ) {
+			json( context, ex, 400, Map.of( "ok", false, "error", e.getMessage() ) );
+		} catch ( java.io.IOException e ) {
+			json( context, ex, 500, Map.of( "ok", false, "error", "Could not save the list: " + e.getMessage() ) );
+		}
+	}
+
+	private Map<String, Object> mcpView( ConsoleAuth.Session s ) {
+		Map<String, Object> m = service.getMcp().view( canChange( s ) && service.getLicensing().has( "ai" ) );
+		m.put( "locked", !service.getLicensing().has( "ai" ) );
+		return m;
+	}
+
+	/** scheme and host of an address, for the audit trail (never the path or a query). */
+	private static String hostOnly( String url ) {
+		try {
+			java.net.URI u = java.net.URI.create( url );
+			return u.getScheme() + "://" + u.getHost();
+		} catch ( RuntimeException e ) {
+			return "?";
+		}
+	}
+
+	/**
 	 * <code>GET ai/config</code> (admin) shows the AI settings, where the key is read from (never the key) and a checklist of what is needed.
 	 * <code>POST ai/config</code> (admin, Plus, not read only) changes the live AI settings. Only <code>ai.*</code> names are accepted and the
 	 * key itself is not one of them.
@@ -927,7 +1044,7 @@ public final class ConsoleRouter {
 		List<Map<String, Object>> req = new ArrayList<>();
 		req.add( check( "bx-ai present", ai.installed(), ai.installed() ? "The module ships inside Lens." : "The bx-ai module is not installed." ) );
 		req.add( check( "BoxLang+", service.getLicensing().has( "ai" ),
-		    service.getLicensing().has( "ai" ) ? "License or trial found." : "The ops agent needs a license or trial." ) );
+		    service.getLicensing().has( "ai" ) ? "License or trial found." : "Lensy needs a license or trial." ) );
 		req.add( check( "Enabled", cfg.getBool( "ai.enabled", false ), "ai.enabled" ) );
 		Map<String, Object> last = ai.lastTest();
 		req.add( check( "Provider reachable", last != null && Boolean.TRUE.equals( last.get( "ok" ) ),

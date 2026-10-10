@@ -11,6 +11,7 @@
 					"password": "lens-demo",
 					"viewerPassword": "lens-view",
 					"allowHeapDump": true,
+					"readOnly": @LENS_READONLY@,
 					"access": "local"
 				},
 				"ai": { "enabled": false, "provider": "@LENS_AI_PROVIDER@" },
@@ -62,7 +63,8 @@
 				},
 				"dev": {
 					"reloadAssets": true,
-					"license": "@LENS_LICENSE@"
+					"license": "@LENS_LICENSE@",
+					"mcpBuiltinBase": "@LENS_MCP_BASE@"
 				}
 			}
 		}

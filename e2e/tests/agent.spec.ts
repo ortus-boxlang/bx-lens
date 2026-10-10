@@ -1,7 +1,7 @@
 import { test, expect, Page, APIRequestContext } from '@playwright/test';
 
 /**
- * The ops assistant, against the harness with a mock Ollama (harness/mock-ai.py on 11434). The main server has AI off, so these tests turn it on
+ * Lensy, against the harness with a mock Ollama (harness/mock-ai.py on 11434). The main server has AI off, so these tests turn it on
  * live through the AI page API and put it back in afterAll. The Free server (8090) shows what stays locked.
  */
 const BASE = '/~bxlens/index.bxm';
@@ -53,7 +53,7 @@ async function mockLog( request: APIRequestContext ): Promise<any[]> {
 
 test.describe.configure( { mode: 'serial' } );
 
-test.describe( 'ops assistant', () => {
+test.describe( 'Lensy', () => {
 
 	test.afterAll( async ( { request } ) => {
 		const { csrf } = await login( request );
@@ -378,7 +378,7 @@ test.describe( 'ops assistant', () => {
 
 } );
 
-test.describe( 'ops assistant on Free', () => {
+test.describe( 'Lensy on Free', () => {
 
 	test( 'the launcher is hidden, the chat is refused with BoxLang+ and the AI page is locked', async ( { page, request } ) => {
 		const { csrf } = await login( request, 'lens-demo', FREE );

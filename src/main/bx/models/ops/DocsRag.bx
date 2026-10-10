@@ -4,7 +4,7 @@
  * Copyright [2026] [Ortus Solutions, Corp]
  */
 /**
- * A little retrieval over the Lens documentation for the ops agent, built on bx-ai. The pages bundled under assets/docs are cut into
+ * A little retrieval over the Lens documentation for Lensy, built on bx-ai. The pages bundled under assets/docs are cut into
  * chunks with the bx-ai MarkdownLoader (one chunk per section, long sections split at paragraphs). The chunks go to Java, which keeps them
  * for a keyword search that needs no model. When an embedding model answers, they are also embedded into an in-memory BoxVectorMemory
  * and searched by meaning. The index lives in memory only and is built again when the pages or the embedding settings change.

@@ -22,10 +22,10 @@ import org.junit.jupiter.api.Test;
  */
 public class ToolsCatalogTest {
 
-	private static final Path	TOOLS_BX	= Path.of( "src/main/bx/models/ops/LensTools.bx" );
+	private static final Path	TOOLS_BX	= Path.of( "src/main/bx/models/ops/LensyTools.bx" );
 	private static final Path	DOCS		= Path.of( "docs/reference/ai-tools.md" );
 
-	/** The @AITool methods of LensTools.bx with their argument names and whether each is required. */
+	/** The @AITool methods of LensyTools.bx with their argument names and whether each is required. */
 	private static Map<String, Map<String, Boolean>> boxlangTools() throws Exception {
 		Map<String, Map<String, Boolean>>	out		= new LinkedHashMap<>();
 		List<String>						lines	= Files.readAllLines( TOOLS_BX );
@@ -49,7 +49,7 @@ public class ToolsCatalogTest {
 	}
 
 	@Test
-	@DisplayName( "LensTools.bx has exactly the tools of the catalog, with the same arguments and required flags" )
+	@DisplayName( "LensyTools.bx has exactly the tools of the catalog, with the same arguments and required flags" )
 	void boxlangAgreesWithCatalog() throws Exception {
 		Map<String, Map<String, Boolean>> bx = boxlangTools();
 		assertThat( new ArrayList<>( bx.keySet() ) ).containsExactlyElementsIn( Tools.all().stream().map( Tools.Tool::name ).toList() ).inOrder();

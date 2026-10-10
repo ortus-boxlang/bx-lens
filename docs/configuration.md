@@ -278,7 +278,7 @@ The disk store keeps errors and reports across restarts. It needs BoxLang+ or a 
 
 ## `ai`
 
-Optional help from a language model: the [ops assistant](console/ai.md), Explain with AI and Ask Lens. Off by default. See [Ask Lens and AI help](console/ask-lens-and-ai.md), [Set up Ollama](guides/ollama.md) and the [data flow](security.md#ai-data-flow). Everything but `apiKey` and `links` can be changed live from the AI page.
+Optional help from a language model: the [Lensy](console/ai.md), Explain with AI and Ask Lens. Off by default. See [Ask Lens and AI help](console/ask-lens-and-ai.md), [Set up Ollama](guides/ollama.md) and the [data flow](security.md#ai-data-flow). Everything but `apiKey` and `links` can be changed live from the AI page.
 
 | Key | Type | Default | Description |
 |---|---|---|---|
@@ -297,6 +297,24 @@ Optional help from a language model: the [ops assistant](console/ai.md), Explain
 | `apiKey` | string | `""` | The API key as a `bxsecret:` value. This is the one setting the console can never change. Leave it empty for a local model. |
 | `apiKeyEnv` | string | `""` | The **name** of an environment variable that holds the key. It wins over `apiKey`. The console refuses anything that is not a variable name. |
 | `links` | boolean | `true` | Show Copy prompt and the Ask ChatGPT and Ask Claude buttons. They send nothing from the server. |
+
+### MCP servers
+
+The MCP servers Lensy may ask are not in `boxlang.json`. The admin keeps them on the AI page, and they are saved with the other console settings in `config/bxlens-settings.json` (or `console.overridesFile`) under `mcp.servers`:
+
+```json
+{
+  "overrides": { },
+  "mcp": {
+    "servers": [
+      { "id": "boxlang", "builtin": true, "enabled": true, "allowedTools": ["*"] },
+      { "id": "acme", "name": "Acme", "url": "https://mcp.example.com/mcp", "builtin": false, "enabled": true, "trusted": false, "allowedTools": ["lookup"] }
+    ]
+  }
+}
+```
+
+The file is checked when it is read, like the console settings: an entry with a bad address, name or id is skipped, listed on the AI page and in the log, and the rest is used. A built-in entry can only change `enabled` and `allowedTools`; its address always comes from Lens. See [Servers Lensy can ask](console/ai.md#servers-lensy-can-ask-mcp) for the rules.
 
 ## `editor`
 
@@ -379,6 +397,7 @@ The ids `logs` (the log messages of one request, shown in Messages) and `logfile
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `reloadAssets` | boolean | `false` | Serve the UI files from disk on every request, so edits show on refresh. The harness turns it on. See [Development](project/contributing.md#the-harness). Leave it off otherwise. |
+| `mcpBuiltinBase` | string | `""` | For tests only. When set, the built-in MCP documentation servers are reached at `base/id` (for example `http://127.0.0.1:11435/mcp.bxs/boxlang`) instead of their real addresses, so the end to end tests need no internet. Only `boxlang.json` can set it; the console cannot. |
 | `license` | string | `""` | Force a license state for demos: `trial`, `plus`, `expired` or `none`. Empty detects the real state. See [Licensing](licensing.md). |
 
 ## Live settings

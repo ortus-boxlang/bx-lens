@@ -33,10 +33,10 @@ import ortus.boxlang.runtime.types.IStruct;
 import ortus.boxlang.runtime.types.Struct;
 
 /**
- * The ops agent of a server. It owns one conversation per console session (memory in the JVM, gone at logout, expiry or reset), the bounded
+ * Lensy of a server. It owns one conversation per console session (memory in the JVM, gone at logout, expiry or reset), the bounded
  * number of chats that may run at once, their deadlines, and the index of the documentation.
  * <p>
- * The agent itself is the BoxLang class <code>models/ops/OpsAgent.bx</code>, built on bx-ai. Everything it can do goes through the
+ * The agent itself is the BoxLang class <code>models/ops/Lensy.bx</code>, built on bx-ai. Everything it can do goes through the
  * {@link Toolbox} of the session, which applies the rules of the console to the user who is logged in.
  */
 public final class AgentService {
@@ -130,11 +130,11 @@ public final class AgentService {
 		m.put( "licensed", licensed );
 		m.put( "available", installed && enabled && licensed );
 		m.put( "reason",
-		    installed ? !licensed ? "The ops agent is a BoxLang+ feature. A license or trial is needed." : !enabled ? "The ops agent is off (ai.enabled)." : ""
+		    installed ? !licensed ? "Lensy is a BoxLang+ feature. A license or trial is needed." : !enabled ? "Lensy is off (ai.enabled)." : ""
 		        : "The bx-ai module is not installed." );
 		m.put( "provider", this.service.getAi().provider() );
 		m.put( "model", this.service.getAi().model() );
-		m.put( "tools", tb == null ? 0 : tb.toolNames().size() );
+		m.put( "tools", tb == null ? 0 : tb.toolNames().size() + tb.mcpTools().size() );
 		m.put( "role", s == null ? "" : s.role );
 		m.put( "actions", tb != null && tb.toolNames().contains( "runGc" ) );
 		Map<String, Object>	r		= new LinkedHashMap<>();
@@ -177,13 +177,13 @@ public final class AgentService {
 			throw new Refusal( 400, "Ask a question of up to " + MAX_MESSAGE + " characters.", false );
 		}
 		if ( !this.service.getLicensing().has( "ai" ) ) {
-			throw new Refusal( 409, "The ops agent is a BoxLang+ feature. A license or trial is needed.", true );
+			throw new Refusal( 409, "Lensy is a BoxLang+ feature. A license or trial is needed.", true );
 		}
 		if ( !this.service.getAi().installed() ) {
 			throw new Refusal( 409, "The bx-ai module is not installed.", false );
 		}
 		if ( !cfg.getBool( "ai.enabled", false ) ) {
-			throw new Refusal( 409, "The ops agent is off. Turn on ai.enabled.", false );
+			throw new Refusal( 409, "Lensy is off. Turn on ai.enabled.", false );
 		}
 		Conversation c = conversation( s, ip );
 		synchronized ( c ) {
@@ -221,6 +221,11 @@ public final class AgentService {
 	private void run( Conversation c, ChatTurn turn, String message ) {
 		try {
 			c.toolbox.beginTurn( turn );
+			// The tools of the MCP servers that are on: look again at the ones not looked at for five minutes. A server that does not answer is
+			// marked, and the answer goes on without it.
+			if ( c.toolbox.licensed() ) {
+				this.service.getMcp().refreshStale();
+			}
 			Object agent = agentFor( c );
 			if ( turn.cancelled() ) {
 				return;
@@ -236,7 +241,7 @@ public final class AgentService {
 				while ( root.getCause() != null && root.getCause() != root ) {
 					root = root.getCause();
 				}
-				this.service.getLogger().warn( "bx-lens ops agent failed: {}", root.toString() );
+				this.service.getLogger().warn( "bx-lens Lensy failed: {}", root.toString() );
 				turn.error( friendly( root ) );
 			}
 		} finally {
@@ -262,15 +267,54 @@ public final class AgentService {
 	}
 
 	private Object agentFor( Conversation c ) {
-		String key = configKey();
+		List<McpService.Tool>	mcp	= c.toolbox.mcpTools();
+		String					key	= configKey() + "|" + this.service.getMcp().signature( c.toolbox.isAdmin() );
 		synchronized ( c ) {
 			if ( c.agent == null || !key.equals( c.configKey ) ) {
-				IBoxContext ctx = context();
-				c.agent		= instantiate( ctx, "models.ops.OpsAgent", c.toolbox, settingsStruct(), c.toolbox.toolNames() );
+				IBoxContext	ctx		= context();
+				// An agent rebuilt because the tools changed keeps the conversation: the new one gets the memory of the old one. A changed model
+				// or setting starts afresh, as before.
+				Object		memory	= "";
+				if ( c.agent != null && c.configKey.startsWith( configKey() + "|" ) ) {
+					memory = callMethod( ctx, c.agent, "getMemory" );
+				}
+				c.agent		= instantiate( ctx, "models.ops.Lensy", c.toolbox, settingsStruct(), c.toolbox.toolNames(), mcpSpecs( mcp ), memory );
 				c.configKey	= key;
 			}
 			return c.agent;
 		}
+	}
+
+	/** The MCP tools as BoxLang values: name (as the model uses it), description and the cleaned schema. */
+	private static ortus.boxlang.runtime.types.Array mcpSpecs( List<McpService.Tool> tools ) {
+		ortus.boxlang.runtime.types.Array out = new ortus.boxlang.runtime.types.Array();
+		for ( McpService.Tool t : tools ) {
+			IStruct spec = new Struct();
+			spec.put( Key.of( "name" ), t.wire() );
+			spec.put( Key.of( "description" ), t.description() );
+			spec.put( Key.of( "schema" ), bx( t.schema() ) );
+			out.add( spec );
+		}
+		return out;
+	}
+
+	/** Maps become structs and lists become arrays, all the way down. */
+	private static Object bx( Object v ) {
+		if ( v instanceof Map<?, ?> m ) {
+			IStruct s = new Struct();
+			for ( Map.Entry<?, ?> e : m.entrySet() ) {
+				s.put( Key.of( String.valueOf( e.getKey() ) ), bx( e.getValue() ) );
+			}
+			return s;
+		}
+		if ( v instanceof List<?> l ) {
+			ortus.boxlang.runtime.types.Array a = new ortus.boxlang.runtime.types.Array();
+			for ( Object o : l ) {
+				a.add( bx( o ) );
+			}
+			return a;
+		}
+		return v;
 	}
 
 	/** A string that changes when a setting the agent was built from changes. */

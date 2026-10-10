@@ -106,7 +106,7 @@ Lens counts a failure when a query started and never finished, or when a databas
 - "The AI call failed" has the reason from the provider. The log has more.
 - Only admins can call the model.
 
-## The ops assistant button is missing, or it does not answer
+## Lensy button is missing, or it does not answer
 
 The round button, the Alt+K shortcut and the bar's Ask link show only when `bx-ai` is present, you have BoxLang+ or a trial and `ai.enabled` is true. Open the **AI** page (admin) to see which of these fails. Press **Test connection**: it names the provider error. For a local model see [Set up Ollama](guides/ollama.md). A viewer has fewer tools than an admin, so some questions answer "I have no tool for that". "The assistant is busy" means `ai.maxConcurrentChats` chats are running; an answer that stops after `ai.timeoutSeconds` or `ai.maxToolCalls` can be shortened by asking a narrower question. An approval card that says Expired was not answered in five minutes: ask again.
 

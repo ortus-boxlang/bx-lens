@@ -87,6 +87,8 @@ public final class LensService {
 	private volatile LensConfig										baseConfig			= LensConfig.defaults();
 	private volatile SettingsRegistry								settingsRegistry	= new SettingsRegistry( List.of() );
 	private volatile SettingsStore									settingsStore		= new SettingsStore( null, settingsRegistry );
+	private volatile ortus.boxlang.modules.bxlens.ops.McpService	mcp					= new ortus.boxlang.modules.bxlens.ops.McpService(
+	    settingsStore, () -> "" );
 	private final List<ILensCollector>								allBuiltIns			= new ArrayList<>();
 	private final ConsoleData										consoleData			= new ConsoleData( this );
 	private final AtomicInteger										streams				= new AtomicInteger();
@@ -177,6 +179,10 @@ public final class LensService {
 		}
 		this.settingsStore	= new SettingsStore( overridesFile, this.settingsRegistry );
 		this.config			= new LensConfig( LensConfig.overlay( settings, this.settingsStore.get() ) );
+		this.mcp.shutdown();
+		// dev.mcpBuiltinBase serves the builtin documentation servers from a stand-in (the test harness): base/id for each. It is read from
+		// boxlang.json only; the console cannot change it.
+		this.mcp = new ortus.boxlang.modules.bxlens.ops.McpService( this.settingsStore, () -> this.baseConfig.getString( "dev.mcpBuiltinBase", "" ) );
 		if ( this.settingsStore.skipped() > 0 ) {
 			getLogger().warn( "bx-lens: ignored {} invalid entries in the settings overrides file [{}]", this.settingsStore.skipped(), overridesFile );
 		}
@@ -268,6 +274,7 @@ public final class LensService {
 		try {
 			ai.shutdown();
 			agents.shutdown();
+			mcp.shutdown();
 		} catch ( Throwable t ) {
 			// Nothing to stop
 		}
@@ -361,6 +368,12 @@ public final class LensService {
 	/** Replace the license (tests). */
 	public void setLicensing( Licensing licensing ) {
 		this.licensing = licensing;
+	}
+
+	/** Replace the MCP service (tests). */
+	public void setMcp( ortus.boxlang.modules.bxlens.ops.McpService mcp ) {
+		this.mcp.shutdown();
+		this.mcp = mcp;
 	}
 
 	/** Replace the settings (tests). Call {@link #setConfig} with {@code LensConfig.defaults()} to put them back. */
@@ -1063,10 +1076,17 @@ public final class LensService {
 	}
 
 	/**
-	 * The ops agent: conversations, approvals, the documentation index.
+	 * Lensy: conversations, approvals, the documentation index.
 	 */
 	public ortus.boxlang.modules.bxlens.ops.AgentService getAgents() {
 		return agents;
+	}
+
+	/**
+	 * The MCP servers Lensy may ask: the list an admin keeps in the console, what was found on them, and the calls.
+	 */
+	public ortus.boxlang.modules.bxlens.ops.McpService getMcp() {
+		return mcp;
 	}
 
 	public ErrorStore getErrors() {

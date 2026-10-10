@@ -7,7 +7,7 @@ icon: lucide:sparkles
 
 # Ask Lens and AI help
 
-Lens can help you read an error, a failing query or a deadlock, and can answer questions about the server. All of it is optional. Nothing is sent anywhere unless you copy a prompt yourself or an admin turns on `ai.enabled`. With BoxLang+ the Ask Lens page is the full page of the [ops assistant](ai.md), a chat that looks at the server with tools. The Copy prompt, Ask ChatGPT and Ask Claude buttons stay on the page.
+Lens can help you read an error, a failing query or a deadlock, and can answer questions about the server. All of it is optional. Nothing is sent anywhere unless you copy a prompt yourself or an admin turns on `ai.enabled`. With BoxLang+ the Ask Lens page is the full page of the [Lensy](ai.md), a chat that looks at the server with tools. The Copy prompt, Ask ChatGPT and Ask Claude buttons stay on the page.
 
 ![The Ask Lens page](../assets/screenshots/console-ask.png)
 

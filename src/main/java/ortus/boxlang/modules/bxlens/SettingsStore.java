@@ -10,7 +10,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import ortus.boxlang.modules.bxlens.util.Json;
@@ -27,6 +29,7 @@ public final class SettingsStore {
 	private final Path						file;
 	private final SettingsRegistry			registry;
 	private volatile Map<String, Object>	overrides	= Map.of();
+	private volatile List<Object>			mcpServers	= List.of();
 
 	/**
 	 * @param file     where overrides are kept, may be null to keep them in memory only
@@ -59,17 +62,38 @@ public final class SettingsStore {
 		for ( Map.Entry<String, Object> e : next.entrySet() ) {
 			clean.put( registry.get( e.getKey() ).key(), registry.coerce( e.getKey(), e.getValue() ) );
 		}
-		write( clean );
+		write( clean, this.mcpServers );
 		this.overrides = Map.copyOf( clean );
 	}
 
-	private void write( Map<String, Object> map ) throws IOException {
+	/**
+	 * The MCP server list as it was saved (the entries are checked by the MCP service, which skips and reports bad ones).
+	 */
+	public List<Object> mcpServers() {
+		return this.mcpServers;
+	}
+
+	/**
+	 * Save the MCP server list next to the overrides.
+	 */
+	public synchronized void setMcpServers( List<Map<String, Object>> servers ) throws IOException {
+		List<Object> copy = new ArrayList<>( servers );
+		write( this.overrides, copy );
+		this.mcpServers = List.copyOf( copy );
+	}
+
+	private void write( Map<String, Object> map, List<Object> mcp ) throws IOException {
 		if ( file == null ) {
 			return;
 		}
 		Files.createDirectories( file.toAbsolutePath().getParent() );
-		Path tmp = file.resolveSibling( file.getFileName() + ".tmp" );
-		Files.writeString( tmp, Json.write( Map.of( "overrides", map ) ), StandardCharsets.UTF_8 );
+		Path				tmp	= file.resolveSibling( file.getFileName() + ".tmp" );
+		Map<String, Object>	doc	= new LinkedHashMap<>();
+		doc.put( "overrides", map );
+		if ( !mcp.isEmpty() ) {
+			doc.put( "mcp", Map.of( "servers", mcp ) );
+		}
+		Files.writeString( tmp, Json.write( doc ), StandardCharsets.UTF_8 );
 		Files.move( tmp, file, StandardCopyOption.REPLACE_EXISTING );
 	}
 
@@ -107,6 +131,17 @@ public final class SettingsStore {
 				}
 			}
 			this.overrides = Map.copyOf( out );
+			for ( Map.Entry<?, ?> e : m.entrySet() ) {
+				String k = e.getKey() instanceof Key key ? key.getName() : String.valueOf( e.getKey() );
+				if ( k.equalsIgnoreCase( "mcp" ) && e.getValue() instanceof Map<?, ?> mm ) {
+					for ( Map.Entry<?, ?> me : mm.entrySet() ) {
+						String mk = me.getKey() instanceof Key key ? key.getName() : String.valueOf( me.getKey() );
+						if ( mk.equalsIgnoreCase( "servers" ) && me.getValue() instanceof java.util.Collection<?> c ) {
+							this.mcpServers = List.copyOf( ortus.boxlang.modules.bxlens.util.Plain.list( ortus.boxlang.modules.bxlens.util.Plain.plain( c ) ) );
+						}
+					}
+				}
+			}
 		} catch ( Throwable t ) {
 			skipped++;
 		}
