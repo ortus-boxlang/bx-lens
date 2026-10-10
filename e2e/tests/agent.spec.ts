@@ -163,8 +163,11 @@ test.describe( 'ops assistant', () => {
 		await page.fill( '#agent-input', 'run gc again' );
 		await expect( page.locator( '#agent-send' ) ).toBeEnabled();
 		await page.click( '#agent-send' );
-		const second = page.locator( '.acard' ).last();
+		// The denied card is still on screen: wait for the new one before taking the last card
+		await expect( page.locator( '.acard' ) ).toHaveCount( 2 );
+		const second = page.locator( '.acard' ).nth( 1 );
 		await expect( second ).toContainText( 'Approval needed' );
+		await expect( second.locator( '[data-act=approve]' ) ).toBeEnabled();
 		await second.locator( '[data-act=approve]' ).click();
 		await expect( second ).toContainText( 'Approved' );
 		await expect( page.locator( '.abub' ).last() ).toContainText( 'Garbage collection ran' );

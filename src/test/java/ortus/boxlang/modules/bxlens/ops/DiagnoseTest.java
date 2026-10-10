@@ -88,6 +88,7 @@ public class DiagnoseTest {
 				}
 				Thread.sleep( 100 );
 			}
+			assertThat( ( List<?> ) data.get( "deadlocked" ) ).isNotEmpty();
 			List<Finding> findings = Diagnose.threads( data );
 			assertThat( findings ).isNotEmpty();
 			Finding f = findings.get( 0 );

@@ -598,6 +598,9 @@ public final class ConsoleData {
 	 */
 	public Map<String, Object> threads() {
 		ThreadMXBean				tb		= ManagementFactory.getThreadMXBean();
+		// Look for a deadlock first: deadlocked threads never move again, so a dump taken after it shows them in the lock wait that caused it.
+		// The other order could report threads that formed a deadlock a moment after they were dumped, with the wrong lock as evidence.
+		long[]						dead	= tb.findDeadlockedThreads();
 		ThreadInfo[]				infos	= tb.dumpAllThreads( true, true );
 		long						self	= Thread.currentThread().threadId();
 		List<Map<String, Object>>	list	= new ArrayList<>();
@@ -645,8 +648,7 @@ public final class ConsoleData {
 			list.add( m );
 		}
 		list.sort( Comparator.comparing( m -> String.valueOf( m.get( "name" ) ), String.CASE_INSENSITIVE_ORDER ) );
-		long[]				dead	= tb.findDeadlockedThreads();
-		Map<String, Object>	out		= new LinkedHashMap<>();
+		Map<String, Object> out = new LinkedHashMap<>();
 		out.put( "threads", list );
 		out.put( "states", states );
 		out.put( "deadlocked", dead == null ? List.of() : java.util.Arrays.stream( dead ).boxed().toList() );
