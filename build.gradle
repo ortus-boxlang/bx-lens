@@ -165,35 +165,33 @@ spotless {
  * - Copies the build/libs/bx-lens-*.jar to build/modules/bx-lens/libs/
  * - Copies the src/main/bx/** to build/modules/bx-lens/ folder.
  */
-def bxAiVersion = '3.4.0'
+def bxAiVersion = '3.6.0-snapshot'
 /**
  * BoxLang AI (bx-ai) ships inside this module as a nested module (module inception: the modules folder of a module).
- * It is downloaded once into build/cache.
+ * <p>
+ * It is the bleeding edge build of bx-ai (development), kept in vendor/, until a release that has the MCP client controls
+ * (withUrlGuard, withRedirects, withMaxResponseBytes, withHandshake, the timeout in milliseconds, listTools( cursor )) is published.
+ * Then: set bxAiVersion to that release, download it again as before from
+ * https://downloads.ortussolutions.com/ortussolutions/boxlang-modules/bx-ai/${version}/bx-ai-${version}.zip, update the checksum and delete vendor/.
  */
-task downloadBxAi( type: Download ) {
-	src "https://downloads.ortussolutions.com/ortussolutions/boxlang-modules/bx-ai/${bxAiVersion}/bx-ai-${bxAiVersion}.zip"
-	dest file( "build/cache/bx-ai-${bxAiVersion}.zip" )
-	overwrite false
-	onlyIfModified false
-}
+def bxAiZip = file( "vendor/bx-ai-${bxAiVersion}.zip" )
 
 // The archive is bundled into the module, so it must be the one this build was written against
-def bxAiSha256 = 'ceffd0009633cb5a5d9a543cdbc616c5d1e6541719a3755c036443255cc77ea7'
+def bxAiSha256 = '1e64c4ef4e54013a8d948fe7f853c34afb98cb7a7c8792f32b7d2bb820c3f9d8'
 task verifyBxAi( type: Verify ) {
-	dependsOn downloadBxAi
-	src file( "build/cache/bx-ai-${bxAiVersion}.zip" )
+	src bxAiZip
 	algorithm 'SHA-256'
 	checksum bxAiSha256
 }
 
 task createModuleStructure(type: Copy) {
-	dependsOn downloadBxAi, verifyBxAi
+	dependsOn verifyBxAi
 	mustRunAfter shadowJar, jar
     from( 'build/libs' ) {
 		include "${project.name}-${version}.jar"
         into 'libs'
     }
-    from( zipTree( file( "build/cache/bx-ai-${bxAiVersion}.zip" ) ) ) {
+    from( zipTree( bxAiZip ) ) {
         into 'modules/bxai'
     }
     from( 'src/main/bx/assets' ) {
