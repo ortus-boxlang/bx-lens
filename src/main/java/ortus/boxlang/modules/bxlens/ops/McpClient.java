@@ -63,13 +63,31 @@ public final class McpClient {
 		}
 	}
 
-	private final HttpClient		http;
+	/**
+	 * Created on first use, never when the module loads. The JDK reads <code>jdk.httpclient.allowRestrictedHeaders</code> when its HTTP classes
+	 * first load, and the BoxLang runtime sets that property when its HTTP service starts, which is after the modules are loaded. A client built
+	 * earlier would freeze the list without it and break every <code>bx:http</code> call of the application that sets Content-Length or Host.
+	 */
+	private volatile HttpClient		http;
 	private final McpUrls.Resolver	resolver;
 	private final AtomicLong		ids	= new AtomicLong( 1 );
 
 	public McpClient( McpUrls.Resolver resolver ) {
-		this.resolver	= resolver == null ? McpUrls.SYSTEM : resolver;
-		this.http		= HttpClient.newBuilder().followRedirects( HttpClient.Redirect.NEVER ).connectTimeout( Duration.ofSeconds( 5 ) ).build();
+		this.resolver = resolver == null ? McpUrls.SYSTEM : resolver;
+	}
+
+	private HttpClient http() {
+		HttpClient c = this.http;
+		if ( c == null ) {
+			synchronized ( this ) {
+				c = this.http;
+				if ( c == null ) {
+					c			= HttpClient.newBuilder().followRedirects( HttpClient.Redirect.NEVER ).connectTimeout( Duration.ofSeconds( 5 ) ).build();
+					this.http	= c;
+				}
+			}
+		}
+		return c;
 	}
 
 	/**
@@ -208,7 +226,7 @@ public final class McpClient {
 			}
 			HttpResponse<InputStream> r;
 			try {
-				r = McpClient.this.http.send( b.POST( HttpRequest.BodyPublishers.ofString( Json.write( msg ) ) ).build(),
+				r = McpClient.this.http().send( b.POST( HttpRequest.BodyPublishers.ofString( Json.write( msg ) ) ).build(),
 				    HttpResponse.BodyHandlers.ofInputStream() );
 			} catch ( HttpTimeoutException e ) {
 				throw new McpException( "unreachable", "timed out after " + this.timeout.toSeconds() + " s" );
