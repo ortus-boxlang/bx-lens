@@ -140,6 +140,9 @@ class {
 		} else if ( status == 408 ) {
 			// bx:http answers 408 when its time limit passes
 			message = "timed out after #ceiling( arguments.timeoutMs / 1000 )# s"
+		} else if ( status == 502 && raw contains "Connection Failure" ) {
+			// bx:http answers 502 when it could not connect (refused, unreachable, reset)
+			message = "could not connect (connection refused or blocked)"
 		} else if ( status >= 400 ) {
 			message = "HTTP #status#"
 		} else if ( status == 0 ) {

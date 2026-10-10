@@ -147,6 +147,7 @@ public class BxAiMcpClientIntegrationTest extends BaseIntegrationTest {
 		this.fake.close();
 		McpClient.McpException e = assertThrows( McpClient.McpException.class, () -> this.client.listTools( url, Duration.ofSeconds( 5 ) ) );
 		assertThat( e.kind ).isEqualTo( "unreachable" );
+		assertThat( e.getMessage() ).startsWith( "could not connect" );
 		assertThat( e.getMessage() ).doesNotContain( "127.0.0.1" );
 		assertThat( e.getMessage() ).doesNotContain( String.valueOf( this.fake.port() ) );
 		this.fake = new FakeMcpServer();
