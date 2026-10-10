@@ -26,7 +26,6 @@ public class LensConfigTest {
 		assertThat( cfg.light ).isTrue();
 		assertThat( cfg.trackNonHtml ).isFalse();
 		assertThat( cfg.queriesIncludeParams ).isFalse();
-		assertThat( cfg.ormEnabled ).isFalse();
 		assertThat( cfg.isCollectorEnabled( "orm", false ) ).isFalse();
 		assertThat( cfg.maxRequests ).isEqualTo( 50 );
 		assertThat( cfg.slowQueryMs ).isEqualTo( 25 );
@@ -81,7 +80,7 @@ public class LensConfigTest {
 	public void privacyDefaults() {
 		assertThat( new LensConfig(
 		    Map.of( "collectors", Map.of( "queries", Map.of( "includeParams", true ), "orm", Map.of( "enabled", true ) ) ) ).queriesIncludeParams ).isTrue();
-		assertThat( new LensConfig( Map.of( "collectors", Map.of( "orm", Map.of( "enabled", true ) ) ) ).ormEnabled ).isTrue();
+		assertThat( new LensConfig( Map.of( "collectors", Map.of( "orm", Map.of( "enabled", true ) ) ) ).isCollectorEnabled( "orm", false ) ).isTrue();
 		assertThat( new SettingsRegistry( java.util.List.of( "orm", "queries" ) ).get( "collectors.orm.enabled" ).def() ).isEqualTo( false );
 		assertThat( new SettingsRegistry( java.util.List.of() ).get( "collectors.queries.includeParams" ).def() ).isEqualTo( false );
 		assertThat( new SettingsRegistry( java.util.List.of() ).get( "collect.level" ).def() ).isEqualTo( "light" );
@@ -93,7 +92,9 @@ public class LensConfigTest {
 		String bx = java.nio.file.Files.readString( java.nio.file.Path.of( "src/main/bx/ModuleConfig.bx" ) );
 		assertThat( bx ).contains( "collect : { level : \"light\" }" );
 		assertThat( bx ).contains( "includeParams : false" );
-		assertThat( bx ).contains( "orm          : { enabled : false" );
+		assertThat( bx ).contains( "orm          : { enabled : false }" );
+		// Statistics are bx-orm's own setting (generateStatistics), Lens no longer forces them
+		assertThat( bx ).doesNotContain( "statistics : true" );
 		assertThat( bx ).contains( "headerAlways : true" );
 	}
 

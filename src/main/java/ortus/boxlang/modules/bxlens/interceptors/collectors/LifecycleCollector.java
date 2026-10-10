@@ -77,6 +77,30 @@ public class LifecycleCollector extends BaseCollector {
 		LensService.getInstance().getStats().activeSessions.decrementAndGet();
 	}
 
+	/**
+	 * A module finished loading: an integration whose module just arrived starts listening, without a restart.
+	 */
+	@InterceptionPoint
+	public void postModuleLoad( IStruct event ) {
+		reconcileIntegrations();
+	}
+
+	/**
+	 * A module was unloaded: an integration whose module left stops listening.
+	 */
+	@InterceptionPoint
+	public void postModuleUnload( IStruct event ) {
+		reconcileIntegrations();
+	}
+
+	private void reconcileIntegrations() {
+		try {
+			LensService.getInstance().reconcileIntegrations();
+		} catch ( Throwable t ) {
+			fail( "reconcileIntegrations", t );
+		}
+	}
+
 	private void finish( IStruct event, LensService.Trigger trigger ) {
 		try {
 			RequestBoxContext rc = requestContext( event );

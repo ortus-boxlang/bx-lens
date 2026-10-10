@@ -22,7 +22,7 @@ icon: lucide:map
 | Cache hit and miss events | Needs core. Lens uses statistic differences today. |
 | SOAP events | Needs core. |
 | Bar on core error pages | Needs the web context to announce `onRequestFlushBuffer`. |
-| ORM SQL in Queries | Planned and not built yet. It will be free, like normal queries. Global ORM statistics will need BoxLang+. |
+| ORM SQL in Queries | Built, as an opt in integration that listens to bx-orm events (see [ORM](../panels/orm.md)). The SQL is free, like normal queries. The ORM page with statistics needs BoxLang+. |
 | Panels from other modules (ORM, Redis, mail, AI, JDBC pools, Quick, qb, ColdBox, cbwire) | Ideas. |
 
 The BIF call collector is shipped, see the [BIFs panel](../panels/bifs.md). See [Core gaps](../reference/events.md#core-gaps).

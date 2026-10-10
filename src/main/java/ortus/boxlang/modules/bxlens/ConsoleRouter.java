@@ -314,11 +314,17 @@ public final class ConsoleRouter {
 			logFiles( context, ex, route, s );
 		} else if ( route.equals( "modules" ) && method.equals( "GET" ) && panelOn( "modules" ) ) {
 			json( context, ex, 200, service.getEnvironment().modules() );
+		} else if ( route.equals( "integrations" ) && method.equals( "GET" ) ) {
+			json( context, ex, 200, integrations( s ) );
+		} else if ( route.startsWith( "integrations/" ) && method.equals( "POST" ) ) {
+			changeIntegration( context, ex, s, route.substring( "integrations/".length() ) );
 		} else if ( route.equals( "orm" ) && method.equals( "GET" ) && panelOn( "orm" ) ) {
 			if ( plusOnly( context, ex, "ormStats", "ORM statistics" ) ) {
 				return;
 			}
-			json( context, ex, 200, service.getOrm().stats() );
+			json( context, ex, 200, orm( s ) );
+		} else if ( route.equals( "orm/statistics" ) && method.equals( "POST" ) && panelOn( "orm" ) ) {
+			ormStatistics( context, ex, s );
 		} else if ( route.equals( "configuration" ) && method.equals( "GET" ) && panelOn( "configuration" ) ) {
 			json( context, ex, 200, service.getRuntimeInfo().configuration( isAdmin( s ) ) );
 		} else if ( route.equals( "environment" ) && method.equals( "GET" ) && panelOn( "environment" ) ) {
@@ -514,7 +520,7 @@ public final class ConsoleRouter {
 			}
 			if ( t[ 0 ].equals( "settings" ) ) {
 				// Always there, so the settings can always be read
-			} else if ( cfg.hiddenTabs.contains( t[ 0 ] ) || !cfg.isCollectorEnabled( t[ 0 ], true ) ) {
+			} else if ( cfg.hiddenTabs.contains( t[ 0 ] ) || Integrations.get( t[ 0 ] ) == null && !cfg.isCollectorEnabled( t[ 0 ], true ) ) {
 				continue;
 			}
 			Map<String, Object> m = new LinkedHashMap<>();
@@ -956,8 +962,82 @@ public final class ConsoleRouter {
 	}
 
 	private boolean panelOn( String id ) {
-		LensConfig cfg = service.getConfig();
-		return cfg.isCollectorEnabled( id, true ) && !cfg.hiddenTabs.contains( id );
+		LensConfig	cfg			= service.getConfig();
+		// An integration page is always there: it is where the status and the switch live
+		boolean		integration	= Integrations.get( id ) != null;
+		return ( integration || cfg.isCollectorEnabled( id, true ) ) && !cfg.hiddenTabs.contains( id );
+	}
+
+	/**
+	 * The module integrations with their status. Everyone who can sign in sees it, only an admin can change it.
+	 */
+	private Map<String, Object> integrations( ConsoleAuth.Session s ) {
+		Map<String, Object> m = new LinkedHashMap<>();
+		m.put( "integrations", service.getIntegrations().list( service.getConfig() ) );
+		m.put( "canChange", canChange( s ) );
+		return m;
+	}
+
+	/**
+	 * Switch an integration on or off. The module must be installed to switch it on. The viewer role and read-only mode are refused before this.
+	 */
+	private void changeIntegration( IBoxContext context, WebExchange ex, ConsoleAuth.Session s, String id ) {
+		Integrations.Def d = Integrations.get( decode( id ) );
+		if ( d == null ) {
+			json( context, ex, 404, Map.of( "ok", false, "error", "Unknown integration" ) );
+			return;
+		}
+		String enabled = ex.formParam( "enabled" );
+		if ( !"true".equals( enabled ) && !"false".equals( enabled ) ) {
+			json( context, ex, 400, Map.of( "ok", false, "error", "enabled must be true or false" ) );
+			return;
+		}
+		try {
+			service.setIntegration( d.id(), "true".equals( enabled ) );
+			service.getAudit().log( "integration.change", s.role, ex.remoteAddr(), "id=" + d.id() + " enabled=" + enabled );
+			json( context, ex, 200, integrations( s ) );
+		} catch ( IllegalStateException e ) {
+			service.getAudit().log( "denied.integration", s.role, ex.remoteAddr(), "id=" + d.id() + " " + e.getMessage() );
+			json( context, ex, 409, Map.of( "ok", false, "error", e.getMessage() ) );
+		} catch ( java.io.IOException e ) {
+			json( context, ex, 500, Map.of( "ok", false, "error", "Could not save the setting: " + e.getMessage() ) );
+		}
+	}
+
+	/**
+	 * The ORM page: integration status, the Hibernate statistics bx-orm reports and what the ORM events added up to.
+	 */
+	private Map<String, Object> orm( ConsoleAuth.Session s ) {
+		Map<String, Object> m = new LinkedHashMap<>( service.getOrm().statistics() );
+		m.put( "integration", service.getIntegrations().describe( Integrations.get( "orm" ), service.getConfig() ) );
+		m.put( "totals", service.getOrmTotals().snapshot() );
+		m.put( "canChange", canChange( s ) && service.getOrm().canSwitchStatistics() );
+		return m;
+	}
+
+	/**
+	 * Switch Hibernate statistics on or off for an ORM application, through the bx-orm service. Admin only (a viewer is refused before this),
+	 * a Plus feature, audited.
+	 */
+	private void ormStatistics( IBoxContext context, WebExchange ex, ConsoleAuth.Session s ) {
+		if ( plusOnly( context, ex, "ormStats", "ORM statistics" ) ) {
+			return;
+		}
+		String	app		= ex.formParam( "app" );
+		String	enabled	= ex.formParam( "enabled" );
+		if ( !"true".equals( enabled ) && !"false".equals( enabled ) ) {
+			json( context, ex, 400, Map.of( "ok", false, "error", "enabled must be true or false" ) );
+			return;
+		}
+		try {
+			service.getOrm().setStatistics( app, "true".equals( enabled ) );
+			service.getAudit().log( "orm.statistics", s.role, ex.remoteAddr(), "app=" + app + " enabled=" + enabled );
+			json( context, ex, 200, orm( s ) );
+		} catch ( IllegalArgumentException e ) {
+			json( context, ex, 404, Map.of( "ok", false, "error", e.getMessage() ) );
+		} catch ( IllegalStateException e ) {
+			json( context, ex, 409, Map.of( "ok", false, "error", e.getMessage() ) );
+		}
 	}
 
 	/**

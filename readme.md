@@ -55,26 +55,23 @@ Upgrading? `enabled` is now `bar.enabled` and `access.allowedIPs` is now `bar.ac
 
 ## What you get
 
-| Panel | Shows |
+The **bar** is a snapshot of one request. The **console** holds everything that needs analysis or is about the whole server. The full list, with what is Free and what is BoxLang+, is in [Features](docs/features.md).
+
+| Bar tab | Shows |
 |---|---|
-| **Issues** | Everything suspicious, ranked: exceptions, N+1 queries, slow queries, slow templates, failed HTTP calls |
-| **Timeline** | One waterfall of templates, functions, queries, HTTP calls and transactions. Hover, click for detail, zoom, pan, filter, search, open the file in your editor |
-| **Queries** | Every statement with its parameters, rows, time, datasource and the template line that ran it. Copy SQL |
-| **ORM** | The SQL bx-orm (Hibernate) runs shows in Queries, labelled ORM. **BoxLang+:** Hibernate statistics on the console ORM page. See [ORM](docs/panels/orm.md) |
-| **Templates** | The include and call tree |
-| **HTTP** | Outgoing HTTP calls with status, size and time |
+| **Timeline** | One waterfall of templates, functions, queries, HTTP calls and transactions. Zoom, pan, filter, search, open the file in your editor. Spans an exception cut short are marked interrupted |
+| **Queries** | Every statement with rows, time, datasource and the template line that ran it. Bound values only when you turn them on. Copy SQL |
 | **Exceptions** | Caught and uncaught exceptions with BoxLang locations and the Java stack |
+| **HTTP** | Outgoing HTTP calls with status, size and time |
 | **Messages and Timers** | What your code sends with `lensMessage()`, `lensDump()`, `lensMeasure()` |
-| **Cache** | Every BoxCache cache with hit rate, objects, evictions and what this request did to it |
-| **Modules** | Loaded modules with version, author, what they provide and activation time |
-| **BIFs** | Opt-in (`collectors.bifs.enabled`). Calls, total, average and slowest time per built-in function, and errors. It costs time on every BIF call, so use it to hunt, then turn it off. Needs a BoxLang build with `postBIFInvocation` timing |
-| **Request, Scopes, Runtime** | Request and response headers, redacted scope snapshots, memory, GC, threads and versions. **BoxLang+:** the CPU time and allocation of the request |
-| **History** | The last 50 requests, including JSON and SSE, recycled in memory. Free keeps the last 25, **BoxLang+** keeps the configured size |
+| **Request** | Request and response headers and status. **BoxLang+:** the CPU time and allocation of the request |
+| **Runtime** | A cached snapshot: versions, uptime, heap, cache names and the main `boxlang.json` settings |
+| **Scopes, BIFs** | Opt in. Redacted scope snapshots, and calls and time per built-in function |
 | Your panels | Applications and other modules add panels with `lensPanel()` or the `onLensCollect` interception point |
 
-The Issues tab lists security Notes for missing headers and cookie flags. With **BoxLang+** it also names where a slow request was stuck (a stack sample after `thresholds.slowRequestMs`).
+Every tracked request has an id (`X-BxLens-Id`, `lensRequestId()`). The ORM is an opt in [integration](docs/reference/integrations.md): with bx-orm 1.7.2 or later installed and `collectors.orm.enabled` on, its SQL shows with the other queries, labelled ORM, and **BoxLang+** adds the console ORM page. Issues, History, Modules, Cache detail and the JVM detail are in the console, not on the bar.
 
-The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, Caches, Logs, Modules, Environment, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
+The console pages are Overview, Requests, In flight, Errors, Reports, Ask Lens, Queries, Executors, Tasks, Datasources, ORM, Caches, Logs, Modules, Environment, Configuration, System, Threads, Bar designer and Settings. The console makes no request to any other site, so it works air gapped. See [Console](docs/console/index.md).
 
 ## What the console adds
 

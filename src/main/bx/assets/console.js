@@ -201,7 +201,22 @@
 				resetQueries: async function () { this.qs = await (await this.api("queries/reset", { method: "POST" })).json(); this.qpick = null; },
 				openRequest: function (id) { this.go("requests"); this.pick(id); },
 				orml: null,
-				loadOrm: async function () { var r = await this.api("orm"); this.orml = r.ok ? await r.json() : null; },
+				loadOrm: async function () { this.loadIntegrations(); var r = await this.api("orm"); this.orml = r.ok ? await r.json() : null; },
+				ormStatistics: async function (app, on) {
+					var r = await this.api("orm/statistics", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ app: app, enabled: String(on) }).toString() });
+					var j = await r.json();
+					if (r.ok) { this.orml = j; this.toast(on ? "Statistics are on" : "Statistics are off"); } else { this.toast(j.error || "Could not change the statistics"); }
+				},
+				ints: null,
+				loadIntegrations: async function () { var r = await this.api("integrations"); this.ints = r.ok ? await r.json() : null; },
+				intOf: function (id) { return this.ints ? (this.ints.integrations.find(function (i) { return i.id === id; }) || null) : null; },
+				intStatusText: function (i) { return { on: "On", available: "Available, off", notInstalled: "Not installed" }[i.status] || i.status; },
+				intHint: function (i) { return i.status === "notInstalled" ? i.hint : (i.status === "available" ? "Installed. Turn on to listen." : "Listening."); },
+				setIntegration: async function (i, on) {
+					var r = await this.api("integrations/" + encodeURIComponent(i.id), { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ enabled: String(on) }).toString() });
+					var j = await r.json();
+					if (r.ok) { this.ints = j; this.toast(i.name + (on ? " is on" : " is off")); if (this.tab === "orm") { this.loadOrm(); } } else { this.toast(j.error || "Could not change the integration"); this.loadIntegrations(); }
+				},
 				modl: null, modsel: "", modq: "",
 				loadModules: async function () { this.modl = await (await this.api("modules")).json(); if (!this.modsel && this.modl.modules.length) { this.modsel = this.modl.modules[0].name; } },
 				modRows: function () { var q = this.modq.toLowerCase(); return this.modl.modules.filter(function (m) { return !q || m.name.toLowerCase().indexOf(q) >= 0; }); },
@@ -311,7 +326,7 @@
 					if (this.tab === "queries") { this.loadQueries(); }
 					if (this.tab === "environment" && !this.envd) { this.loadEnv(); }
 					if (this.tab === "configuration") { this.loadConfig(); }
-					if (this.tab === "modules") { this.loadModules(); }
+					if (this.tab === "modules") { this.loadModules(); this.loadIntegrations(); }
 					if (this.tab === "orm") { this.loadOrm(); this.ormTimer = setInterval(function () { if (self.tab === "orm" && !document.hidden) { self.loadOrm(); } }, 5000); } else { clearInterval(this.ormTimer); }
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }

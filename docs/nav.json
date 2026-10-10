@@ -4,6 +4,7 @@
 		"title": "Start Here",
 		"children": [
 			"getting-started.md",
+			"features.md",
 			"configuration.md",
 			"ui.md",
 			"security.md",
@@ -58,6 +59,7 @@
 		"title": "Reference",
 		"children": [
 			"reference/events.md",
+			"reference/integrations.md",
 			"reference/bar-files.md",
 			"design/api-spec.md"
 		]

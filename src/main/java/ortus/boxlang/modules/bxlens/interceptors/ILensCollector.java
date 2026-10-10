@@ -28,6 +28,14 @@ public interface ILensCollector {
 	}
 
 	/**
+	 * The id of the module integration this collector belongs to, or null. A collector of an integration is registered only while its setting is
+	 * on and its module is installed (see {@link ortus.boxlang.modules.bxlens.Integrations}).
+	 */
+	default String integration() {
+		return null;
+	}
+
+	/**
 	 * Is this collector too heavy or too revealing for the light collect level? Heavy collectors are not registered at that level.
 	 */
 	default boolean heavy() {

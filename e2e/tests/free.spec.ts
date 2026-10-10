@@ -33,10 +33,33 @@ test.describe( 'Free: what is open and what is locked', () => {
 		expect( ( await r.json() ).plus ).toBe( true );
 	} );
 
+	test( 'the ORM integration is free to see and says bx-orm is not installed', async ( { page, request } ) => {
+		const { csrf } = await session( request );
+		const list = await ( await request.get( `${ API }/integrations` ) ).json();
+		expect( list.integrations[ 0 ].id ).toBe( 'orm' );
+		expect( list.integrations[ 0 ].status ).toBe( 'notInstalled' );
+		// Not installed: switching on is refused, also on the free tier
+		const on = await request.post( `${ API }/integrations/orm`, { headers: { 'X-Lens-CSRF': csrf }, form: { enabled: 'true' } } );
+		expect( on.status() ).toBe( 409 );
+		// Changing the ORM statistics is a Plus feature: refused before anything else
+		const stats = await request.post( `${ API }/orm/statistics`, { headers: { 'X-Lens-CSRF': csrf }, form: { app: 'x', enabled: 'true' } } );
+		expect( stats.status() ).toBe( 403 );
+		expect( ( await stats.json() ).plus ).toBe( true );
+		await page.goto( '/~bxlens/index.bxm' );
+		await page.fill( '#pw', 'lens-demo' );
+		await page.click( '.go' );
+		await page.click( '.nav:has-text("ORM")' );
+		const sec = page.locator( '.main section:visible' );
+		await expect( sec.locator( '#orm-integration .chipx' ) ).toHaveText( 'Not installed' );
+		await expect( sec.locator( '#orm-integration input[type=checkbox]' ) ).toBeDisabled();
+		await expect( sec ).toContainText( 'Install bx-orm to enable' );
+		await expect( sec.locator( '.plusnote' ) ).toContainText( 'BoxLang+' );
+	} );
+
 	test( 'the free pages and reads still work', async ( { request } ) => {
 		await request.get( '/orders.bxm' );
 		await session( request );
-		for ( const p of [ 'overview', 'requests', 'inflight', 'executors', 'tasks', 'datasources', 'caches', 'logfiles', 'environment', 'modules', 'system', 'threads', 'queries', 'errors', 'reports', 'settings' ] ) {
+		for ( const p of [ 'overview', 'requests', 'inflight', 'executors', 'tasks', 'datasources', 'caches', 'logfiles', 'environment', 'modules', 'integrations', 'system', 'threads', 'queries', 'errors', 'reports', 'settings' ] ) {
 			const r = await request.get( `${ API }/${ p }` );
 			expect( r.status(), p ).toBe( 200 );
 		}
