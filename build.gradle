@@ -177,7 +177,7 @@ def bxAiVersion = '3.6.0-snapshot'
 def bxAiZip = file( "vendor/bx-ai-${bxAiVersion}.zip" )
 
 // The archive is bundled into the module, so it must be the one this build was written against
-def bxAiSha256 = '1e64c4ef4e54013a8d948fe7f853c34afb98cb7a7c8792f32b7d2bb820c3f9d8'
+def bxAiSha256 = 'dd48d2a96de29486847bc1a7f7f9e8c81431f96a819e8fe4723c9f9d5eac9ec2'
 task verifyBxAi( type: Verify ) {
 	src bxAiZip
 	algorithm 'SHA-256'

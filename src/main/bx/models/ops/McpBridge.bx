@@ -11,6 +11,7 @@
  * - withUrlGuard: the address is checked again immediately before every request (Java McpUrls.check), so the rules of the admin page hold
  *   at the moment of connecting. A refusal is kept as the reason and shown as it is, it holds no address and no secret.
  * - withRedirects( false ): a redirect is an error, the new address is never called.
+ * - withHttpVersion( "HTTP/1.1" ): no HTTP/2 upgrade request (h2c) on a plain http address, which some servers answer badly.
  * - withMaxResponseBytes: an answer longer than the limit is refused.
  * - withHandshake: initialize first, as the MCP specification asks. A server that does not know it is still used.
  * - no credentials: no token and no custom header except the user agent.
@@ -112,6 +113,7 @@ class {
 		return MCP( arguments.url )
 			.withTimeout( arguments.timeoutMs )
 			.withRedirects( false )
+			.withHttpVersion( "HTTP/1.1" )
 			.withMaxResponseBytes( static.MAX_BODY )
 			.withHandshake()
 			.withHeaders( { "User-Agent" : "bx-lens" } )
