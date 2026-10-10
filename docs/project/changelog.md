@@ -13,7 +13,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) an
 
 ### Added
 
-- The [Lensy](../console/ai.md) (BoxLang+): a chat with 32 [tools](../reference/ai-tools.md) over the data of the console, JVM introspection (threads, deadlocks, GC pressure, executor recommendations, a health sweep) and the bundled docs, on a local Ollama by default. Actions need an Approve click. New AI page, bar Ask link and live `ai.*` settings. See the [threat model](../security.md#ops-assistant-threat-model) and [Set up Ollama](../guides/ollama.md).
+- [Lensy](../console/ai.md#servers-lensy-can-ask-mcp) can ask MCP servers: the eleven Ortus documentation servers (all off) and servers the admin adds, with a per server list of allowed tools, an approval for custom servers and addresses checked on the server. See the [threat model](../security.md#mcp-servers).
+- The assistant is now called Lensy, with a mascot, in the drawer, the AI page and the bar.
+- The [Lensy](../console/ai.md) (BoxLang+): a chat with 32 [tools](../reference/ai-tools.md) over the data of the console, JVM introspection (threads, deadlocks, GC pressure, executor recommendations, a health sweep) and the bundled docs, on a local Ollama by default. Actions need an Approve click. New AI page, bar Ask link and live `ai.*` settings. See the [threat model](../security.md#lensy-threat-model) and [Set up Ollama](../guides/ollama.md).
 - Server identity on every record: host, address and an instance id on requests, errors, reports, query statistics, in flight entries, the audit log and the disk store files, plus `lensServer()`. See [`server`](../configuration.md#server) and [Server identity](../features.md#server-identity).
 - Five BIFs that return the console data as plain structs and arrays, in any request: `lensReport`, `lensErrors`, `lensQueries`, `lensInflight` and `lensLicense`. See [Data functions](../guides/bifs.md#data-functions).
 - The [BIFs panel](../panels/bifs.md) and the `collectors.bifs` collector: time per built-in function, from `postBIFInvocation`. It is heavy and off by default. It needs a BoxLang build with core pull request 657.

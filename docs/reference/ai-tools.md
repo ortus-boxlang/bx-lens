@@ -9,7 +9,7 @@ icon: lucide:wrench
 
 The [Lensy](../console/ai.md) answers by calling these tools. A tool is either **LOOK** (it reads what the console already shows) or **ACT** (it changes something and waits for your Approve click). The **Role** column says who may use it: `viewer and admin` means both console roles, `admin` means only the admin role. A viewer is not even offered the admin tools, and the server refuses them if the model asks anyway.
 
-Every call, whoever makes it, goes through one gate (the Toolbox): the license is checked (BoxLang+), the role, the read only mode and `console.actions`, the arguments are checked against the tool, the result is stripped of secrets and cut to 12,000 characters, and an `ai.tool` line is written to the [audit log](../security.md#audit-log). See the [threat model](../security.md#ops-assistant-threat-model).
+Every call, whoever makes it, goes through one gate (the Toolbox): the license is checked (BoxLang+), the role, the read only mode and `console.actions`, the arguments are checked against the tool, the result is stripped of secrets and cut to 12,000 characters, and an `ai.tool` line is written to the [audit log](../security.md#audit-log). See the [threat model](../security.md#lensy-threat-model).
 
 No tool takes SQL text. The database tools read metadata only. There is no tool to restart or stop the server, to take a heap dump or to read a file.
 
@@ -71,6 +71,20 @@ No tool takes SQL text. The database tools read metadata only. There is no tool 
 | `changeSetting` | CHANGES THE SERVER. Change one live Lens setting, for example thresholds.slowQueryMs. Settings about AI, access, the console and the disk store cannot be changed. The administrator must approve it first. | admin | ACT | `key`, `value` |
 
 An argument with a question mark is optional. `diagnose` is open to the viewer role, but a viewer gets only the parts of the sweep a viewer may see (executors, datasources, error rate, slow and running requests) and the answer says what was left out.
+
+## MCP tools
+
+Tools of the [MCP servers](../console/ai.md#servers-lensy-can-ask-mcp) the admin turned on are added to the list above. They are not in the catalog: they are found on each server (`tools/list`, 10 seconds, kept for 5 minutes) and filtered by the list the admin ticked.
+
+| Item | Rule |
+|---|---|
+| Name | `server.tool` for people (chips, approvals, audit), `server__tool` for the model. A character in a tool name other than a letter, digit, underscore or hyphen becomes `_`, and a name is cut to 64 characters. |
+| Description | `[Server name] description`, cut to 500 characters. |
+| Arguments | The schema the server published, reduced to properties with a simple type (text, number, whole number, true or false), a short description and the required names. Anything else is dropped. The call is checked against it: required arguments, types, 2000 characters at most, no control characters, names the schema does not have are dropped. |
+| Role | Admin: every enabled server. Viewer: only the built-in documentation servers. |
+| Approval | Built-in servers: none (except `sendFeedback`). Custom servers: your click every time, unless the server is marked trusted, read only. A call that needs a click is refused when `console.readOnly` is on, or `console.actions` or `ai.actions` is off. |
+| Gate | The same Toolbox as every other tool: BoxLang+, role, enabled and ticked, arguments, tool calls per answer (`ai.maxToolCalls`), 120 calls a minute, redaction and the 12,000 character cap. The result is wrapped with a reminder that it is data from outside. |
+| Audit | `ai.mcp server=... tool=... result=ok|denied|error ms=...` |
 
 ## Settings the agent cannot change
 

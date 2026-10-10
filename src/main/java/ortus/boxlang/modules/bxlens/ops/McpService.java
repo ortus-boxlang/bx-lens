@@ -384,7 +384,7 @@ public final class McpService {
 				wires.add( wire );
 				String desc = t.description().length() > 500 ? t.description().substring( 0, 500 ) + "..." : t.description();
 				out.add( new Tool( s.id(), s.name(), t.name(), wire, s.id() + "." + t.name(), "[" + s.name() + "] " + desc, cleanSchema( t.schema() ),
-				    s.builtin(), !s.builtin() && !s.trusted(), s.url() ) );
+				    s.builtin(), !s.builtin() && !s.trusted() || s.isWrite( t.name() ), s.url() ) );
 			}
 		}
 		return out;
@@ -497,6 +497,8 @@ public final class McpService {
 					tm.put( "name", t.name() );
 					tm.put( "description", t.description().length() > 200 ? t.description().substring( 0, 200 ) + "..." : t.description() );
 					tm.put( "allowed", s.allows( t.name() ) );
+					tm.put( "defaultOn", !s.isWrite( t.name() ) );
+					tm.put( "writes", s.isWrite( t.name() ) );
 					tools.add( tm );
 				}
 			}

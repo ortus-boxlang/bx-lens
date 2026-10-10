@@ -213,6 +213,25 @@ public class ToolboxMcpTest {
 	}
 
 	@Test
+	@DisplayName( "sendFeedback on a documentation server sends text to its maintainers, so it needs a click even though the server is builtin" )
+	void feedbackNeedsAClick() throws Exception {
+		this.fake.toolNames = List.of( "searchDocumentation", "getPage", "sendFeedback" );
+		this.mcp.discover( "boxlang" );
+		Toolbox box = box( "admin" );
+		assertThat( box.callMcp( wire( "boxlang", "sendFeedback" ), Map.of() ).status() ).isEqualTo( "denied" );
+		this.mcp.update( "boxlang", null, List.of( "sendFeedback" ) );
+		Toolbox.Result denied = approvalCall( box, wire( "boxlang", "sendFeedback" ), Map.of(), false );
+		assertThat( denied.status() ).isEqualTo( "denied" );
+		assertThat( this.fake.calls ).isEmpty();
+		this.audit.clear();
+		Toolbox.Result sent = approvalCall( box, wire( "boxlang", "sendFeedback" ), Map.of(), true );
+		assertThat( sent.status() ).isEqualTo( "ok" );
+		assertThat( this.fake.calls ).hasSize( 1 );
+		settings( Map.of( "console", Map.of( "readOnly", true ) ) );
+		assertThat( box.callMcp( wire( "boxlang", "sendFeedback" ), Map.of() ).text() ).contains( "read only" );
+	}
+
+	@Test
 	@DisplayName( "a trusted custom server runs without a click; the flag does nothing for approval-free builtin servers" )
 	void trustedRuns() throws Exception {
 		this.mcp.update( this.acme.id(), true, null );

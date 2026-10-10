@@ -56,4 +56,13 @@ WITH_AI=1 SKIP_BUILD=1 ./start.sh            # bx-ai is inside the module; this 
 
 Then open the console, go to Ask Lens, or open an error and press Explain with AI. The mock answers with the start of the prompt it received.
 
+### Trying the MCP servers
+
+```bash
+./start-mock-mcp.sh &                        # BoxLang mock of the MCP servers, http://127.0.0.1:11435/mcp.bxs/{server}
+LENS_MCP_BASE=http://127.0.0.1:11435/mcp.bxs WITH_AI=1 SKIP_BUILD=1 ./start.sh
+```
+
+`harness/mock-mcp` is a small BoxLang app (`Application.bx`, `mcp.bxs`) served by MiniServer. The built-in documentation servers (`boxlang`, `coldbox`, ...) answer `searchDocumentation` and `getPage`; `acme` is a custom server with `lookup`, `echo`, `leak` and `injected`; `plain` answers JSON instead of events, `nohandshake` rejects `initialize` like the GitBook servers do, `slow` takes three seconds and `broken` answers 500. `GET /mcp.bxs/_log` lists what was asked and `DELETE` clears it. `LENS_READONLY=true` and `LENS_SEED_OVERRIDES=harness/seed/readonly-mcp.json` start a read only console with servers already on, which the end to end tests use on port 8092.
+
 `LENS_LICENSE=plus` (the default in the e2e config), `trial`, `expired` or `none` shows each license state. Plus and trial turn on the disk store (`harness/.run/home/lens-data`) and the longer request history.

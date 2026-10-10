@@ -379,7 +379,7 @@
 					if (on && i < 0) { this.mcpDraft.push(name); } else if (!on && i >= 0) { this.mcpDraft.splice(i, 1); }
 				},
 				mcpSaveTools: async function (sv) {
-					var all = sv.tools.length > 0 && this.mcpDraft.length === sv.tools.length && sv.builtin;
+					var draft = this.mcpDraft, all = sv.builtin && sv.tools.length > 0 && sv.tools.every(function (t) { return t.defaultOn === (draft.indexOf(t.name) >= 0); });
 					if (await this.mcpCall(sv.id, "ai/mcp", {}, { id: sv.id, tools: JSON.stringify(all ? ["*"] : this.mcpDraft) })) { this.toast("Allowed tools saved"); }
 				},
 				// A hint as the address is typed. The server decides; this only saves a round trip.

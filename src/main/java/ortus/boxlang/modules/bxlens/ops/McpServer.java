@@ -41,8 +41,19 @@ public record McpServer( String id, String name, String url, boolean builtin, bo
 		return this.allowedTools.contains( ALL );
 	}
 
+	/**
+	 * Tools of the builtin servers that send something to the people who run the server (the GitBook feedback tool). "All tools" does not include
+	 * them: they must be ticked by name, and a call still needs a click.
+	 */
+	public static final Set<String> WRITES = Set.of( "sendFeedback" );
+
 	public boolean allows( String tool ) {
-		return allowsAll() || this.allowedTools.contains( tool );
+		return allowsAll() ? !isWrite( tool ) : this.allowedTools.contains( tool );
+	}
+
+	/** Does this tool send data to the people who run a builtin server, so that a click is needed whoever asks? */
+	public boolean isWrite( String tool ) {
+		return this.builtin && WRITES.contains( tool );
 	}
 
 	public McpServer with( boolean enabled, boolean trusted, List<String> allowed ) {

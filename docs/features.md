@@ -77,7 +77,7 @@ One page at `/~bxlens/index.bxm`, with its own password, an optional second view
 
 ### Lensy
 
-A chat in a drawer on every console page (and the full page of Ask Lens) that answers by calling tools: overview, requests, errors, queries, executors with concrete pool recommendations, threads, blocked threads and deadlocks, garbage collection pressure, datasources, logs, database metadata and a `diagnose` health sweep, plus a search of these docs. Actions (tasks, caches, run GC, integrations, a live setting) wait for an Approve click. Default model: Ollama on this machine. BoxLang+. See [the AI page](console/ai.md), [the tool list](reference/ai-tools.md) and the [threat model](security.md#ops-assistant-threat-model).
+A chat in a drawer on every console page (and the full page of Ask Lens) that answers by calling tools: overview, requests, errors, queries, executors with concrete pool recommendations, threads, blocked threads and deadlocks, garbage collection pressure, datasources, logs, database metadata and a `diagnose` health sweep, plus a search of these docs. Actions (tasks, caches, run GC, integrations, a live setting) wait for an Approve click. Default model: Ollama on this machine. Admins can also let it ask [MCP servers](console/ai.md#servers-lensy-can-ask-mcp), such as the Ortus documentation, which are all off until turned on. BoxLang+. See [the AI page](console/ai.md), [the tool list](reference/ai-tools.md) and the [threat model](security.md#lensy-threat-model).
 
 ### Roles and control
 

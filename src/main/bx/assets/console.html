@@ -732,10 +732,10 @@
                           <td class="mono dim mcpurl" x-text="sv.url"></td>
                           <td><label class="sw"><input type="checkbox" class="mcp-on" :checked="sv.enabled" :disabled="!mcp.canChange || mcpBusy === sv.id" :aria-label="'Use ' + sv.name" @click.prevent="mcpToggle(sv)"><span></span></label></td>
                           <td><span class="mcpstatus" :class="sv.status" x-text="mcpStatus(sv)"></span></td>
-                          <td class="mono"><span x-text="sv.status === 'ok' ? (sv.allowAll ? sv.toolCount + ' of ' + sv.toolCount : sv.allowedTools.length + ' of ' + sv.toolCount) : '-'"></span></td>
+                          <td class="mono"><span x-text="sv.status === 'ok' ? sv.tools.filter(function (x) { return x.allowed; }).length + ' of ' + sv.toolCount : '-'"></span></td>
                           <td><label class="sw" x-show="!sv.builtin"><input type="checkbox" class="mcp-trusted" :checked="sv.trusted" :disabled="!mcp.canChange || mcpBusy === sv.id" :aria-label="'Trust ' + sv.name + ' as read only'" @click.prevent="mcpTrust(sv)"><span></span></label><span class="dim" x-show="sv.builtin" title="Built-in servers only read documentation">no click needed</span></td>
                           <td class="tools" style="justify-content:flex-end">
-                            <button class="btn mini mcp-pick" :disabled="sv.status !== 'ok'" @click="mcpOpen = mcpOpen === sv.id ? '' : sv.id; mcpDraft = sv.allowAll ? sv.tools.map(function (x) { return x.name; }) : sv.allowedTools.slice()">Tools</button>
+                            <button class="btn mini mcp-pick" :disabled="sv.status !== 'ok'" @click="mcpOpen = mcpOpen === sv.id ? '' : sv.id; mcpDraft = sv.tools.filter(function (x) { return x.allowed; }).map(function (x) { return x.name; })">Tools</button>
                             <button class="btn mini mcp-test" :disabled="!mcp.canChange || mcpBusy === sv.id" @click="mcpTest(sv)">Test</button>
                             <button class="btn mini mcp-remove" x-show="!sv.builtin" :disabled="!mcp.canChange || mcpBusy === sv.id" @click="mcpRemove(sv)">Remove</button>
                           </td>
@@ -743,7 +743,7 @@
                         <tr class="mcppick" x-show="mcpOpen === sv.id"><td colspan="7">
                           <div class="mcppicker">
                             <template x-for="tl in sv.tools" :key="tl.name">
-                              <label class="mcptool"><input type="checkbox" :checked="mcpDraft.indexOf(tl.name) >= 0" :disabled="!mcp.canChange" @change="mcpPickTool(tl.name, $event.target.checked)"><b class="mono" x-text="tl.name"></b> <span class="dim" x-text="tl.description"></span></label>
+                              <label class="mcptool"><input type="checkbox" :checked="mcpDraft.indexOf(tl.name) >= 0" :disabled="!mcp.canChange" @change="mcpPickTool(tl.name, $event.target.checked)"><b class="mono" x-text="tl.name"></b> <span class="chipx hid" x-show="tl.writes" title="Sends text to the people who run this documentation. Every call asks for your click.">sends feedback, asks first</span> <span class="dim" x-text="tl.description"></span></label>
                             </template>
                             <div class="tools" style="margin-top:6px"><button class="btn primary mcp-save-tools" :disabled="!mcp.canChange || mcpBusy === sv.id" @click="mcpSaveTools(sv)">Save allowed tools</button><span class="dim" x-show="!sv.builtin && !sv.allowedTools.length">None allowed yet: Lensy sees no tool of this server until you pick some.</span></div>
                           </div>

@@ -7,7 +7,9 @@ icon: lucide:bot
 
 # The AI page and Lensy
 
-Lensy is a chat inside the console. You ask in plain words ("Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "What is slow right now?") and it answers by looking at the server through a set of [tools](../reference/ai-tools.md): requests, errors, queries, executors, threads, memory, datasources and the Lens documentation. It never gets more than the user who is signed in. It is a **BoxLang+** feature. Copy prompt and the ChatGPT and Claude buttons of [Ask Lens](ask-lens-and-ai.md) stay free.
+![Lensy](../assets/lensy.svg){ width=96 }
+
+**Lensy is the Box Agent for your BoxLang server.** It is a chat inside the console. You ask in plain words ("Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "What is slow right now?") and it answers by looking at the server through a set of [tools](../reference/ai-tools.md): requests, errors, queries, executors, threads, memory, datasources and the Lens documentation. It never gets more than the user who is signed in. It is a **BoxLang+** feature. Copy prompt and the ChatGPT and Claude buttons of [Ask Lens](ask-lens-and-ai.md) stay free.
 
 ![The assistant with a tool call and an answer](../assets/screenshots/console-agent.png)
 
@@ -48,6 +50,32 @@ The actions need the admin role, BoxLang+, a console that is not [read only](set
 
 ![The AI page](../assets/screenshots/console-ai.png)
 
+## Servers Lensy can ask (MCP)
+
+An MCP server gives Lensy more tools. Lens lists the eleven Ortus documentation servers (BoxLang, ColdBox, CommandBox, TestBox, WireBox, LogBox, CacheBox, ContentBox, qb, Quick and cbauth). They are built in, **all off**, and cannot be removed or have their address changed. The admin can also add servers of their own. The list is on the AI page, under **Servers Lensy can ask (MCP)**, and is saved with the other console settings in `config/bxlens-settings.json` under `mcp.servers`. A saved entry that is not valid is skipped and shown on the page; it never stops the server from starting.
+
+| Column | Meaning |
+|---|---|
+| On | Lensy may use the server. Turning one on asks first and shows the address: **the words Lensy puts in the tool arguments, usually your question, are sent to that server.** |
+| Status | `ok`, `unreachable` with the reason (could not connect, timed out, HTTP 503...), `refused` when the address is no longer allowed, or `off`. A server that does not answer never stops Lensy: it carries on with the other tools. |
+| Tools | How many of the server's tools Lensy may use. **Tools** opens the list and lets the admin tick which ones. A built-in server allows all of its tools, except `sendFeedback` (it sends text to the people who write the documentation), which has to be ticked by name and always asks for your click. A custom server allows none until the admin ticks some. |
+| Trusted, read only | Custom servers only. A custom server's calls ask for your Approve click every time. Mark it trusted to say its tools only read, and they run without a click. |
+| Test | Connects and lists the tools again (ten tests a minute for each session). |
+
+Rules for a custom server:
+
+- The name is 1 to 40 characters. At most 20 custom servers.
+- The address must be **https**. Plain `http` is accepted only for `localhost`, `127.x.x.x` and `[::1]`.
+- No user name or password in the address, no `#` fragment, at most 500 characters.
+- Every address the host name resolves to must be public. Private (10.x, 172.16 to 31.x, 192.168.x), loopback, link-local (169.254.x.x, which holds the cloud metadata address), unique local (fc00::/7), carrier-grade NAT and multicast addresses are refused, when the server is added and again before every connection. Redirects are never followed.
+- **There is no way to add headers or credentials in this version.** Lens sends no API key and no cookie to an MCP server, so a server that needs authentication cannot be used yet.
+
+Names: Lensy shows a tool as `server.tool` (for example `boxlang.searchDocumentation`) in chips, approvals and the audit log. The model is given `server__tool`, because model providers do not accept a dot in a tool name. A tool description is shown to the model with the server's name in front of it: `[BoxLang docs] Search across the documentation...`.
+
+Who can use them: the admin can use every enabled server. A viewer can use the tools of enabled **built-in** servers, and nothing else, and cannot see or change the list. All changes are admin only, need BoxLang+, are refused when the console is read only, and are in the audit log as `ai.mcp.change`. Every call is in the audit log as `ai.mcp` with the server, the tool, `ok` or `denied`, and the milliseconds (never the arguments).
+
+What comes back from a server is **untrusted content from the internet**. Lens wraps it as data, hides secrets in it, cuts it to 12,000 characters, and the system prompt tells Lensy not to follow instructions found in it. Read the [threat model](../security.md#mcp-servers) before turning a server on.
+
 ## The settings
 
 The AI page changes these live. They apply at once and are saved with the other [console overrides](settings.md). See [`ai`](../configuration.md#ai) for the defaults.
@@ -77,7 +105,7 @@ On Free the page is locked:
 
 ## What leaves the server
 
-Every question and every tool result goes to the provider. Lens hides secrets and caps every result at 12,000 characters first, but the results can still hold request paths, error messages, thread names, log lines and settings. **A local model keeps all of it inside your network. A hosted provider receives it.** Pick the provider with that in mind. See the [threat model](../security.md#ops-assistant-threat-model).
+Every question and every tool result goes to the provider. When Lensy uses an [MCP server](#servers-lensy-can-ask-mcp), the words in the tool arguments also go to that server. Lens hides secrets and caps every result at 12,000 characters first, but the results can still hold request paths, error messages, thread names, log lines and settings. **A local model keeps all of it inside your network. A hosted provider receives it.** Pick the provider with that in mind. See the [threat model](../security.md#lensy-threat-model).
 
 ## Limits
 

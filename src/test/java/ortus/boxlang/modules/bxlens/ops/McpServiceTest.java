@@ -272,6 +272,27 @@ public class McpServiceTest {
 	}
 
 	@Test
+	@DisplayName( "the feedback tool of a documentation server is left out of all tools, and needs a click when it is ticked by name" )
+	void feedbackToolIsAWrite() throws Exception {
+		this.fake.toolNames = List.of( "searchDocumentation", "getPage", "sendFeedback" );
+		this.mcp.enable( "boxlang", true );
+		this.mcp.discover( "boxlang" );
+		assertThat( this.mcp.tools( true ).stream().map( McpService.Tool::tool ).toList() ).containsExactly( "searchDocumentation", "getPage" );
+		this.mcp.update( "boxlang", null, List.of( "searchDocumentation", "sendFeedback" ) );
+		List<McpService.Tool> tools = this.mcp.tools( true );
+		assertThat( tools.stream().map( McpService.Tool::tool ).toList() ).containsExactly( "searchDocumentation", "sendFeedback" );
+		assertThat( tools.get( 0 ).needsApproval() ).isFalse();
+		assertThat( tools.get( 1 ).needsApproval() ).isTrue();
+		Map<String, Object> row = rows( this.mcp.view( true ) ).get( "boxlang" );
+		assertThat( row.get( "toolCount" ) ).isEqualTo( 3 );
+		@SuppressWarnings( "unchecked" )
+		List<Map<String, Object>> shown = ( List<Map<String, Object>> ) row.get( "tools" );
+		assertThat( shown.get( 2 ).get( "writes" ) ).isEqualTo( true );
+		assertThat( shown.get( 2 ).get( "defaultOn" ) ).isEqualTo( false );
+		assertThat( shown.get( 0 ).get( "defaultOn" ) ).isEqualTo( true );
+	}
+
+	@Test
 	@DisplayName( "the signature changes when the tools offered to the model change" )
 	void signature() throws Exception {
 		String empty = this.mcp.signature( true );
