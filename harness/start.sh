@@ -37,6 +37,9 @@ sed -i "s|\"reloadAssets\": true|\"reloadAssets\": ${LENS_RELOAD_ASSETS:-true}|"
 sed -i "s|@LENS_LICENSE@|${LENS_LICENSE:-}|g" "$RUN/home/config/boxlang.json"
 # LENS_SERVER_HEADER=true also sends X-BxLens-Server. LENS_SERVER_NAME and LENS_SERVER_ADDRESS (environment) set the server identity
 sed -i "s|@LENS_SERVER_HEADER@|${LENS_SERVER_HEADER:-false}|g" "$RUN/home/config/boxlang.json"
+# LENS_MCP_BASE=http://127.0.0.1:11435/mcp.bxs serves the builtin MCP documentation servers from the mock (harness/start-mock-mcp.sh) at base/id,
+# so nothing needs the internet. Empty uses the real servers.
+sed -i "s|@LENS_MCP_BASE@|${LENS_MCP_BASE:-}|g" "$RUN/home/config/boxlang.json"
 cp -R "$ROOT/build/modules/bx-lens" "$RUN/home/modules/bxLens"
 # DEV=1 serves the UI files straight from src/main/bx/assets, so edits show on refresh (needs dev.reloadAssets)
 if [ -n "${DEV:-}" ]; then

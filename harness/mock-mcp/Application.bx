@@ -1,0 +1,19 @@
+/**
+ * [BoxLang]
+ *
+ * Copyright [2026] [Ortus Solutions, Corp]
+ */
+/**
+ * The stand-in for the MCP servers of the Ortus documentation (and for a custom server), used by the BX Lens end to end tests so they need no
+ * internet. See mcp.bxs. Application scope holds the log of what was asked.
+ */
+class {
+
+	this.name = "bxlens-mock-mcp"
+
+	function onApplicationStart() {
+		application.log = []
+		return true
+	}
+
+}

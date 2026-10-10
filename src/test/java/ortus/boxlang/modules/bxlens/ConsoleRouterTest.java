@@ -29,6 +29,15 @@ public class ConsoleRouterTest {
 	}
 
 	@Test
+	@DisplayName( "every MCP route is for the admin role, reading included" )
+	void mcpRoutesAreAdminOnly() {
+		for ( String r : new String[] { "ai/mcp", "ai/mcp/boxlang/enable", "ai/mcp/boxlang/test", "ai/mcp/acme" } ) {
+			assertWithMessage( r ).that( ConsoleRouter.ADMIN_ONLY.stream().anyMatch( r::startsWith ) ).isTrue();
+		}
+		assertThat( ConsoleRouter.VIEWER_POST ).containsExactly( "agent/chat", "agent/reset", "agent/approve" );
+	}
+
+	@Test
 	@DisplayName( "the pages and settings a viewer does not get" )
 	void viewer() {
 		assertThat( ConsoleRouter.ADMIN_PAGES ).containsExactly( "logfiles", "environment", "system", "threads", "ai" );

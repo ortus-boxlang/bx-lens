@@ -192,3 +192,22 @@ tr.row.sel td { background: var(--sel); }
 .aitoggle { display: flex; justify-content: space-between; align-items: center; gap: 10px; background: var(--input); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; font-size: 12.5px; }
 .aikey { margin-top: 6px; max-width: 520px; }
 @media (max-width: 760px) { .agent.drawer { height: calc(100vh - 90px); } }
+
+/* Lensy, the mascot (sprite symbols lensy-idle, lensy-think, lensy-think-still, lensy-happy, lensy-error in icons.svg) */
+.lensy { width: 28px; height: 28px; flex: none; vertical-align: middle; }
+.lensy.sm { width: 22px; height: 22px; } .lensy.av { width: 28px; height: 28px; margin-top: 2px; } .lensy.big { width: 64px; height: 64px; display: block; margin: 0 0 8px; }
+.lensy.head { width: 32px; height: 32px; vertical-align: -8px; margin-right: 4px; }
+.fab .lensy { width: 36px; height: 36px; }
+.lname { display: inline-flex; align-items: center; gap: 6px; }
+.amsg.assistant { display: flex; gap: 8px; align-items: flex-start; } .amsg.assistant > div { flex: 1; min-width: 0; }
+@keyframes lensy-wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+.lensy.think { animation: lensy-wiggle 2.4s ease-in-out infinite; transform-origin: 50% 90%; }
+@media (prefers-reduced-motion: reduce) { .lensy.think { animation: none; } }
+
+/* MCP servers */
+.mcptable th { text-align: left; font: 600 11px var(--mono); color: var(--mute); padding: 4px 8px; } .mcptable td { padding: 6px 8px; vertical-align: middle; border-top: 1px solid var(--line); }
+.mcpurl { max-width: 260px; overflow-wrap: anywhere; font-size: 11px; }
+.mcpstatus { font: 12px var(--mono); } .mcpstatus.ok { color: var(--ok); } .mcpstatus.unreachable, .mcpstatus.refused { color: var(--crit); } .mcpstatus.pending, .mcpstatus.disabled { color: var(--mute); }
+.mcppicker { display: flex; flex-direction: column; gap: 4px; background: var(--input); border-radius: 6px; padding: 8px; } .mcptool { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.mcpadd { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; } .mcpadd .aifield { flex: 1; min-width: 200px; }
+.srvbadge { font: 600 10px var(--mono); background: var(--sel); color: var(--cyan); border: 1px solid var(--cyan); border-radius: 8px; padding: 0 6px; margin-right: 4px; }

@@ -4,6 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 const PORT = process.env.PORT || '8085';
 const FREE_PORT = process.env.FREE_PORT || '8090';
 const ORM_PORT = process.env.ORM_PORT || '8091';
+const MCP_PORT = process.env.MCP_PORT || '11435';
 const chromium = process.env.LENS_CHROMIUM; // optional path to a Chromium build, for machines where `playwright install` is not possible
 
 export default defineConfig( {
@@ -34,13 +35,22 @@ export default defineConfig( {
 			timeout: 30_000,
 			reuseExistingServer: !process.env.CI,
 		},
+		// Stand-ins for the MCP servers (harness/mock-mcp, written in BoxLang, served by its own MiniServer): the specs need no internet.
+				{
+			command: 'bash ../harness/start-mock-mcp.sh',
+			url: `http://127.0.0.1:${ MCP_PORT }/mcp.bxs/_log`,
+			timeout: 120_000,
+			reuseExistingServer: !process.env.CI,
+			stdout: 'pipe',
+			env: { MOCK_MCP_PORT: MCP_PORT },
+		},
 		{
 			command: 'bash ../harness/start.sh',
 			url: `http://127.0.0.1:${ PORT }/index.bxm`,
 			timeout: 240_000,
 			reuseExistingServer: !process.env.CI,
 			stdout: 'pipe',
-			env: { PORT, SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: process.env.LENS_LICENSE ?? 'plus', LENS_TEST_API_KEY: 'sk-live-0123456789supersecret' },
+			env: { PORT, SKIP_BUILD: process.env.SKIP_BUILD ?? '1', LENS_LICENSE: process.env.LENS_LICENSE ?? 'plus', LENS_TEST_API_KEY: 'sk-live-0123456789supersecret', LENS_MCP_BASE: `http://127.0.0.1:${ MCP_PORT }/mcp.bxs` },
 		},
 		// A second server without a license, to prove what stays free and what is locked
 		{

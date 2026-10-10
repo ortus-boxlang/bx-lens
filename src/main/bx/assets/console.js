@@ -185,7 +185,20 @@
 				},
 				openAgentWhenReady: function () { var self = this; this.loadAgent().then(function () { self.openAgent(); }); },
 				// ---- Lensy: a floating drawer on every page, and the full page of Ask Lens ----
-				agent: { st: null, open: false, msgs: [], busy: false, input: "", ctl: null },
+				agent: { st: null, open: false, msgs: [], busy: false, input: "", ctl: null, mood: "idle", moodTimer: null },
+				// Lensy's face: idle, think (while a turn runs), happy (after an answer, for a few seconds), error. Reduced motion gets a still face.
+				reducedMotion: function () { try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } },
+				lensyHref: function (kind) {
+					var k = kind || this.agent.mood || "idle";
+					if (k === "think") { return this.reducedMotion() ? "#lensy-think-still" : "#lensy-think"; }
+					return "#lensy-" + k;
+				},
+				agentMsgMood: function (i) { return i === this.agent.msgs.length - 1 && this.agent.mood !== "think" ? this.agent.mood : "idle"; },
+				setMood: function (mood, backAfterMs) {
+					this.agent.mood = mood;
+					if (this.agent.moodTimer) { clearTimeout(this.agent.moodTimer); this.agent.moodTimer = null; }
+					if (backAfterMs) { var self = this; this.agent.moodTimer = setTimeout(function () { self.agent.mood = "idle"; }, backAfterMs); }
+				},
 				agentExamples: ["Do we have any blocked threads?", "How healthy are the executors and how do I improve them?", "How many requests did we serve and what is the error rate?", "What is slow right now?"],
 				agentOn: function () { return !!(this.agent.st && this.agent.st.available); },
 				loadAgent: async function () { try { this.agent.st = await (await this.api("agent/status")).json(); } catch (e) { this.agent.st = null; } },
@@ -210,7 +223,7 @@
 				sendAgent: async function (text) {
 					var q = (text !== undefined ? text : this.agent.input).trim();
 					if (!q || this.agent.busy) { return; }
-					this.agent.input = ""; this.agent.busy = true;
+					this.agent.input = ""; this.agent.busy = true; this.setMood("think");
 					var self = this, m = { role: "assistant", parts: [], done: false };
 					this.agent.msgs.push({ role: "user", text: q });
 					this.agent.msgs.push(m);
@@ -248,6 +261,7 @@
 						if (e.name !== "AbortError") { m.parts.push({ type: "error", text: "The connection to the server was lost." }); }
 					} finally {
 						m.done = true; this.agent.busy = false; this.agent.ctl = null;
+						this.setMood(m.parts.some(function (p) { return p.type === "error"; }) ? "error" : "happy", 8000);
 						// A card nobody answered is no longer waiting
 						m.parts.forEach(function (p) { if (p.type === "approval" && p.state === "pending") { p.state = "closed"; } });
 						this.$nextTick(function () { self.scrollAgent(); });
@@ -265,7 +279,7 @@
 				resetAgent: async function () {
 					this.stopAgent();
 					try { await this.api("agent/reset", { method: "POST" }); } catch (e) { /* the page keeps what it has */ }
-					this.agent.msgs = []; this.agent.busy = false; this.toast("Conversation cleared");
+					this.agent.msgs = []; this.agent.busy = false; this.setMood("idle"); this.toast("Conversation cleared");
 				},
 				agentRag: function () { var s = this.agent.st; return s && s.rag ? (s.rag.mode === "embeddings" ? "docs: embeddings" : s.rag.mode === "keywords" ? "docs: keywords" : s.rag.mode === "off" ? "docs: off" : "docs: on first use") : ""; },
 				toolLabel: function (p) {
@@ -318,6 +332,70 @@
 					}
 				},
 				// ---- the AI page ----
+				// ---- MCP servers (admin) ----
+				mcp: null, mcpError: "", mcpBusy: "", mcpConfirm: null, mcpOpen: "", mcpDraft: [], mcpAdd: { name: "", url: "", hint: "" },
+				loadMcp: async function () {
+					try { var r = await this.api("ai/mcp"); this.mcp = r.ok ? await r.json() : null; } catch (e) { this.mcp = null; }
+				},
+				mcpStatus: function (sv) {
+					if (sv.status === "ok") { return sv.enabled ? "ok" : "reachable, off"; }
+					if (sv.status === "pending") { return "not looked at yet"; }
+					if (sv.status === "disabled") { return "off"; }
+					return sv.status + (sv.reason ? ": " + sv.reason : "");
+				},
+				// One call to the server; the answer is the whole list again
+				mcpCall: async function (id, path, opts, form) {
+					this.mcpBusy = id; this.mcpError = "";
+					try {
+						var o = Object.assign({ method: "POST" }, opts || {});
+						if (form) { o.headers = { "Content-Type": "application/x-www-form-urlencoded" }; o.body = new URLSearchParams(form).toString(); }
+						var r = await this.api(path, o), j = await r.json().catch(function () { return {}; });
+						if (r.ok) { this.mcp = j; await this.loadAgent(); return true; }
+						this.mcpError = j.error || "The change was refused."; return false;
+					} finally { this.mcpBusy = ""; }
+				},
+				mcpToggle: function (sv) {
+					if (!this.mcp.canChange) { return; }
+					if (sv.enabled) { this.mcpEnable(sv, false, false); } else { this.mcpConfirm = { id: sv.id, name: sv.name, url: sv.url }; }
+				},
+				mcpEnable: async function (sv, on, confirmed) {
+					if (on && !confirmed) { return; }
+					this.mcpConfirm = null;
+					if (await this.mcpCall(sv.id, "ai/mcp/" + encodeURIComponent(sv.id) + "/enable", {}, { enabled: on ? "true" : "false" })) { this.toast(sv.name + (on ? " is on" : " is off")); }
+				},
+				mcpTrust: async function (sv) {
+					if (!this.mcp.canChange) { return; }
+					await this.mcpCall(sv.id, "ai/mcp", {}, { id: sv.id, trusted: sv.trusted ? "false" : "true" });
+				},
+				mcpTest: async function (sv) {
+					if (await this.mcpCall(sv.id, "ai/mcp/" + encodeURIComponent(sv.id) + "/test")) { this.toast("Looked at " + sv.name); }
+				},
+				mcpRemove: async function (sv) {
+					if (!confirm("Remove " + sv.name + "?")) { return; }
+					await this.mcpCall(sv.id, "ai/mcp/" + encodeURIComponent(sv.id), { method: "DELETE" });
+				},
+				mcpPickTool: function (name, on) {
+					var i = this.mcpDraft.indexOf(name);
+					if (on && i < 0) { this.mcpDraft.push(name); } else if (!on && i >= 0) { this.mcpDraft.splice(i, 1); }
+				},
+				mcpSaveTools: async function (sv) {
+					var all = sv.tools.length > 0 && this.mcpDraft.length === sv.tools.length && sv.builtin;
+					if (await this.mcpCall(sv.id, "ai/mcp", {}, { id: sv.id, tools: JSON.stringify(all ? ["*"] : this.mcpDraft) })) { this.toast("Allowed tools saved"); }
+				},
+				// A hint as the address is typed. The server decides; this only saves a round trip.
+				mcpUrlHint: function () {
+					var u = this.mcpAdd.url.trim().toLowerCase(), h = "";
+					if (u && u.indexOf("https://") !== 0) {
+						var rest = u.slice(7), c1 = rest.indexOf(":"), c2 = rest.indexOf("/"), cut = c1 < 0 ? c2 : c2 < 0 ? c1 : Math.min(c1, c2), host = cut < 0 ? rest : rest.slice(0, cut);
+						var loop = host === "localhost" || host === "[::1]" || host.indexOf("127.") === 0;
+						if (u.indexOf("http://") === 0 && !loop) { h = "Only https:// is accepted. Plain http works for localhost only."; }
+					}
+					if (u.indexOf("@") > 0 && u.indexOf("://") > 0 && u.indexOf("@") < (u.indexOf("/", u.indexOf("://") + 3) < 0 ? u.length : u.indexOf("/", u.indexOf("://") + 3))) { h = "Leave the user name and password out of the address."; }
+					this.mcpAdd.hint = h;
+				},
+				mcpAddServer: async function () {
+					if (await this.mcpCall("+", "ai/mcp", {}, { name: this.mcpAdd.name.trim(), url: this.mcpAdd.url.trim() })) { this.mcpAdd = { name: "", url: "", hint: "" }; this.toast("Server added, switched off"); }
+				},
 				aic: null, aiForm: {}, aiSaving: false, aiTesting: false, aiTestOut: null, aiError: "",
 				loadAiConfig: async function () {
 					try { this.aic = await (await this.api("ai/config")).json(); this.aiForm = Object.assign({}, this.aic.values); } catch (e) { this.aic = null; }
@@ -499,7 +577,7 @@
 					if (this.tab !== "logfiles" && this.es) { this.connect(); }
 					if (this.tab === "caches") { this.loadCaches(); this.cacheTimer = setInterval(function () { if (self.tab === "caches" && !document.hidden) { self.loadCaches(); } }, 5000); } else { clearInterval(this.cacheTimer); }
 					if (this.tab === "designer" && !this.bar) { this.loadBar(); }
-					if (this.tab === "ai") { this.loadAiConfig(); }
+					if (this.tab === "ai") { this.loadAiConfig(); this.loadMcp(); }
 					if (this.tab === "ask") { this.loadAgent(); }
 					this.$nextTick(function () { self.placeAgent(); });
 					if (this.tab === "threads") {
